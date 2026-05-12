@@ -1,4 +1,6 @@
-﻿namespace RotationSolver.RebornRotations.PVPRotations.Melee;
+﻿using RotationSolver.Basic.Actions.PvPTargetSelection;
+
+namespace RotationSolver.RebornRotations.PVPRotations.Melee;
 
 [Rotation("Default PVP", CombatType.PvP, GameVersion = "7.5")]
 [SourceCode(Path = "main/RebornRotations/PVPRotations/Melee/SAM_Default.PvP.cs")]
@@ -45,7 +47,9 @@ public sealed class SAM_DefaultPvP : SamuraiRotation
 			return true;
 		}
 
-		if (SmitePvP.CanUse(out action, usedUp: true) && SmitePvP.Target.Target.GetHealthRatio() <= SmitePvPPercent)
+		if (SmitePvP.CanUse(out action, usedUp: true)
+			&& SmitePvP.Target.Target.GetHealthRatio() <= SmitePvPPercent
+			&& PvPBurstGate.ShouldUse(SmitePvP, PvPBurstIntent.Secure))
 		{
 			return true;
 		}

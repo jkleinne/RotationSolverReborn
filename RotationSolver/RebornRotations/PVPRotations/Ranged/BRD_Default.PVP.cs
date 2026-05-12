@@ -1,4 +1,6 @@
-﻿namespace RotationSolver.RebornRotations.PVPRotations.Ranged;
+﻿using RotationSolver.Basic.Actions.PvPTargetSelection;
+
+namespace RotationSolver.RebornRotations.PVPRotations.Ranged;
 
 [Rotation("Default PVP", CombatType.PvP, GameVersion = "7.5")]
 [SourceCode(Path = "main/RebornRotations/PVPRotations/Ranged/BRD_Default.PvP.cs")]
@@ -63,12 +65,12 @@ public sealed class BRD_DefaultPvP : BardRotation
 			}
 		}
 
-		if (EagleEyeShotPvP.CanUse(out action))
+		if (EagleEyeShotPvP.CanUse(out action) && PvPBurstGate.ShouldUse(EagleEyeShotPvP))
 		{
 			return true;
 		}
 
-		if (EncoreOfLightPvP.CanUse(out action, skipAoeCheck: true))
+		if (EncoreOfLightPvP.CanUse(out action, skipAoeCheck: true) && PvPBurstGate.ShouldUse(EncoreOfLightPvP))
 		{
 			return true;
 		}
@@ -80,22 +82,22 @@ public sealed class BRD_DefaultPvP : BardRotation
 	#region GCDs
 	protected override bool GeneralGCD(out IAction? action)
 	{
-		if (HarmonicArrowPvP.CanUse(out action))
+		if (HarmonicArrowPvP.CanUse(out action) && PvPBurstGate.ShouldUse(HarmonicArrowPvP))
 		{
 			return true;
 		}
 
-		if (PitchPerfectPvP.CanUse(out action, skipAoeCheck: true))
+		if (PitchPerfectPvP.CanUse(out action, skipAoeCheck: true) && PvPBurstGate.ShouldUse(PitchPerfectPvP))
 		{
 			return true;
 		}
 
-		if (BlastArrowPvP.CanUse(out action))
+		if (BlastArrowPvP.CanUse(out action) && PvPBurstGate.ShouldUse(BlastArrowPvP))
 		{
 			return true;
 		}
 
-		if (ApexArrowPvP.CanUse(out action))
+		if (ApexArrowPvP.CanUse(out action) && PvPBurstGate.ShouldUse(ApexArrowPvP))
 		{
 			return true;
 		}

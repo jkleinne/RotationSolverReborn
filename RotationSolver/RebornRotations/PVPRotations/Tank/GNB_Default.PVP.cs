@@ -1,4 +1,6 @@
-﻿namespace RotationSolver.RebornRotations.PVPRotations.Tank;
+﻿using RotationSolver.Basic.Actions.PvPTargetSelection;
+
+namespace RotationSolver.RebornRotations.PVPRotations.Tank;
 
 [Rotation("Default PVP", CombatType.PvP, GameVersion = "7.5")]
 [SourceCode(Path = "main/RebornRotations/PVPRotations/Tank/GNB_Default.PvP.cs")]
@@ -89,7 +91,9 @@ public sealed class GNB_DefaultPvP : GunbreakerRotation
 			return true;
 		}
 
-		if (Target.GetHealthRatio() * 100 <= 50 && BlastingZonePvP.CanUse(out action))
+		if (Target.GetHealthRatio() * 100 <= 50
+			&& BlastingZonePvP.CanUse(out action)
+			&& PvPBurstGate.ShouldUse(BlastingZonePvP, PvPBurstIntent.Secure))
 		{
 			return true;
 		}
