@@ -207,6 +207,8 @@ public sealed class RotationSolverPlugin : IAsyncDalamudPlugin
 	}
 
 	private static bool? _previousTerritoryIsPvP;
+	private const int PvPAutoOnPollIntervalTicks = 30;
+	private const int PvPAutoOnMaxPollAttempts = 120;
 
 	private static void ClientState_TerritoryChanged(uint id)
 	{
@@ -233,15 +235,71 @@ public sealed class RotationSolverPlugin : IAsyncDalamudPlugin
 			PluginLog.Warning($"Failed on Territory changed: {ex.Message}");
 		}
 
-		// PvP queue areas (e.g., Wolves' Den, ID 250) are themselves IsPvpZone=True, so a typical
-		// queue path (Wolves' Den -> CC arena) is a PvP->PvP transition with no signal here. The
-		// actual match start is reported by DutyState.DutyStarted instead. We only handle the
-		// PvP -> non-PvP exit case here, as a safety net for /leaveduty before DutyCompleted fires.
+		// PvP -> non-PvP exit: safety net for /leaveduty before DutyCompleted fires.
 		if (previousIsPvP == true && newTerritory.IsPvP == false
 			&& Service.Config.AutoOffPvPMatchEnd && DataCenter.State)
 		{
+			PluginLog.Information("[PvP] Leaving PvP territory; cancelling state.");
 			RSCommands.CancelState();
 		}
+
+		// Entering a PvP territory: arm a poll that fires AutoOn once we're actually bound to the
+		// duty and the loading screen has cleared. Dalamud's DutyState.DutyStarted event is driven
+		// by a server "Duty Commenced" actor-control packet that is not reliably emitted for CC;
+		// its framework fallback only updates the internal IsDutyStarted bool when
+		// BoundByDuty && InCombat without raising the event. Mirror the same BoundByDuty signal
+		// here so we no longer depend on the packet being delivered.
+		if (newTerritory.IsPvP && Service.Config.AutoOnPvPMatchStart)
+		{
+			PluginLog.Information($"[PvP] Entered PvP territory {id} ({newTerritory.Name}); arming AutoOn poll.");
+			SchedulePvPAutoOnAttempt(territoryId: id, attempt: 0);
+		}
+	}
+
+	private static void SchedulePvPAutoOnAttempt(uint territoryId, int attempt)
+	{
+		_ = Svc.Framework.RunOnTick(() =>
+		{
+			if (DataCenter.Territory == null
+				|| !DataCenter.Territory.IsPvP
+				|| DataCenter.Territory.Id != territoryId)
+			{
+				return;
+			}
+
+			if (DataCenter.State)
+			{
+				return;
+			}
+
+			var loadingScreenActive = Svc.Condition[ConditionFlag.BetweenAreas]
+				|| Svc.Condition[ConditionFlag.BetweenAreas51];
+			var boundByDuty = Svc.Condition[ConditionFlag.BoundByDuty]
+				|| Svc.Condition[ConditionFlag.BoundByDuty56]
+				|| Svc.Condition[ConditionFlag.BoundByDuty95];
+
+			if (Player.Available && !loadingScreenActive && boundByDuty)
+			{
+				PluginLog.Information($"[PvP] AutoOn poll satisfied at attempt {attempt}; firing Auto.");
+				RSCommands.DoStateCommandType(StateCommandType.Auto);
+				if (!DataCenter.State)
+				{
+					PluginLog.Warning("[PvP] AutoOn fired but DataCenter.State stayed false. DoStateCommandType returned without flipping state.");
+				}
+				return;
+			}
+
+			if (attempt + 1 < PvPAutoOnMaxPollAttempts)
+			{
+				SchedulePvPAutoOnAttempt(territoryId, attempt + 1);
+			}
+			else
+			{
+				PluginLog.Warning($"[PvP] AutoOn poll timed out after {PvPAutoOnMaxPollAttempts} attempts. "
+					+ $"Player.Available={Player.Available} loadingScreenActive={loadingScreenActive} "
+					+ $"boundByDuty={boundByDuty} State={DataCenter.State} IsPvP={DataCenter.IsPvP}");
+			}
+		}, delayTicks: PvPAutoOnPollIntervalTicks);
 	}
 
 	private static void DutyState_DutyStarted(IDutyStateEventArgs e)
@@ -251,11 +309,13 @@ public sealed class RotationSolverPlugin : IAsyncDalamudPlugin
 			return;
 		}
 
-		// PvP match start: the canonical "AutoOnPvPMatchStart" trigger. A PvP queue area is itself
-		// IsPvpZone, so a territory-transition signal misses Wolves'-Den -> CC-arena entirely.
-		// DutyStarted fires when the actual match begins regardless of where the player queued from.
+		// Faster AutoOn path for content where the server emits the "Duty Commenced" actor-control
+		// packet. CC frequently doesn't, so the territory-driven poll above is the primary trigger
+		// and this is a best-effort early fire.
+		PluginLog.Information($"[PvP] DutyStarted event: IsPvP={DataCenter.IsPvP} State={DataCenter.State}");
 		if (DataCenter.IsPvP && Service.Config.AutoOnPvPMatchStart && !DataCenter.State)
 		{
+			PluginLog.Information("[PvP] DutyStarted firing Auto.");
 			RSCommands.DoStateCommandType(StateCommandType.Auto);
 		}
 
