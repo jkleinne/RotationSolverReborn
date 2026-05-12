@@ -1,3 +1,5 @@
+using RotationSolver.Basic.Actions.PvPTargetSelection;
+
 namespace RotationSolver.RebornRotations.PVPRotations.Magical;
 
 [Rotation("Default PvP", CombatType.PvP, GameVersion = "7.5")]
@@ -44,22 +46,22 @@ public class PCT_DefaultPvP : PictomancerRotation
 		if (FreeBurst || CurrentTarget?.GetHealthRatio() <= BurstThreshold)
 		{
 			// Use all Muses in sequence for maximum burst
-			if (PomMusePvP.CanUse(out action, usedUp: true))
+			if (PomMusePvP.CanUse(out action, usedUp: true) && PvPBurstGate.ShouldUse(PomMusePvP))
 			{
 				return true;
 			}
 
-			if (WingedMusePvP.CanUse(out action, usedUp: true))
+			if (WingedMusePvP.CanUse(out action, usedUp: true) && PvPBurstGate.ShouldUse(WingedMusePvP))
 			{
 				return true;
 			}
 
-			if (ClawedMusePvP.CanUse(out action, usedUp: true))
+			if (ClawedMusePvP.CanUse(out action, usedUp: true) && PvPBurstGate.ShouldUse(ClawedMusePvP))
 			{
 				return true;
 			}
 
-			if (FangedMusePvP.CanUse(out action, usedUp: true))
+			if (FangedMusePvP.CanUse(out action, usedUp: true) && PvPBurstGate.ShouldUse(FangedMusePvP))
 			{
 				return true;
 			}

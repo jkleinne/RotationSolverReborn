@@ -248,6 +248,9 @@ internal partial class Configs : IPluginConfiguration
 	[ConditionBool, UI("Ignore TTK for PvP purposes.", Filter = DutySpecifcPvP)]
 	private static readonly bool _ignorePvPTTK = true;
 
+	[ConditionBool, UI("Conserve burst in PvP unless the target is valuable, vulnerable, or killable.", Filter = DutySpecifcPvP)]
+	private static readonly bool _pvpBurstConservation = true;
+
 	[ConditionBool, UI("Prioritize A tier tomeliths in Shatter.", Filter = DutySpecifcPvP)]
 	private static readonly bool _prioAtomelith = false;
 

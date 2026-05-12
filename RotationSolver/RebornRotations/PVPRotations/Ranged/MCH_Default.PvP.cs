@@ -1,3 +1,5 @@
+using RotationSolver.Basic.Actions.PvPTargetSelection;
+
 namespace RotationSolver.RebornRotations.PVPRotations.Ranged;
 
 [Rotation("Default PVP", CombatType.PvP, GameVersion = "7.5")]
@@ -28,7 +30,9 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 	{
 		if (nextGCD.IsTheSameTo(false, ActionID.DrillPvP, ActionID.BioblasterPvP, ActionID.AirAnchorPvP, ActionID.ChainSawPvP))
 		{
-			if (AnalysisPvP.CanUse(out action, usedUp: true))
+			if (AnalysisPvP.CanUse(out action, usedUp: true)
+				&& nextGCD is IBaseAction nextGcdAction
+				&& PvPBurstGate.ShouldUse(nextGcdAction))
 			{
 				return true;
 			}
@@ -36,18 +40,18 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 
 		if (WildfirePvP.CanUse(out action))
 		{
-			if (StatusHelper.PlayerHasStatus(true, StatusID.Overheated_3149))
+			if (StatusHelper.PlayerHasStatus(true, StatusID.Overheated_3149) && PvPBurstGate.ShouldUse(WildfirePvP))
 			{
 				return true;
 			}
 		}
 
-		if (BishopAutoturretPvP.CanUse(out action))
+		if (BishopAutoturretPvP.CanUse(out action) && PvPBurstGate.ShouldUse(BishopAutoturretPvP))
 		{
 			return true;
 		}
 
-		if (EagleEyeShotPvP.CanUse(out action))
+		if (EagleEyeShotPvP.CanUse(out action) && PvPBurstGate.ShouldUse(EagleEyeShotPvP))
 		{
 			return true;
 		}
@@ -60,35 +64,37 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 	#region GCDs
 	protected override bool GeneralGCD(out IAction? action)
 	{
-		if (FullMetalFieldPvP.CanUse(out action))
+		if (FullMetalFieldPvP.CanUse(out action) && PvPBurstGate.ShouldUse(FullMetalFieldPvP))
 		{
 			return true;
 		}
 
 		if (BlazingShotPvP.CanUse(out action))
 		{
-			if (StatusHelper.PlayerHasStatus(true, StatusID.Overheated_3149) && !StatusHelper.PlayerHasStatus(true, StatusID.Analysis))
+			if (StatusHelper.PlayerHasStatus(true, StatusID.Overheated_3149)
+				&& !StatusHelper.PlayerHasStatus(true, StatusID.Analysis)
+				&& PvPBurstGate.ShouldUse(BlazingShotPvP))
 			{
 				return true;
 			}
 		}
 
-		if (DrillPvP.CanUse(out action, usedUp: true))
+		if (DrillPvP.CanUse(out action, usedUp: true) && PvPBurstGate.ShouldUse(DrillPvP))
 		{
 			return true;
 		}
 
-		if (BioblasterPvP.CanUse(out action, usedUp: true))
+		if (BioblasterPvP.CanUse(out action, usedUp: true) && PvPBurstGate.ShouldUse(BioblasterPvP))
 		{
 			return true;
 		}
 
-		if (AirAnchorPvP.CanUse(out action, usedUp: true))
+		if (AirAnchorPvP.CanUse(out action, usedUp: true) && PvPBurstGate.ShouldUse(AirAnchorPvP))
 		{
 			return true;
 		}
 
-		if (ChainSawPvP.CanUse(out action, usedUp: true))
+		if (ChainSawPvP.CanUse(out action, usedUp: true) && PvPBurstGate.ShouldUse(ChainSawPvP))
 		{
 			return true;
 		}

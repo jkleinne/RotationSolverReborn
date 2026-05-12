@@ -23,6 +23,7 @@ A new `TargetingType.PvPSmart` mode that replaces the role-blind `Auto(LowHP)` c
 - **LB cast awareness** — hostiles mid-cast on a Limit Break gain a bonus (interrupt priority)
 - **Isolation factor** — sigmoid bonus the further a hostile is from its nearest ally (catches stragglers)
 - **Threat factor** — bonus when a hostile is targeting a low-HP ally or a party healer (peel priority)
+- **Burst conservation** — high-impact PvP burst actions are held through unclear windows and spent on valuable, vulnerable, or kill-secure targets
 
 Two preset weight profiles (Casual, Ranked) are bundled, plus a Custom preset for hand-tuned weights. A toggleable debug overlay renders the full per-target score breakdown in real time for tuning.
 

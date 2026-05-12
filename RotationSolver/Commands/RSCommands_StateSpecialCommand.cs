@@ -391,7 +391,7 @@ namespace RotationSolver.Commands
 					DataCenter.IsHenched = false;
 					DataCenter.IsPvPStateEnabled = true;
 					ActionUpdater.AutoCancelTime = DateTime.MinValue;
-					DataCenter.TargetingTypeOverride = TargetingType.LowHP;
+					DataCenter.TargetingTypeOverride = null;
 					if (Service.Config.ShowToggledSettingInChat)
 					{ Svc.Chat.Print($"Targeting : PvP"); }
 					break;
@@ -493,7 +493,7 @@ namespace RotationSolver.Commands
 					DataCenter.IsHenched = false;
 					DataCenter.IsPvPStateEnabled = true;
 					ActionUpdater.AutoCancelTime = DateTime.MinValue;
-					DataCenter.TargetingTypeOverride = TargetingType.LowHP;
+					DataCenter.TargetingTypeOverride = null;
 					if (Service.Config.ShowToggledSettingInChat)
 					{ Svc.Chat.Print($"Targeting : PvP"); }
 					break;

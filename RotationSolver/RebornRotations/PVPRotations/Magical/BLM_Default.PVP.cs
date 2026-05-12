@@ -1,4 +1,6 @@
-﻿namespace RotationSolver.RebornRotations.PVPRotations.Magical;
+﻿using RotationSolver.Basic.Actions.PvPTargetSelection;
+
+namespace RotationSolver.RebornRotations.PVPRotations.Magical;
 
 [Rotation("Default PVP", CombatType.PvP, GameVersion = "7.5")]
 [SourceCode(Path = "main/RebornRotations/PVPRotations/Magical/BLM_Default.PVP.cs")]
@@ -98,7 +100,9 @@ public class BLM_DefaultPVP : BlackMageRotation
 			return true;
 		}
 
-		if (NumberOfHostilesInRangeOf(6) > 0 && BurstPvP.CanUse(out action))
+		if (NumberOfHostilesInRangeOf(6) > 0
+			&& BurstPvP.CanUse(out action)
+			&& PvPBurstGate.ShouldUse(BurstPvP))
 		{
 			return true;
 		}
