@@ -117,7 +117,10 @@ internal static class ActionUpdater
 		{
 			_startCombatTime = DateTime.MinValue;
 
-			if (Service.Config.AutoOffAfterCombat && !DataCenter.IsHenched && !DataCenter.IsAutoDuty)
+			// PvP has its own cancel knobs (AutoOffWhenDeadPvP, AutoOffPvPMatchEnd). Combat in PvP
+			// is intermittent across deaths and respawns, so the PvE after-combat timer would
+			// silently cancel the rotation mid-match.
+			if (Service.Config.AutoOffAfterCombat && !DataCenter.IsHenched && !DataCenter.IsAutoDuty && !DataCenter.IsPvP)
 			{
 				AutoCancelTime = now.AddSeconds(Service.Config.AutoOffAfterCombatTime);
 			}
