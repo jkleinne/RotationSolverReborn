@@ -29,6 +29,22 @@ Two preset weight profiles (Casual, Ranked) are bundled, plus a Custom preset fo
 
 The existing `PvPHealers` / `PvPDPS` / `PvPTanks` modes remain as explicit role overrides.
 
+### Testing burst conservation
+
+Burst conservation is experimental. The current fail-safe behavior has only been tested on Bard so far. Other PvP jobs still use the shared gate, but their job-specific burst timing needs separate in-game validation.
+
+Burst conservation is enabled by default after installing this fork. To toggle it, open RSR settings and go to `Duty` > `PvP`, then use:
+
+```
+Conserve burst in PvP unless the target is valuable, vulnerable, or killable.
+```
+
+For the intended Ranked Crystalline Conflict behavior, also make sure `Target` > `Hostile` has `PvPSmart` in the PvP hostile targeting list, preferably first.
+
+For Bard specifically, `Pitch Perfect`, `Apex Arrow`, and `Powerful Shot` continue to keep the job cycling. `Harmonic Arrow`, `Blast Arrow`, and `Encore of Light` still honor the gate, but spend if a charge cap or ready timer would otherwise be wasted.
+
+This setting may lower raw total damage because it avoids spending burst into Guard, heavy mitigation, tanks, or low-value targets that are unlikely to die. The goal is higher kill conversion, better secure-kill timing, and fewer wasted burst windows rather than higher scoreboard damage. When testing, compare kill participation, burst held for healer or ranged DPS windows, and missed opportunities where the gate felt too conservative.
+
 ### Status & caveats
 
 - Starting weights are conservative seeds. Empirical tuning across Ranked CC matches is pending.
