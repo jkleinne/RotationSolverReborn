@@ -390,9 +390,9 @@ namespace RotationSolver.Commands
 					(Service.Config.AutoOffWhenDead && DataCenter.Territory != null && !DataCenter.Territory.IsPvP && Player.Object != null && Player.Object.CurrentHp == 0) ||
 					(Service.Config.AutoOffWhenDeadPvP && DataCenter.Territory != null && DataCenter.Territory.IsPvP && Player.Object != null && Player.Object.CurrentHp == 0) ||
 					(Service.Config.AutoOffCutScene && !DataCenter.IsAutoDuty && !DataCenter.IsPvP && Svc.Condition[ConditionFlag.OccupiedInCutSceneEvent]) ||
-					(Service.Config.AutoOffSwitchClass && Player.Job != _previousJob) ||
-					(Service.Config.AutoOffBetweenArea && !DataCenter.IsAutoDuty && (Svc.Condition[ConditionFlag.BetweenAreas] || Svc.Condition[ConditionFlag.BetweenAreas51])) ||
-					(Service.Config.CancelStateOnCombatBeforeCountdown && Service.CountDownTime > 0.2f && DataCenter.InCombat) ||
+					(Service.Config.AutoOffSwitchClass && !DataCenter.IsPvP && Player.Job != _previousJob) ||
+					(Service.Config.AutoOffBetweenArea && !DataCenter.IsAutoDuty && !DataCenter.IsPvP && (Svc.Condition[ConditionFlag.BetweenAreas] || Svc.Condition[ConditionFlag.BetweenAreas51])) ||
+					(Service.Config.CancelStateOnCombatBeforeCountdown && !DataCenter.IsPvP && Service.CountDownTime > 0.2f && DataCenter.InCombat) ||
 					(ActionUpdater.AutoCancelTime != DateTime.MinValue && DateTime.Now > ActionUpdater.AutoCancelTime) || false)
 				{
 					CancelState();
@@ -499,7 +499,11 @@ namespace RotationSolver.Commands
 					}
 				}
 
-				if (Service.Config.StartOnCountdown && !DataCenter.IsInDutyReplay())
+				// In PvP the FFXIV countdown system reports both the pre-match countdown and the
+				// per-death respawn timer. The end-of-countdown CancelState below would then fire
+				// once when the match starts and again every time the player dies/respawns. PvP
+				// uses AutoOnPvPMatchStart / AutoOffWhenDeadPvP / the territory-leave path instead.
+				if (Service.Config.StartOnCountdown && !DataCenter.IsInDutyReplay() && !DataCenter.IsPvP)
 				{
 					if (Service.CountDownTime > 0)
 					{
