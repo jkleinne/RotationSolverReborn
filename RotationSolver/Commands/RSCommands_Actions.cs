@@ -389,7 +389,7 @@ namespace RotationSolver.Commands
 				if (Svc.Condition[ConditionFlag.LoggingOut] ||
 					(Service.Config.AutoOffWhenDead && DataCenter.Territory != null && !DataCenter.Territory.IsPvP && Player.Object != null && Player.Object.CurrentHp == 0) ||
 					(Service.Config.AutoOffWhenDeadPvP && DataCenter.Territory != null && DataCenter.Territory.IsPvP && Player.Object != null && Player.Object.CurrentHp == 0) ||
-					(Service.Config.AutoOffCutScene && !DataCenter.IsAutoDuty && Svc.Condition[ConditionFlag.OccupiedInCutSceneEvent]) ||
+					(Service.Config.AutoOffCutScene && !DataCenter.IsAutoDuty && !DataCenter.IsPvP && Svc.Condition[ConditionFlag.OccupiedInCutSceneEvent]) ||
 					(Service.Config.AutoOffSwitchClass && Player.Job != _previousJob) ||
 					(Service.Config.AutoOffBetweenArea && !DataCenter.IsAutoDuty && (Svc.Condition[ConditionFlag.BetweenAreas] || Svc.Condition[ConditionFlag.BetweenAreas51])) ||
 					(Service.Config.CancelStateOnCombatBeforeCountdown && Service.CountDownTime > 0.2f && DataCenter.InCombat) ||
