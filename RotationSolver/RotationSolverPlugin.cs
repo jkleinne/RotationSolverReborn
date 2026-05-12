@@ -239,7 +239,6 @@ public sealed class RotationSolverPlugin : IAsyncDalamudPlugin
 		if (previousIsPvP == true && newTerritory.IsPvP == false
 			&& Service.Config.AutoOffPvPMatchEnd && DataCenter.State)
 		{
-			PluginLog.Information("[PvP] Leaving PvP territory; cancelling state.");
 			RSCommands.CancelState();
 		}
 
@@ -251,7 +250,6 @@ public sealed class RotationSolverPlugin : IAsyncDalamudPlugin
 		// here so we no longer depend on the packet being delivered.
 		if (newTerritory.IsPvP && Service.Config.AutoOnPvPMatchStart)
 		{
-			PluginLog.Information($"[PvP] Entered PvP territory {id} ({newTerritory.Name}); arming AutoOn poll.");
 			SchedulePvPAutoOnAttempt(territoryId: id, attempt: 0);
 		}
 	}
@@ -280,7 +278,6 @@ public sealed class RotationSolverPlugin : IAsyncDalamudPlugin
 
 			if (Player.Available && !loadingScreenActive && boundByDuty)
 			{
-				PluginLog.Information($"[PvP] AutoOn poll satisfied at attempt {attempt}; firing Auto.");
 				RSCommands.DoStateCommandType(StateCommandType.Auto);
 				if (!DataCenter.State)
 				{
@@ -310,12 +307,10 @@ public sealed class RotationSolverPlugin : IAsyncDalamudPlugin
 		}
 
 		// Faster AutoOn path for content where the server emits the "Duty Commenced" actor-control
-		// packet. CC frequently doesn't, so the territory-driven poll above is the primary trigger
-		// and this is a best-effort early fire.
-		PluginLog.Information($"[PvP] DutyStarted event: IsPvP={DataCenter.IsPvP} State={DataCenter.State}");
+		// packet. CC frequently doesn't, so the territory-driven poll is the primary trigger and
+		// this is a best-effort early fire. Idempotent against the poll via the !State guard.
 		if (DataCenter.IsPvP && Service.Config.AutoOnPvPMatchStart && !DataCenter.State)
 		{
-			PluginLog.Information("[PvP] DutyStarted firing Auto.");
 			RSCommands.DoStateCommandType(StateCommandType.Auto);
 		}
 
