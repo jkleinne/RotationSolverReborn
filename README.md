@@ -29,6 +29,22 @@ Two preset weight profiles (Casual, Ranked) are bundled, plus a Custom preset fo
 
 The existing `PvPHealers` / `PvPDPS` / `PvPTanks` modes remain as explicit role overrides.
 
+### Testing burst conservation
+
+Burst conservation is experimental. The current fail safe behavior needs separate in-game validation across PvP jobs.
+
+Burst conservation is enabled by default after installing this fork. To toggle it, open RSR settings and go to `Duty` > `PvP`, then use:
+
+```
+Conserve burst in PvP unless the target is valuable, vulnerable, or killable.
+```
+
+For the intended Ranked Crystalline Conflict behavior, also make sure `Target` > `Hostile` has `PvPSmart` in the PvP hostile targeting list, preferably first.
+
+Some high-impact actions still honor the gate, but spend if a charge cap or ready timer would otherwise be wasted.
+
+This setting may lower raw total damage because it avoids spending burst into Guard, heavy mitigation, tanks, or low-value targets that are unlikely to die. The goal is higher kill conversion, better secure-kill timing, and fewer wasted burst windows rather than higher scoreboard damage. When testing, compare kill participation, burst held for healer or ranged DPS windows, and missed opportunities where the gate felt too conservative.
+
 ### Status & caveats
 
 - Starting weights are conservative seeds. Empirical tuning across Ranked CC matches is pending.

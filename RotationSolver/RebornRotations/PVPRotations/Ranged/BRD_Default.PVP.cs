@@ -7,6 +7,9 @@ namespace RotationSolver.RebornRotations.PVPRotations.Ranged;
 
 public sealed class BRD_DefaultPvP : BardRotation
 {
+	private const uint BurstExpiryGcdWindow = 1;
+	private const float BurstExpiryOffset = 0f;
+
 	#region Configurations
 
 	[RotationConfig(CombatType.PvP, Name = "Use Warden's Paean on other players")]
@@ -70,7 +73,8 @@ public sealed class BRD_DefaultPvP : BardRotation
 			return true;
 		}
 
-		if (EncoreOfLightPvP.CanUse(out action, skipAoeCheck: true) && PvPBurstGate.ShouldUse(EncoreOfLightPvP))
+		if (EncoreOfLightPvP.CanUse(out action, skipAoeCheck: true)
+			&& ShouldUseBurstOrBeforeStatusExpires(EncoreOfLightPvP, StatusID.EncoreOfLightReady))
 		{
 			return true;
 		}
@@ -82,22 +86,25 @@ public sealed class BRD_DefaultPvP : BardRotation
 	#region GCDs
 	protected override bool GeneralGCD(out IAction? action)
 	{
-		if (HarmonicArrowPvP.CanUse(out action) && PvPBurstGate.ShouldUse(HarmonicArrowPvP))
+		if (HarmonicArrowPvP.CanUse(out action)
+			&& ShouldUseBurstOrPreventChargeOvercap(HarmonicArrowPvP))
 		{
 			return true;
 		}
 
-		if (PitchPerfectPvP.CanUse(out action, skipAoeCheck: true) && PvPBurstGate.ShouldUse(PitchPerfectPvP))
+		if (PitchPerfectPvP.CanUse(out action, skipAoeCheck: true))
 		{
 			return true;
 		}
 
-		if (BlastArrowPvP.CanUse(out action) && PvPBurstGate.ShouldUse(BlastArrowPvP))
+		if (BlastArrowPvP.CanUse(out action)
+			&& ShouldUseBurstOrBeforeStatusExpires(BlastArrowPvP, StatusID.BlastArrowReady_3142))
 		{
 			return true;
 		}
 
-		if (ApexArrowPvP.CanUse(out action) && PvPBurstGate.ShouldUse(ApexArrowPvP))
+		if (!StatusHelper.PlayerHasStatus(true, StatusID.BlastArrowReady_3142)
+			&& ApexArrowPvP.CanUse(out action))
 		{
 			return true;
 		}
@@ -108,6 +115,19 @@ public sealed class BRD_DefaultPvP : BardRotation
 		}
 
 		return base.GeneralGCD(out action);
+	}
+
+	private static bool ShouldUseBurstOrPreventChargeOvercap(IBaseAction action)
+	{
+		return PvPBurstGate.ShouldUse(action)
+			|| action.Cooldown.WillHaveXChargesGCD(action.Cooldown.MaxCharges, BurstExpiryGcdWindow, BurstExpiryOffset);
+	}
+
+	private static bool ShouldUseBurstOrBeforeStatusExpires(IBaseAction action, StatusID status)
+	{
+		return PvPBurstGate.ShouldUse(action)
+			|| (StatusHelper.PlayerHasStatus(true, status)
+				&& StatusHelper.PlayerWillStatusEndGCD(BurstExpiryGcdWindow, BurstExpiryOffset, true, status));
 	}
 	#endregion
 }
