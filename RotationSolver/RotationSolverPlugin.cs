@@ -232,12 +232,13 @@ public sealed class RotationSolverPlugin : IAsyncDalamudPlugin
 	}
 
 	private const int PvPAutoOnPollIntervalTicks = 30;
-	private const int PvPAutoOnMaxPollAttempts = 20;
+	private const int PvPAutoOnMaxPollAttempts = 60;
 
 	private static void HandlePvPTerritoryTransition(bool wasPvP, bool isPvP)
 	{
-		// Entering a PvP zone: poll until Player is ready, then arm AutoOn. The TerritoryChanged
-		// event fires before the player has fully loaded in, so a fixed delay would be wrong.
+		// Entering a PvP zone: poll until the loading screen is done and the player is ready, then arm
+		// AutoOn. Firing while BetweenAreas is still set lets the AutoOffBetweenArea path (default on)
+		// cancel the state on the next UpdateRotationState tick.
 		if (!wasPvP && isPvP && Service.Config.AutoOnPvPMatchStart)
 		{
 			SchedulePvPAutoOnAttempt(attempt: 0);
@@ -261,7 +262,10 @@ public sealed class RotationSolverPlugin : IAsyncDalamudPlugin
 				return;
 			}
 
-			if (Player.Available)
+			var loadingScreenActive = Svc.Condition[ConditionFlag.BetweenAreas]
+				|| Svc.Condition[ConditionFlag.BetweenAreas51];
+
+			if (Player.Available && !loadingScreenActive)
 			{
 				RSCommands.DoStateCommandType(StateCommandType.Auto);
 				return;
