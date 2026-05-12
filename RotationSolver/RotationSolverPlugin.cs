@@ -191,6 +191,14 @@ public sealed class RotationSolverPlugin : IAsyncDalamudPlugin
 		{
 			_ = Service.Config.DutyEnd.AddMacro();
 
+			// In PvP, the duty's natural end (match win/lose) is the canonical "match end" signal.
+			// Territory-leave is kept as a fallback for users who exit before completion.
+			if (DataCenter.IsPvP && Service.Config.AutoOffPvPMatchEnd && DataCenter.State)
+			{
+				RSCommands.CancelState();
+				return;
+			}
+
 			if (Service.Config.AutoOffWhenDutyCompleted)
 			{
 				RSCommands.CancelState();
@@ -225,57 +233,15 @@ public sealed class RotationSolverPlugin : IAsyncDalamudPlugin
 			PluginLog.Warning($"Failed on Territory changed: {ex.Message}");
 		}
 
-		if (previousIsPvP.HasValue)
-		{
-			HandlePvPTerritoryTransition(previousIsPvP.Value, newTerritory.IsPvP);
-		}
-	}
-
-	private const int PvPAutoOnPollIntervalTicks = 30;
-	private const int PvPAutoOnMaxPollAttempts = 60;
-
-	private static void HandlePvPTerritoryTransition(bool wasPvP, bool isPvP)
-	{
-		// Entering a PvP zone: poll until the loading screen is done and the player is ready, then arm
-		// AutoOn. Firing while BetweenAreas is still set lets the AutoOffBetweenArea path (default on)
-		// cancel the state on the next UpdateRotationState tick.
-		if (!wasPvP && isPvP && Service.Config.AutoOnPvPMatchStart)
-		{
-			SchedulePvPAutoOnAttempt(attempt: 0);
-			return;
-		}
-
-		// Leaving a PvP zone: this is the actual "PvP match end" signal, regardless of `PvPDisplayActive`.
-		if (wasPvP && !isPvP && Service.Config.AutoOffPvPMatchEnd && DataCenter.State)
+		// PvP queue areas (e.g., Wolves' Den, ID 250) are themselves IsPvpZone=True, so a typical
+		// queue path (Wolves' Den -> CC arena) is a PvP->PvP transition with no signal here. The
+		// actual match start is reported by DutyState.DutyStarted instead. We only handle the
+		// PvP -> non-PvP exit case here, as a safety net for /leaveduty before DutyCompleted fires.
+		if (previousIsPvP == true && newTerritory.IsPvP == false
+			&& Service.Config.AutoOffPvPMatchEnd && DataCenter.State)
 		{
 			RSCommands.CancelState();
 		}
-	}
-
-	private static void SchedulePvPAutoOnAttempt(int attempt)
-	{
-		_ = Svc.Framework.RunOnTick(() =>
-		{
-			// Bail if the user already left the PvP territory or turned the rotation on themselves.
-			if (!(DataCenter.Territory?.IsPvP ?? false) || DataCenter.State)
-			{
-				return;
-			}
-
-			var loadingScreenActive = Svc.Condition[ConditionFlag.BetweenAreas]
-				|| Svc.Condition[ConditionFlag.BetweenAreas51];
-
-			if (Player.Available && !loadingScreenActive)
-			{
-				RSCommands.DoStateCommandType(StateCommandType.Auto);
-				return;
-			}
-
-			if (attempt + 1 < PvPAutoOnMaxPollAttempts)
-			{
-				SchedulePvPAutoOnAttempt(attempt + 1);
-			}
-		}, delayTicks: PvPAutoOnPollIntervalTicks);
 	}
 
 	private static void DutyState_DutyStarted(IDutyStateEventArgs e)
@@ -283,6 +249,14 @@ public sealed class RotationSolverPlugin : IAsyncDalamudPlugin
 		if (!Player.Available)
 		{
 			return;
+		}
+
+		// PvP match start: the canonical "AutoOnPvPMatchStart" trigger. A PvP queue area is itself
+		// IsPvpZone, so a territory-transition signal misses Wolves'-Den -> CC-arena entirely.
+		// DutyStarted fires when the actual match begins regardless of where the player queued from.
+		if (DataCenter.IsPvP && Service.Config.AutoOnPvPMatchStart && !DataCenter.State)
+		{
+			RSCommands.DoStateCommandType(StateCommandType.Auto);
 		}
 
 		if (!TargetFilter.PlayerJobCategory(JobRole.Tank) && !TargetFilter.PlayerJobCategory(JobRole.Healer))

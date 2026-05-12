@@ -386,13 +386,21 @@ namespace RotationSolver.Commands
 					}
 				}
 
+				// In PvP the only cancel paths that should fire are the PvP-specific knobs
+				// (AutoOffWhenDeadPvP, AutoOffPvPMatchEnd via TerritoryChanged/DutyCompleted) plus the
+				// universal LoggingOut. The other paths are PvE concepts: AutoOffSwitchClass and
+				// AutoOffBetweenArea race against transient state during respawn-teleport and the
+				// brief invalid-Player-Object window on death; AutoOffCutScene targets PvE cutscenes;
+				// the AutoOffAfterCombat timer would cancel mid-match because PvP combat is
+				// intermittent. The original split (AutoOffWhenDead vs AutoOffWhenDeadPvP)
+				// established this PvE/PvP separation; completing it here finishes that pattern.
 				if (Svc.Condition[ConditionFlag.LoggingOut] ||
 					(Service.Config.AutoOffWhenDead && DataCenter.Territory != null && !DataCenter.Territory.IsPvP && Player.Object != null && Player.Object.CurrentHp == 0) ||
 					(Service.Config.AutoOffWhenDeadPvP && DataCenter.Territory != null && DataCenter.Territory.IsPvP && Player.Object != null && Player.Object.CurrentHp == 0) ||
 					(Service.Config.AutoOffCutScene && !DataCenter.IsAutoDuty && !DataCenter.IsPvP && Svc.Condition[ConditionFlag.OccupiedInCutSceneEvent]) ||
-					(Service.Config.AutoOffSwitchClass && Player.Job != _previousJob) ||
-					(Service.Config.AutoOffBetweenArea && !DataCenter.IsAutoDuty && (Svc.Condition[ConditionFlag.BetweenAreas] || Svc.Condition[ConditionFlag.BetweenAreas51])) ||
-					(Service.Config.CancelStateOnCombatBeforeCountdown && Service.CountDownTime > 0.2f && DataCenter.InCombat) ||
+					(Service.Config.AutoOffSwitchClass && !DataCenter.IsPvP && Player.Job != _previousJob) ||
+					(Service.Config.AutoOffBetweenArea && !DataCenter.IsAutoDuty && !DataCenter.IsPvP && (Svc.Condition[ConditionFlag.BetweenAreas] || Svc.Condition[ConditionFlag.BetweenAreas51])) ||
+					(Service.Config.CancelStateOnCombatBeforeCountdown && !DataCenter.IsPvP && Service.CountDownTime > 0.2f && DataCenter.InCombat) ||
 					(ActionUpdater.AutoCancelTime != DateTime.MinValue && DateTime.Now > ActionUpdater.AutoCancelTime) || false)
 				{
 					CancelState();
@@ -499,7 +507,10 @@ namespace RotationSolver.Commands
 					}
 				}
 
-				if (Service.Config.StartOnCountdown && !DataCenter.IsInDutyReplay())
+				// StartOnCountdown reads the /countdown agent, which is the PvE pre-pull timer; PvP
+				// match start/respawn timers do not populate it. Even so, gate by !IsPvP so the
+				// PvE auto-on/auto-off semantics never apply inside a PvP match.
+				if (Service.Config.StartOnCountdown && !DataCenter.IsInDutyReplay() && !DataCenter.IsPvP)
 				{
 					if (Service.CountDownTime > 0)
 					{
