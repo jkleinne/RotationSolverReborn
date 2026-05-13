@@ -19,18 +19,25 @@ public sealed class BRD_DefaultPvP : BardRotation
 	private const float PaeanPeelScoreThreshold = 2f;
 	private const float PaeanEngageScoreThreshold = 3f;
 	private const float PaeanCleanseBaseWeight = 100f;
-	private const float PaeanCriticalHpWeight = 4f;
-	private const float PaeanLowHpWeight = 2f;
+	private const float PaeanCriticalHpWeight = 6f;
+	private const float PaeanLowHpWeight = 2.5f;
 	private const float PaeanFocusedHostileWeight = 2f;
-	private const float PaeanPressureRoleWeight = 1.5f;
-	private const float PaeanMeleePressureRoleWeight = 1f;
-	private const float PaeanTankPressureRoleWeight = 0.5f;
+	private const float PaeanHealerSupportRoleWeight = 3f;
+	private const float PaeanRangedSupportRoleWeight = 2f;
+	private const float PaeanMeleeSupportRoleWeight = 1.25f;
+	private const float PaeanTankSupportRoleWeight = 0.5f;
 	private const float PaeanDistanceWeight = 1f;
 	private const float PaeanTankEngageWeight = 2.5f;
 	private const float PaeanMeleeEngageWeight = 2f;
 	private const float PaeanSmartTargetWeight = 1.5f;
 
 	private readonly record struct PaeanCandidate(IBattleChara Target, float Score);
+
+	private enum PaeanCastIntent
+	{
+		Cleanse,
+		Protect,
+	}
 
 	#region Configurations
 
@@ -79,7 +86,7 @@ public sealed class BRD_DefaultPvP : BardRotation
 
 		foreach (var cleanseTarget in SelectCleansePaeanTargets())
 		{
-			if (TryUseWardensPaeanOn(TheWardensPaeanPvP, cleanseTarget.Target, isProtectivePaean: false, out action))
+			if (TryUseWardensPaeanOn(TheWardensPaeanPvP, cleanseTarget.Target, PaeanCastIntent.Cleanse, out action))
 			{
 				return true;
 			}
@@ -87,7 +94,7 @@ public sealed class BRD_DefaultPvP : BardRotation
 
 		foreach (var peelTarget in SelectProtectivePaeanTargets())
 		{
-			if (TryUseWardensPaeanOn(TheWardensPaeanPvP, peelTarget.Target, isProtectivePaean: true, out action))
+			if (TryUseWardensPaeanOn(TheWardensPaeanPvP, peelTarget.Target, PaeanCastIntent.Protect, out action))
 			{
 				return true;
 			}
@@ -95,7 +102,7 @@ public sealed class BRD_DefaultPvP : BardRotation
 
 		foreach (var engageTarget in SelectEngagePaeanTargets())
 		{
-			if (TryUseWardensPaeanOn(TheWardensPaeanPvP, engageTarget.Target, isProtectivePaean: true, out action))
+			if (TryUseWardensPaeanOn(TheWardensPaeanPvP, engageTarget.Target, PaeanCastIntent.Protect, out action))
 			{
 				return true;
 			}
@@ -118,7 +125,7 @@ public sealed class BRD_DefaultPvP : BardRotation
 			var score = PaeanCleanseBaseWeight
 				+ ScorePaeanHealth(member)
 				+ CountHostilesTargeting(member) * PaeanFocusedHostileWeight
-				+ ScoreCleanseRole(member)
+				+ ScoreSupportRole(member)
 				+ ScorePaeanDistance(member);
 
 			candidates.Add(new PaeanCandidate(member, score));
@@ -150,7 +157,7 @@ public sealed class BRD_DefaultPvP : BardRotation
 
 			var score = ScorePaeanHealth(member)
 				+ focusCount * PaeanFocusedHostileWeight
-				+ ScoreProtectiveRole(member, focusCount)
+				+ ScoreSupportRole(member)
 				+ ScorePaeanDistance(member);
 
 			if (score < PaeanPeelScoreThreshold)
@@ -221,39 +228,24 @@ public sealed class BRD_DefaultPvP : BardRotation
 		return healthRatio <= PaeanLowHpThreshold ? PaeanLowHpWeight : 0f;
 	}
 
-	private static float ScoreCleanseRole(IBattleChara member)
+	private static float ScoreSupportRole(IBattleChara member)
 	{
-		if (member.IsJobCategory(JobRole.Healer) || member.IsJobCategory(JobRole.RangedPhysical) || member.IsJobCategory(JobRole.RangedMagical))
+		if (member.IsJobCategory(JobRole.Healer))
 		{
-			return PaeanPressureRoleWeight;
+			return PaeanHealerSupportRoleWeight;
+		}
+
+		if (member.IsJobCategory(JobRole.RangedPhysical) || member.IsJobCategory(JobRole.RangedMagical))
+		{
+			return PaeanRangedSupportRoleWeight;
 		}
 
 		if (member.IsJobCategory(JobRole.Melee))
 		{
-			return PaeanMeleePressureRoleWeight;
+			return PaeanMeleeSupportRoleWeight;
 		}
 
-		return member.IsJobCategory(JobRole.Tank) ? PaeanTankPressureRoleWeight : 0f;
-	}
-
-	private static float ScoreProtectiveRole(IBattleChara member, int focusCount)
-	{
-		if (focusCount == 0)
-		{
-			return 0f;
-		}
-
-		if (member.IsJobCategory(JobRole.Healer) || member.IsJobCategory(JobRole.RangedPhysical) || member.IsJobCategory(JobRole.RangedMagical))
-		{
-			return PaeanPressureRoleWeight;
-		}
-
-		if (member.IsJobCategory(JobRole.Melee))
-		{
-			return PaeanMeleePressureRoleWeight;
-		}
-
-		return member.IsJobCategory(JobRole.Tank) ? PaeanTankPressureRoleWeight : 0f;
+		return member.IsJobCategory(JobRole.Tank) ? PaeanTankSupportRoleWeight : 0f;
 	}
 
 	private static bool IsEngageRole(IBattleChara member)
@@ -348,7 +340,7 @@ public sealed class BRD_DefaultPvP : BardRotation
 		return nearestDistance;
 	}
 
-	private static bool TryUseWardensPaeanOn(IBaseAction wardensPaean, IBattleChara? target, bool isProtectivePaean, out IAction? action)
+	private static bool TryUseWardensPaeanOn(IBaseAction wardensPaean, IBattleChara? target, PaeanCastIntent intent, out IAction? action)
 	{
 		action = null;
 
@@ -367,7 +359,7 @@ public sealed class BRD_DefaultPvP : BardRotation
 		{
 			return wardensPaean.CanUse(
 				out action,
-				skipTargetStatusNeedCheck: isProtectivePaean,
+				skipTargetStatusNeedCheck: intent == PaeanCastIntent.Protect,
 				targetOverride: TargetType.Nearest);
 		}
 		finally
