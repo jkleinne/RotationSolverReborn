@@ -27,6 +27,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RotationSolver.GameData", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RotationSolver.DocumentationGenerator", "RotationSolver.DocumentationGenerator\RotationSolver.DocumentationGenerator.csproj", "{17FAD28D-4AC9-42DE-94D0-98ED1BE86595}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RotationSolver.Tests", "RotationSolver.Tests\RotationSolver.Tests.csproj", "{F26BCCDF-F684-4F46-9A6B-457FE88C327A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -53,6 +55,10 @@ Global
 		{17FAD28D-4AC9-42DE-94D0-98ED1BE86595}.Debug|x64.Build.0 = Debug|x64
 		{17FAD28D-4AC9-42DE-94D0-98ED1BE86595}.Release|x64.ActiveCfg = Release|x64
 		{17FAD28D-4AC9-42DE-94D0-98ED1BE86595}.Release|x64.Build.0 = Release|x64
+		{F26BCCDF-F684-4F46-9A6B-457FE88C327A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F26BCCDF-F684-4F46-9A6B-457FE88C327A}.Debug|x64.Build.0 = Debug|Any CPU
+		{F26BCCDF-F684-4F46-9A6B-457FE88C327A}.Release|x64.ActiveCfg = Release|Any CPU
+		{F26BCCDF-F684-4F46-9A6B-457FE88C327A}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

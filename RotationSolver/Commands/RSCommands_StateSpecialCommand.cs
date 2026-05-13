@@ -37,6 +37,8 @@ namespace RotationSolver.Commands
 
 		public static void DoStateCommandType(StateCommandType stateType, int index = -1)
 		{
+			ClearCountdownAutoStateForExternalStateChange();
+
 			DoOneCommandType((type, role) => type.ToStateString(role), role =>
 			{
 				if (!DataCenter.State && DataCenter.IsPvP && !DataCenter.IsPvPStateEnabled && Service.Config.PvpStateControl)
@@ -65,6 +67,8 @@ namespace RotationSolver.Commands
 
 		public static void DoAutodutyStateCommandType(StateCommandType stateType, TargetingType targetingType)
 		{
+			ClearCountdownAutoStateForExternalStateChange();
+
 			DoOneCommandType((type, role) => type.ToStateString(role), role =>
 			{
 				AutodutyUpdateState(stateType, role, targetingType);

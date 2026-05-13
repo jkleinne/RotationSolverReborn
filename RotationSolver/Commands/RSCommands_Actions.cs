@@ -15,7 +15,8 @@ namespace RotationSolver.Commands
 		private static bool started = false;
 		internal static DateTime _lastUsedTime = DateTime.MinValue;
 		internal static uint _lastActionID;
-		private static float _lastCountdownTime = 0;
+		private static bool _isCountdownStateChange;
+		private static AutoOffPolicy.CountdownAutoState _countdownAutoState = AutoOffPolicy.CountdownAutoState.None;
 		private static Job _previousJob = Job.ADV;
 		private static readonly Random random = Random.Shared;
 
@@ -279,6 +280,33 @@ namespace RotationSolver.Commands
 			}
 		}
 
+		internal static void ClearAutoOffTracking()
+		{
+			ActionUpdater.AutoCancelTime = DateTime.MinValue;
+			_countdownAutoState = AutoOffPolicy.CountdownAutoState.None;
+		}
+
+		private static void ClearCountdownAutoStateForExternalStateChange()
+		{
+			if (!_isCountdownStateChange)
+			{
+				_countdownAutoState = AutoOffPolicy.CountdownAutoState.None;
+			}
+		}
+
+		private static void DoCountdownStateCommandType(StateCommandType stateType)
+		{
+			_isCountdownStateChange = true;
+			try
+			{
+				DoStateCommandType(stateType);
+			}
+			finally
+			{
+				_isCountdownStateChange = false;
+			}
+		}
+
 		internal static void SetTargetWithDelay(IGameObject? candidate)
 		{
 			if (candidate == null)
@@ -362,8 +390,11 @@ namespace RotationSolver.Commands
 					return;
 				}
 
-				if (ActionUpdater.AutoCancelTime != DateTime.MinValue &&
-					(!DataCenter.State || DataCenter.InCombat))
+				if (AutoOffPolicy.ShouldClearPendingAfterCombatCancel(
+					ActionUpdater.AutoCancelTime,
+					DataCenter.State,
+					DataCenter.InCombat,
+					didTerritoryChange: false))
 				{
 					ActionUpdater.AutoCancelTime = DateTime.MinValue;
 				}
@@ -401,7 +432,7 @@ namespace RotationSolver.Commands
 					(Service.Config.AutoOffSwitchClass && !DataCenter.IsPvP && Player.Job != _previousJob) ||
 					(Service.Config.AutoOffBetweenArea && !DataCenter.IsAutoDuty && !DataCenter.IsPvP && (Svc.Condition[ConditionFlag.BetweenAreas] || Svc.Condition[ConditionFlag.BetweenAreas51])) ||
 					(Service.Config.CancelStateOnCombatBeforeCountdown && !DataCenter.IsPvP && Service.CountDownTime > 0.2f && DataCenter.InCombat) ||
-					(ActionUpdater.AutoCancelTime != DateTime.MinValue && DateTime.Now > ActionUpdater.AutoCancelTime) || false)
+					AutoOffPolicy.ShouldCancelForPendingAfterCombat(ActionUpdater.AutoCancelTime, DateTime.Now, DataCenter.State, DataCenter.InCombat) || false)
 				{
 					CancelState();
 					if (Player.Job != _previousJob)
@@ -510,25 +541,29 @@ namespace RotationSolver.Commands
 				// StartOnCountdown reads the /countdown agent, which is the PvE pre-pull timer; PvP
 				// match start/respawn timers do not populate it. Even so, gate by !IsPvP so the
 				// PvE auto-on/auto-off semantics never apply inside a PvP match.
-				if (Service.Config.StartOnCountdown && !DataCenter.IsInDutyReplay() && !DataCenter.IsPvP)
+				var countdownDecision = AutoOffPolicy.EvaluateCountdown(
+					Service.Config.StartOnCountdown,
+					DataCenter.IsInDutyReplay(),
+					DataCenter.IsPvP,
+					Service.CountDownTime,
+					DataCenter.State,
+					DataCenter.InCombat,
+					Service.Config.CountdownStartsManualMode,
+					_countdownAutoState);
+				_countdownAutoState = countdownDecision.NextState;
+
+				if (countdownDecision.ShouldStartState)
 				{
-					if (Service.CountDownTime > 0)
-					{
-						_lastCountdownTime = Service.CountDownTime;
-						if (!DataCenter.State)
-						{
-							DoStateCommandType(Service.Config.CountdownStartsManualMode
-								? StateCommandType.Manual
-								: StateCommandType.Auto);
-						}
-						return;
-					}
-					else if (Service.CountDownTime == 0 && _lastCountdownTime > 0.2f)
-					{
-						_lastCountdownTime = 0;
-						CancelState();
-						return;
-					}
+					DoCountdownStateCommandType(countdownDecision.StartManualMode
+						? StateCommandType.Manual
+						: StateCommandType.Auto);
+					return;
+				}
+
+				if (countdownDecision.ShouldCancelState)
+				{
+					CancelState();
+					return;
 				}
 			}
 			catch (Exception ex)
