@@ -1,6 +1,7 @@
 ﻿using System.Numerics;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using RotationSolver.Basic.Actions.PvPTargetSelection;
+using RotationSolver.Basic.Actions.PvPTargetSelection.Factors;
 
 namespace RotationSolver.RebornRotations.PVPRotations.Ranged;
 
@@ -16,6 +17,7 @@ public sealed class BRD_DefaultPvP : BardRotation
 	private const float PaeanHealthyEngageThreshold = 0.65f;
 	private const float PaeanShortCombatDistance = 12f;
 	private const int PaeanMaxFocusedHostilesForEngage = 1;
+	private const float RepellingBackstepYalms = 10f;
 	private const float PaeanPeelScoreThreshold = 2f;
 	private const float PaeanEngageScoreThreshold = 3f;
 	private const float PaeanCleanseBaseWeight = 100f;
@@ -42,7 +44,7 @@ public sealed class BRD_DefaultPvP : BardRotation
 	#region Configurations
 
 	[RotationConfig(CombatType.PvP, Name = "Use Warden's Paean on other players")]
-	public bool BRDEsuna2 { get; set; } = false;
+	public bool BRDEsuna2 { get; set; } = true;
 	#endregion
 
 	#region oGCDs
@@ -150,7 +152,9 @@ public sealed class BRD_DefaultPvP : BardRotation
 
 			var focusCount = CountHostilesTargeting(member);
 			var healthRatio = member.GetHealthRatio();
-			if (focusCount == 0 && healthRatio > PaeanLowHpThreshold)
+			if (!BardPvPDecisionPolicy.ShouldUseProtectivePaean(
+				healthRatio,
+				focusCount))
 			{
 				continue;
 			}
@@ -372,7 +376,11 @@ public sealed class BRD_DefaultPvP : BardRotation
 	{
 		if (RepellingShotPvP.CanUse(out action))
 		{
-			if (!StatusHelper.PlayerHasStatus(true, StatusID.Repertoire))
+			var input = BuildShutdownInput(
+				RepellingShotPvP,
+				IsRepellingBackstepSafe(RepellingShotPvP.Target.Target));
+
+			if (BardPvPDecisionPolicy.ShouldUseRepellingShot(input))
 			{
 				return true;
 			}
@@ -380,7 +388,8 @@ public sealed class BRD_DefaultPvP : BardRotation
 
 		if (SilentNocturnePvP.CanUse(out action))
 		{
-			if (!StatusHelper.PlayerHasStatus(true, StatusID.Repertoire))
+			var input = BuildShutdownInput(SilentNocturnePvP, safeBackstepExists: true);
+			if (BardPvPDecisionPolicy.ShouldUseSilentNocturne(input))
 			{
 				return true;
 			}
@@ -398,6 +407,82 @@ public sealed class BRD_DefaultPvP : BardRotation
 		}
 
 		return base.AttackAbility(nextGCD, out action);
+	}
+
+	private static BardPvPShutdownInput BuildShutdownInput(IBaseAction action, bool safeBackstepExists)
+	{
+		var target = action.Target.Target;
+		return new BardPvPShutdownInput(
+			TargetHasResilience: target.HasStatus(false, StatusID.Resilience),
+			TargetIsCasting: target.IsCasting && target.IsCastInterruptible,
+			TargetThreatensFragileAlly: TargetThreatensProtectedAlly(target),
+			TargetIsBurstWorthy: IsBurstWorthy(target),
+			TargetHasLowMp: target.CurrentMp <= PvPScoringFactors.MediumMp,
+			TargetHealthRatio: target.GetHealthRatio(),
+			TargetDistance: target.DistanceToPlayer(),
+			SafeBackstepExists: safeBackstepExists,
+			ObjectiveControlNeeded: IsObjectiveRelevantTarget(target));
+	}
+
+	private static bool TargetThreatensProtectedAlly(IBattleChara target)
+	{
+		if (target.TargetObjectId == 0)
+		{
+			return false;
+		}
+
+		return ThreatenedAllyState.BuildThreatenedAllyIds().Contains(target.TargetObjectId);
+	}
+
+	private static bool IsBurstWorthy(IBattleChara target)
+	{
+		if (target.MaxHp <= 0 || !target.IsEnemy())
+		{
+			return false;
+		}
+
+		var database = PvPMitigationDatabaseProvider.Current;
+		var effectiveHp = EffectiveHpCalculator.Compute(target, database);
+		var effectiveHpRatio = double.IsPositiveInfinity(effectiveHp)
+			? double.PositiveInfinity
+			: effectiveHp / target.MaxHp;
+
+		var score = PvPTargetScorer.Explain(target, PvPScoringContextBuilder.BuildCurrent(GetContextHostiles(target)));
+		var input = new PvPBurstDecisionInput(
+			Intent: PvPBurstIntent.Burst,
+			EffectiveHpRatio: effectiveHpRatio,
+			ActiveDamageReduction: MitigationPenalty.Compute(target, database),
+			Score: score);
+
+		return PvPBurstDecision.Evaluate(input) != PvPBurstRecommendation.Hold;
+	}
+
+	private static IReadOnlyList<IBattleChara> GetContextHostiles(IBattleChara target)
+	{
+		return DataCenter.AllHostileTargets.Count > 0 ? DataCenter.AllHostileTargets : [target];
+	}
+
+	private static bool IsObjectiveRelevantTarget(IBattleChara target)
+	{
+		return PvPObjectiveState.BuildObjectiveRelevantTargetIds().Contains(target.GameObjectId);
+	}
+
+	private static bool IsRepellingBackstepSafe(IBattleChara target)
+	{
+		if (Player == null)
+		{
+			return false;
+		}
+
+		var awayFromTarget = Player.Position - target.Position;
+		if (awayFromTarget.LengthSquared() <= float.Epsilon)
+		{
+			return false;
+		}
+
+		var destination = Player.Position + Vector3.Normalize(awayFromTarget) * RepellingBackstepYalms;
+		return DataCenter.IsMovementDestinationSafe(destination)
+			&& DataCenter.IsFixedDashSafe(Player.Position, destination);
 	}
 	#endregion
 

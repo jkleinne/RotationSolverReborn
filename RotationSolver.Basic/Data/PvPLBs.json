@@ -1,1 +1,23 @@
-[]
+[
+  { "ActionId": 29069, "Category": "Utility",   "Description": "PLD Phalanx" },
+  { "ActionId": 29083, "Category": "Utility",   "Description": "WAR Primal Scream" },
+  { "ActionId": 29097, "Category": "Offensive", "Description": "DRK Eventide" },
+  { "ActionId": 29130, "Category": "Offensive", "Description": "GNB Relentless Rush" },
+  { "ActionId": 29485, "Category": "Offensive", "Description": "MNK Meteodrive" },
+  { "ActionId": 29497, "Category": "Offensive", "Description": "DRG Sky High" },
+  { "ActionId": 29515, "Category": "Offensive", "Description": "NIN Seiton Tenchu" },
+  { "ActionId": 29537, "Category": "Offensive", "Description": "SAM Zantetsuken" },
+  { "ActionId": 29553, "Category": "Utility",   "Description": "RPR Tenebrae Lemurum" },
+  { "ActionId": 39190, "Category": "Offensive", "Description": "VPR World-swallower" },
+  { "ActionId": 29401, "Category": "Utility",   "Description": "BRD Final Fantasia" },
+  { "ActionId": 29415, "Category": "Offensive", "Description": "MCH Marksman's Spite" },
+  { "ActionId": 29432, "Category": "Utility",   "Description": "DNC Contradance" },
+  { "ActionId": 29662, "Category": "Utility",   "Description": "BLM Soul Resonance" },
+  { "ActionId": 29673, "Category": "Offensive", "Description": "SMN Summon Bahamut" },
+  { "ActionId": 41498, "Category": "Offensive", "Description": "RDM Southern Cross" },
+  { "ActionId": 39215, "Category": "Utility",   "Description": "PCT Advent of Chocobastion" },
+  { "ActionId": 29230, "Category": "Healing",   "Description": "WHM Afflatus Purgation" },
+  { "ActionId": 41502, "Category": "Healing",   "Description": "SCH Seraphism" },
+  { "ActionId": 29255, "Category": "Healing",   "Description": "AST Celestial River" },
+  { "ActionId": 29266, "Category": "Healing",   "Description": "SGE Mesotes" }
+]

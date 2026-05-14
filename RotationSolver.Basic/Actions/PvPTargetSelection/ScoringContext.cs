@@ -12,4 +12,5 @@ public sealed record ScoringContext(
     ulong? CrystalCarrierObjectId,
     IReadOnlyList<IBattleChara> Hostiles,
     IReadOnlySet<ulong> ThreatenedAllyIds,
+    IReadOnlySet<ulong> ObjectiveRelevantTargetIds,
     float EffectiveRangeYalms);

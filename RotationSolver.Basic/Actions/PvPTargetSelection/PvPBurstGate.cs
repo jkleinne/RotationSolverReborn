@@ -1,4 +1,5 @@
 using ECommons.GameFunctions;
+using RotationSolver.Basic.Actions.PvPTargetSelection.Factors;
 
 namespace RotationSolver.Basic.Actions.PvPTargetSelection;
 
@@ -40,7 +41,7 @@ public static class PvPBurstGate
         var input = new PvPBurstDecisionInput(
             Intent: intent,
             EffectiveHpRatio: effectiveHpRatio,
-            ActiveDamageReduction: ComputeActiveDamageReduction(target, database),
+            ActiveDamageReduction: MitigationPenalty.Compute(target, database),
             Score: score);
 
         return PvPBurstDecision.Evaluate(input) != PvPBurstRecommendation.Hold;
@@ -118,19 +119,4 @@ public static class PvPBurstGate
         return target != null && target.MaxHp > 0 && target.IsEnemy();
     }
 
-    private static double ComputeActiveDamageReduction(IBattleChara target, IMitigationDatabase database)
-    {
-        var statusList = target.StatusList;
-        if (statusList == null) return 0.0;
-
-        var total = 0.0;
-        foreach (var status in statusList)
-        {
-            if (!database.TryGet((StatusID)status.StatusId, out var entry)) continue;
-            if (entry.Kind == MitigationKind.Invuln) continue;
-            total += entry.DamageReductionPercent;
-        }
-
-        return total;
-    }
 }

@@ -57,6 +57,7 @@ public static class PvPBurstDecision
         if (score.Carrier > PrioritySignalContribution) return true;
         if (score.LB > PrioritySignalContribution) return true;
         if (score.Threat > PrioritySignalContribution) return true;
+        if (score.Objective > PrioritySignalContribution) return true;
         return score.Role >= HighRoleContribution && score.Total >= ValuableTargetScore;
     }
 }

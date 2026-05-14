@@ -2,6 +2,7 @@
 using ECommons.DalamudServices;
 using ECommons.ExcelServices;
 using ECommons.Logging;
+using RotationSolver.Basic.Actions.PvPTargetSelection;
 using System.Collections.Concurrent;
 using static RotationSolver.Basic.Configuration.ConfigTypes;
 
@@ -40,7 +41,8 @@ internal partial class Configs : IPluginConfiguration
 		List3 = "List3",
 		Debug = "Debug";
 
-	public const int CurrentVersion = 12;
+	public const int CurrentVersion = 13;
+	private const int BardControlSupportConfigVersion = 13;
 	public int Version { get; set; } = CurrentVersion;
 
 	public string LastSeenChangelog { get; set; } = "0.0.0.0";
@@ -56,11 +58,10 @@ internal partial class Configs : IPluginConfiguration
 
 	[UI("PvP scoring preset for the PvPSmart targeting mode.\nCasual: forgiving role-weighted tuning. Ranked: mitigation-heavy, more reactive. Custom: read from PvPScoringWeights below.")]
 	public RotationSolver.Basic.Actions.PvPTargetSelection.ScoringPreset PvPScoringPreset { get; set; }
-		= RotationSolver.Basic.Actions.PvPTargetSelection.ScoringPreset.Casual;
+		= RotationSolver.Basic.Actions.PvPTargetSelection.ScoringWeights.DefaultPreset;
 
 	public RotationSolver.Basic.Actions.PvPTargetSelection.ScoringWeights PvPScoringWeights { get; set; }
-		= RotationSolver.Basic.Actions.PvPTargetSelection.ScoringWeights.ForPreset(
-			RotationSolver.Basic.Actions.PvPTargetSelection.ScoringPreset.Casual);
+		= RotationSolver.Basic.Actions.PvPTargetSelection.ScoringWeights.DefaultWeights;
 
 	[UI("Show a debug overlay with per-target PvPSmart score breakdowns while in PvP.\nThe overlay refreshes each frame and is intended for tuning the scoring weights. Has no effect outside PvP zones.")]
 	public bool PvPSmartShowDebugOverlay { get; set; } = false;
@@ -1369,13 +1370,25 @@ internal partial class Configs : IPluginConfiguration
 
 	public static Configs Migrate(Configs oldConfigs)
 	{
-		// Implement migration logic if needed
-		if (oldConfigs.Version != CurrentVersion)
+		if (oldConfigs.Version > CurrentVersion || oldConfigs.Version < 12)
 		{
-			// Reset to default if versions do not match
 			return new Configs();
 		}
+
+		if (oldConfigs.Version < BardControlSupportConfigVersion)
+		{
+			oldConfigs.MigrateBardControlSupportConfig();
+		}
+
+		oldConfigs.Version = CurrentVersion;
 		return oldConfigs;
+	}
+
+	private void MigrateBardControlSupportConfig()
+	{
+		var migrated = ScoringWeights.MigrateLegacyConfig(PvPScoringPreset, PvPScoringWeights);
+		PvPScoringPreset = migrated.Preset;
+		PvPScoringWeights = migrated.Weights;
 	}
 
 	public void Backup()

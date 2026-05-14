@@ -87,7 +87,11 @@ public sealed class LBDatabase : ILBDatabase
     private static void TryWarn(string message)
     {
         try { PluginLog.Warning(message); }
-        catch { /* no plugin context — swallow */ }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"Unable to write PvP LB warning to plugin log ({ex.Message}). Original warning: {message}");
+        }
     }
 
     private static Dictionary<uint, LBEntry> BuildDictionary(IEnumerable<LBEntry> entries)
