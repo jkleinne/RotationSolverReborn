@@ -26,7 +26,7 @@ internal class PvPSmartDebugOverlay : Window
         Size = new Vector2(980, 260);
         SizeCondition = ImGuiCond.FirstUseEver;
         RespectCloseHotkey = true;
-        IsOpen = Service.Config.PvPSmartShowDebugOverlay;
+        IsOpen = true;
     }
 
     public override bool DrawConditions()
