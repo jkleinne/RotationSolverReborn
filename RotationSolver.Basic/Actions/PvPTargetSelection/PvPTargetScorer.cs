@@ -24,7 +24,7 @@ public static class PvPTargetScorer
 
     /// <summary>
     /// Return the per-term breakdown of a target's score. Use this when per-factor attribution
-    /// is needed — the debug overlay (Task 4), empirical weight tuning, or future diagnostics.
+    /// is needed, for example the debug overlay, empirical weight tuning, or future diagnostics.
     /// For the hot target-selection path, use <see cref="Score"/> instead; it returns only the
     /// composed scalar and discards the breakdown.
     /// </summary>
@@ -38,6 +38,7 @@ public static class PvPTargetScorer
             return new ScoreBreakdown(
                 Role: 0.0, Finish: 0.0, Mitigation: 0.0, Distance: 0.0, Sticky: 0.0,
                 Carrier: 0.0, LB: 0.0, Isolation: 0.0, Threat: 0.0,
+                MpPressure: 0.0, Resilience: 0.0, Objective: 0.0,
                 Invuln: true, Total: double.NegativeInfinity);
         }
 
@@ -56,8 +57,11 @@ public static class PvPTargetScorer
         var lbTerm        = context.Weights.LBWeight                  * LBCastFactor.Compute(target, context.LBDatabase);
         var isolationTerm = context.Weights.IsolationWeight           * IsolationFactor.Compute(target, context.Hostiles);
         var threatTerm    = context.Weights.ThreatWeight              * ThreatFactor.Compute(target, context.ThreatenedAllyIds);
+        var mpTerm        = context.Weights.MpPressureWeight          * PvPScoringFactors.ComputeMpPressure(target.CurrentMp);
+        var resilienceTerm = context.Weights.ResiliencePenaltyWeight  * PvPScoringFactors.ComputeResiliencePenalty(HasStatus(target, StatusID.Resilience));
+        var objectiveTerm = context.Weights.ObjectiveWeight           * PvPScoringFactors.ComputeObjectivePressure(target.GameObjectId, context.ObjectiveRelevantTargetIds);
 
-        var total = roleTerm + finishTerm - mitigTerm - distanceTerm + stickyTerm + carrierTerm + lbTerm + isolationTerm + threatTerm;
+        var total = roleTerm + finishTerm - mitigTerm - distanceTerm + stickyTerm + carrierTerm + lbTerm + isolationTerm + threatTerm + mpTerm - resilienceTerm + objectiveTerm;
 
         return new ScoreBreakdown(
             Role: roleTerm,
@@ -69,6 +73,9 @@ public static class PvPTargetScorer
             LB: lbTerm,
             Isolation: isolationTerm,
             Threat: threatTerm,
+            MpPressure: mpTerm,
+            Resilience: resilienceTerm,
+            Objective: objectiveTerm,
             Invuln: false,
             Total: total);
     }
@@ -84,6 +91,22 @@ public static class PvPTargetScorer
                 return true;
             }
         }
+        return false;
+    }
+
+    private static bool HasStatus(IBattleChara target, StatusID statusId)
+    {
+        var statusList = target.StatusList;
+        if (statusList == null) return false;
+
+        foreach (var status in statusList)
+        {
+            if ((StatusID)status.StatusId == statusId)
+            {
+                return true;
+            }
+        }
+
         return false;
     }
 

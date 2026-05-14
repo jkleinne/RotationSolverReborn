@@ -23,7 +23,7 @@ internal class PvPSmartDebugOverlay : Window
 
     public PvPSmartDebugOverlay() : base("PvPSmart Score Breakdown", BaseFlags)
     {
-        Size = new Vector2(820, 260);
+        Size = new Vector2(980, 260);
         SizeCondition = ImGuiCond.FirstUseEver;
         RespectCloseHotkey = true;
         IsOpen = Service.Config.PvPSmartShowDebugOverlay;
@@ -63,7 +63,7 @@ internal class PvPSmartDebugOverlay : Window
         const ImGuiTableFlags TableFlags =
             ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp;
 
-        if (!ImGui.BeginTable("##pvpsmart_breakdown", 13, TableFlags))
+        if (!ImGui.BeginTable("##pvpsmart_breakdown", 16, TableFlags))
         {
             return;
         }
@@ -80,6 +80,9 @@ internal class PvPSmartDebugOverlay : Window
         ImGui.TableSetupColumn("LB");
         ImGui.TableSetupColumn("Isol");
         ImGui.TableSetupColumn("Threat");
+        ImGui.TableSetupColumn("MP");
+        ImGui.TableSetupColumn("-Resil");
+        ImGui.TableSetupColumn("Obj");
         ImGui.TableSetupColumn("Invuln");
         ImGui.TableHeadersRow();
 
@@ -123,6 +126,9 @@ internal class PvPSmartDebugOverlay : Window
             ImGui.TableNextColumn(); ImGui.TextUnformatted(b.LB.ToString("F3"));
             ImGui.TableNextColumn(); ImGui.TextUnformatted(b.Isolation.ToString("F3"));
             ImGui.TableNextColumn(); ImGui.TextUnformatted(b.Threat.ToString("F3"));
+            ImGui.TableNextColumn(); ImGui.TextUnformatted(b.MpPressure.ToString("F3"));
+            ImGui.TableNextColumn(); ImGui.TextUnformatted(b.Resilience.ToString("F3"));
+            ImGui.TableNextColumn(); ImGui.TextUnformatted(b.Objective.ToString("F3"));
             ImGui.TableNextColumn(); ImGui.TextUnformatted(b.Invuln ? "Y" : "");
         }
 

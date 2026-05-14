@@ -33,6 +33,7 @@ public sealed class MitigationDatabase : IMitigationDatabase
         new MitigationEntry(StatusID.LivingDead,      MitigationKind.Invuln,  0.00, "DRK Living Dead: invulnerability state until expiration."),
         new MitigationEntry(StatusID.Holmgang_409,    MitigationKind.Invuln,  0.00, "WAR Holmgang: true invulnerability."),
         new MitigationEntry(StatusID.Superbolide,     MitigationKind.Invuln,  0.00, "GNB Superbolide: drops to 1 HP with self-recovery; conservative skip."),
+        new MitigationEntry(StatusID.Resilience,      MitigationKind.HeavyDR, 0.00, "PvP Resilience: control protection from Purify, modeled as non-DR for scoring."),
         new MitigationEntry(StatusID.Bloodwhetting,   MitigationKind.HeavyDR, 0.50, "WAR Bloodwhetting: heavy DR plus self-heal."),
         new MitigationEntry(StatusID.SacredSoil,      MitigationKind.Shield,  0.20, "SCH Sacred Soil: damage shield, modeled as DR equivalent."),
         new MitigationEntry(StatusID.Macrocosmos,     MitigationKind.Shield,  0.20, "AST Macrocosmos: damage shield plus delayed heal."),
@@ -110,7 +111,11 @@ public sealed class MitigationDatabase : IMitigationDatabase
     private static void TryWarn(string message)
     {
         try { PluginLog.Warning(message); }
-        catch { /* no plugin context — swallow */ }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"Unable to write PvP mitigation warning to plugin log ({ex.Message}). Original warning: {message}");
+        }
     }
 
     private static Dictionary<StatusID, MitigationEntry> BuildDictionary(IEnumerable<MitigationEntry> entries)

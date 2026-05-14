@@ -4,7 +4,7 @@ namespace RotationSolver.Basic.Actions.PvPTargetSelection;
 /// Per-target, per-term breakdown of a <see cref="PvPTargetScorer"/> computation.
 /// Each field holds the <em>weighted</em> contribution (i.e., factor output multiplied
 /// by the corresponding <see cref="ScoringWeights"/> entry). Penalty terms
-/// (<see cref="Mitigation"/>, <see cref="Distance"/>) are stored as their positive
+/// (<see cref="Mitigation"/>, <see cref="Distance"/>, <see cref="Resilience"/>) are stored as their positive
 /// magnitude; the scorer subtracts them. <see cref="Total"/> is the composed scalar.
 ///
 /// <para>
@@ -17,7 +17,7 @@ namespace RotationSolver.Basic.Actions.PvPTargetSelection;
 /// only <see cref="Total"/> (which holds <see cref="double.NegativeInfinity"/>) is meaningful.
 /// </para>
 /// </summary>
-// All call sites construct this with named arguments, never positional. With 11 fields
+// All call sites construct this with named arguments, never positional. With 14 fields
 // silently swapping values would be undetectable; the named-args discipline is load-bearing.
 public readonly record struct ScoreBreakdown(
     double Role,
@@ -29,5 +29,8 @@ public readonly record struct ScoreBreakdown(
     double LB,
     double Isolation,
     double Threat,
+    double MpPressure,
+    double Resilience,
+    double Objective,
     bool Invuln,
     double Total);

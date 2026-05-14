@@ -7,8 +7,8 @@ namespace RotationSolver.Basic.Actions.PvPTargetSelection;
 /// drift between the two would silently invalidate empirical tuning observations.
 ///
 /// <para>
-/// Pure on its single <paramref name="hostiles"/> input from the caller's perspective —
-/// all other state is sourced from <see cref="Service.Config"/>, the static provider
+/// Pure on its single <paramref name="hostiles"/> input from the caller's perspective.
+/// All other state is sourced from <see cref="Service.Config"/>, the static provider
 /// singletons (mitigation DB, LB DB), and the per-frame DataCenter snapshots.
 /// </para>
 /// </summary>
@@ -39,6 +39,7 @@ public static class PvPScoringContextBuilder
             CrystalCarrierObjectId: CrystalCarrierState.GetCurrentCarrierId(),
             Hostiles: hostiles,
             ThreatenedAllyIds: ThreatenedAllyState.BuildThreatenedAllyIds(),
+            ObjectiveRelevantTargetIds: PvPObjectiveState.BuildObjectiveRelevantTargetIds(),
             EffectiveRangeYalms: DefaultEffectiveRangeYalms);
     }
 }

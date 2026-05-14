@@ -9,6 +9,10 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPScoringFactors.cs" Link="PvPScoringFactors.cs" />
+		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\ScoringPreset.cs" Link="ScoringPreset.cs" />
+		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\ScoringWeights.cs" Link="ScoringWeights.cs" />
 		<Compile Include="..\RotationSolver\Commands\AutoOffPolicy.cs" Link="AutoOffPolicy.cs" />
+		<Compile Include="..\RotationSolver\RebornRotations\PVPRotations\Ranged\BardPvPDecisionPolicy.cs" Link="BardPvPDecisionPolicy.cs" />
 	</ItemGroup>
 </Project>
