@@ -1,37 +1,41 @@
 
 # [![](https://raw.githubusercontent.com/FFXIV-CombatReborn/RebornAssets/main/IconAssets/RSR_Icon.png)](https://github.com/FFXIV-CombatReborn/RotationSolverReborn)
 
-**Ascended Rotation Solver Reborn — personal fork of RSR**
+**Ascended Rotation Solver Reborn, personal fork of RSR**
 
 ![Github License](https://img.shields.io/github/license/FFXIV-CombatReborn/RotationSolverReborn.svg?label=License&style=for-the-badge)
 
-This is a personal fork of [FFXIV-CombatReborn/RotationSolverReborn](https://github.com/FFXIV-CombatReborn/RotationSolverReborn). It tracks upstream and layers one experimental feature on top: a scoring-based PvP hostile target selector (`PvPSmart`). PvE behavior is identical to upstream.
+This is a personal fork of [FFXIV-CombatReborn/RotationSolverReborn](https://github.com/FFXIV-CombatReborn/RotationSolverReborn). It tracks upstream selectively and keeps a separate package identity, plugin manifest, and Dalamud repository entry for the `ascended-*` plugin set.
 
-If you don't specifically want the `PvPSmart` targeting mode, install upstream RSR instead. This fork does not publish its own Dalamud plugin repository; it exists primarily as a development branch for the PvP targeting work.
+The fork focuses on PvP automation quality. Its main additions are `PvPSmart` hostile targeting, PvP burst conservation, Bard control support, and match-aware auto on/off behavior. PvE rotation behavior is intended to stay aligned with upstream.
+
+If you do not specifically want the PvP changes, install upstream RSR instead.
 
 ## What this fork adds
 
 A new `TargetingType.PvPSmart` mode that replaces the role-blind `Auto(LowHP)` cycle in PvP with a scoring-based selector. For each candidate hostile, the scorer composes a weighted scalar over pure factors and picks the argmax:
 
-- **Invuln short-circuit** — Guard, Hallowed Ground, Living Dead, Holmgang, Superbolide are skipped outright
-- **Role value** — Healer / Ranged DPS weighted above Melee / Tank
-- **Effective HP & finish** — current HP scaled by active mitigation statuses, with a finish-kill bias when a candidate is within burst range
-- **Mitigation penalty** — heavy DR cooldowns deprioritize a target during the window they're active
-- **Distance penalty** — soft falloff as targets approach the effective range edge
-- **Hysteresis** — small sticky bonus for the previous target to prevent GCD-to-GCD oscillation between near-equal candidates
-- **Crystal carrier awareness** *(Crystalline Conflict)* — the hostile holding the crystal gains a bonus
-- **LB cast awareness** — hostiles mid-cast on a Limit Break gain a bonus (interrupt priority)
-- **Isolation factor** — sigmoid bonus the further a hostile is from its nearest ally (catches stragglers)
-- **Threat factor** — bonus when a hostile is targeting a low-HP ally or a party healer (peel priority)
-- **Burst conservation** — high-impact PvP burst actions are held through unclear windows and spent on valuable, vulnerable, or kill-secure targets
+- **Invuln short-circuit:** Guard, Hallowed Ground, Living Dead, Holmgang, Superbolide are skipped outright
+- **Role value:** Healer / Ranged DPS weighted above Melee / Tank
+- **Effective HP & finish:** current HP scaled by active mitigation statuses, with a finish-kill bias when a candidate is within burst range
+- **Mitigation penalty:** heavy DR cooldowns deprioritize a target during the window they're active
+- **Distance penalty:** soft falloff as targets approach the effective range edge
+- **Hysteresis:** small sticky bonus for the previous target to prevent GCD-to-GCD oscillation between near-equal candidates
+- **Crystal carrier awareness** *(Crystalline Conflict)*: the hostile holding the crystal gains a bonus
+- **LB cast awareness:** hostiles mid-cast on a Limit Break gain a bonus (interrupt priority)
+- **Isolation factor:** sigmoid bonus the further a hostile is from its nearest ally (catches stragglers)
+- **Threat factor:** bonus when a hostile is targeting a low-HP ally or a party healer (peel priority)
+- **Burst conservation:** high-impact PvP burst actions are held through unclear windows and spent on valuable, vulnerable, or kill-secure targets
+- **Bard support logic:** Warden's Paean prioritizes cleanse, peel, and engage targets, while Repelling Shot and Silent Nocturne check target value before firing
+- **PvP state handling:** optional auto on/off behavior follows PvP match start, match end, death, countdown, and duty transition signals
 
-Two preset weight profiles (Casual, Ranked) are bundled, plus a Custom preset for hand-tuned weights. A toggleable debug overlay renders the full per-target score breakdown in real time for tuning.
+Two preset weight profiles (Casual, Ranked) are bundled, plus a Custom preset for hand-tuned weights. Ranked is the default preset. A toggleable debug overlay renders the full per-target score breakdown in real time for tuning.
 
 The existing `PvPHealers` / `PvPDPS` / `PvPTanks` modes remain as explicit role overrides.
 
-### Testing burst conservation
+### Testing PvP behavior
 
-Burst conservation is experimental. The current fail safe behavior needs separate in-game validation across PvP jobs.
+The PvP changes are experimental and should be validated in live PvP after updates, especially Bard support decisions and burst conservation.
 
 Burst conservation is enabled by default after installing this fork. To toggle it, open RSR settings and go to `Duty` > `PvP`, then use:
 
@@ -39,7 +43,7 @@ Burst conservation is enabled by default after installing this fork. To toggle i
 Conserve burst in PvP unless the target is valuable, vulnerable, or killable.
 ```
 
-For the intended Ranked Crystalline Conflict behavior, also make sure `Target` > `Hostile` has `PvPSmart` in the PvP hostile targeting list, preferably first.
+For the intended Ranked Crystalline Conflict behavior, also make sure `Target` > `Hostile` has `PvPSmart` in the PvP hostile targeting list, preferably first. The same settings area exposes the PvP scoring preset and the debug overlay toggle.
 
 Some high-impact actions still honor the gate, but spend if a charge cap or ready timer would otherwise be wasted.
 
@@ -47,18 +51,19 @@ This setting may lower raw total damage because it avoids spending burst into Gu
 
 ### Status & caveats
 
-- Starting weights are conservative seeds. Empirical tuning across Ranked CC matches is pending.
-- Crystal-carrier `StatusID` and the `PvPLBs.json` database are stubs awaiting in-game observation; the carrier and LB factors evaluate to zero until those are populated.
+- Scoring weights still need empirical tuning across Ranked CC matches.
+- Crystal-carrier `StatusID` is still unverified. The carrier factor evaluates to zero until that status is populated.
+- The PvP Limit Break database is populated, but match behavior should still be checked against live casts after game updates.
 
 ## Upstream features
 
 Everything below is inherited unchanged from upstream RSR:
 
-- **Dynamic Rotation Guidance (Training Mode)** — real-time rotation suggestions tailored to the in-game situation
-- **Customizable Settings** — adjust rotations per preference, encounter, and boss mechanics
-- **Comprehensive Database** — extensive class ability coverage for accurate rotation
-- **User-Friendly Interface** — clean ImGui surface
-- **Regular Updates** — upstream tracks game patches and class changes; this fork periodically pulls from it
+- **Dynamic Rotation Guidance (Training Mode):** real-time rotation suggestions tailored to the in-game situation
+- **Customizable Settings:** adjust rotations per preference, encounter, and boss mechanics
+- **Comprehensive Database:** extensive class ability coverage for accurate rotation
+- **User-Friendly Interface:** clean ImGui surface
+- **Regular Updates:** upstream tracks game patches and class changes; this fork periodically pulls from it
 
 ## Installing
 
@@ -88,7 +93,7 @@ https://raw.githubusercontent.com/FFXIV-CombatReborn/CombatRebornRepo/main/plugi
 PvP targeting work goes here. Anything else should be contributed upstream:
 
 - For PvP scoring changes (factors, weights, debug overlay): fork this repo, branch from `main`, open a PR against `jkleinne/ascended-rotationsolverreborn:main`
-- For everything else (rotations, PvE behavior, core engine): contribute to [upstream RSR](https://github.com/FFXIV-CombatReborn/RotationSolverReborn) instead — changes there flow into this fork on the next sync
+- For everything else (rotations, PvE behavior, core engine): contribute to [upstream RSR](https://github.com/FFXIV-CombatReborn/RotationSolverReborn) instead. Changes there flow into this fork on the next sync
 
 Combat rotation changes should be validated against [Stone, Sky, Sea](https://ffxiv.consolegameswiki.com/wiki/Stone,_Sky,_Sea) per expansion before submission.
 
