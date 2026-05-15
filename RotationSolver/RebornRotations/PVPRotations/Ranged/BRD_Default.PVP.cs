@@ -646,7 +646,7 @@ public sealed class BRD_DefaultPvP : BardRotation
 		return base.GeneralGCD(out action);
 	}
 
-	private static bool TryUseDirectSecureGcd(out IAction? action)
+	private bool TryUseDirectSecureGcd(out IAction? action)
 	{
 		if (TryUseDirectSecureAction(HarmonicArrowPvP, HarmonicArrowPotency, out action))
 		{
