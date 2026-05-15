@@ -29,6 +29,20 @@ var tests = new (string Name, Action Test)[]
 	("repelling accepts safe peel", RepellingAcceptsSafePeel),
 	("protective paean rejects healthy unfocused ally", ProtectivePaeanRejectsHealthyUnfocusedAlly),
 	("protective paean allows focused ally", ProtectivePaeanAllowsFocusedAlly),
+	("machinist target policy prefers killable low resource target", MachinistTargetPolicyPrefersKillableLowResourceTarget),
+	("machinist target policy allows guarded drill punish", MachinistTargetPolicyAllowsGuardedDrillPunish),
+	("machinist analysis drill rejects full resource target", MachinistAnalysisDrillRejectsFullResourceTarget),
+	("machinist analysis air anchor rejects resilient target", MachinistAnalysisAirAnchorRejectsResilientTarget),
+	("machinist analysis air anchor rejects isolated setup", MachinistAnalysisAirAnchorRejectsIsolatedSetup),
+	("machinist analysis chain saw requires follow up", MachinistAnalysisChainSawRequiresFollowUp),
+	("machinist scattergun rejects unsafe close range", MachinistScattergunRejectsUnsafeCloseRange),
+	("machinist wildfire requires committed target and follow up", MachinistWildfireRequiresCommittedTargetAndFollowUp),
+	("machinist bishop accepts objective teamfight", MachinistBishopAcceptsObjectiveTeamfight),
+	("machinist bishop rejects out of range targets", MachinistBishopRejectsOutOfRangeTargets),
+	("machinist marksmans spite rejects guard", MachinistMarksmanSpiteRejectsGuard),
+	("machinist marksmans spite accepts low mp kill window", MachinistMarksmanSpiteAcceptsLowMpKillWindow),
+	("machinist marksmans spite accepts vulnerable target", MachinistMarksmanSpiteAcceptsVulnerableTarget),
+	("machinist full metal rejects uncommitted follow up", MachinistFullMetalRejectsUncommittedFollowUp),
 	("pvp lb json contains verified entries", PvpLbJsonContainsVerifiedEntries),
 	("pvp mitigation json contains resilience", PvpMitigationJsonContainsResilience),
 };
@@ -417,6 +431,224 @@ static void ProtectivePaeanAllowsFocusedAlly()
 	AssertTrue(
 		BardPvPDecisionPolicy.ShouldUseProtectivePaean(0.60f, 1),
 		"focused ally near pressure threshold should receive fake-shield Paean");
+}
+
+static void MachinistTargetPolicyPrefersKillableLowResourceTarget()
+{
+	var highResourceTarget = MachinistTarget(1, healthRatio: 0.40f, currentMp: 10_000);
+	var lowResourceTarget = MachinistTarget(2, healthRatio: 0.40f, currentMp: 2_000);
+
+	var selected = MachinistPvPTargetPolicy.SelectBest(
+		[highResourceTarget, lowResourceTarget],
+		MachinistPvPActionIntent.MarksmanSpite);
+
+	AssertEqual(2UL, selected?.TargetId, "MCH should prefer the target that cannot answer with repeated Recuperates");
+}
+
+static void MachinistTargetPolicyAllowsGuardedDrillPunish()
+{
+	var guardedLowTarget = MachinistTarget(
+		1,
+		healthRatio: 0.25f,
+		currentMp: 2_000,
+		hasGuard: true);
+	var exposedHealthyTarget = MachinistTarget(2, healthRatio: 0.70f, currentMp: 2_000);
+
+	var selected = MachinistPvPTargetPolicy.SelectBest(
+		[guardedLowTarget, exposedHealthyTarget],
+		MachinistPvPActionIntent.AnalysisDrill);
+
+	AssertEqual(1UL, selected?.TargetId, "Analysis Drill should be allowed to punish low HP Guard");
+}
+
+static void MachinistAnalysisDrillRejectsFullResourceTarget()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(1, healthRatio: 0.90f, currentMp: 10_000),
+		SafeCloseRange: true,
+		FollowUpAvailable: false,
+		AlliesCanBurst: false,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: false);
+
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseAnalysisDrill(input), "Analysis Drill should not pad into full-resource targets");
+}
+
+static void MachinistAnalysisAirAnchorRejectsResilientTarget()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(1, healthRatio: 0.30f, currentMp: 2_000, hasResilience: true),
+		SafeCloseRange: true,
+		FollowUpAvailable: true,
+		AlliesCanBurst: true,
+		ObjectiveControlNeeded: true,
+		TargetCommitted: true);
+
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseAnalysisAirAnchor(input), "Analysis Air Anchor should reject Resilience when stun value matters");
+}
+
+static void MachinistAnalysisAirAnchorRejectsIsolatedSetup()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(1, healthRatio: 0.90f, currentMp: 10_000),
+		SafeCloseRange: true,
+		FollowUpAvailable: true,
+		AlliesCanBurst: false,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: true);
+
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseAnalysisAirAnchor(input), "Analysis Air Anchor should not spend stun on an isolated durable target");
+}
+
+static void MachinistAnalysisChainSawRequiresFollowUp()
+{
+	var withoutFollowUp = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(1, healthRatio: 0.50f, currentMp: 2_000),
+		SafeCloseRange: true,
+		FollowUpAvailable: false,
+		AlliesCanBurst: false,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: true);
+	var withFollowUp = withoutFollowUp with
+	{
+		FollowUpAvailable = true,
+		AlliesCanBurst = true,
+	};
+
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseAnalysisChainSaw(withoutFollowUp), "Analysis Chain Saw should not mark targets without follow-up");
+	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseAnalysisChainSaw(withFollowUp), "Analysis Chain Saw should set up burst when allies can hit");
+}
+
+static void MachinistScattergunRejectsUnsafeCloseRange()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(1, healthRatio: 0.25f, currentMp: 2_000, isInCloseRange: true),
+		SafeCloseRange: false,
+		FollowUpAvailable: true,
+		AlliesCanBurst: true,
+		ObjectiveControlNeeded: true,
+		TargetCommitted: true);
+
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseScattergun(input), "Scattergun should reject unsafe 12y commits");
+}
+
+static void MachinistWildfireRequiresCommittedTargetAndFollowUp()
+{
+	var looseTarget = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(1, healthRatio: 0.45f, currentMp: 2_000),
+		SafeCloseRange: true,
+		FollowUpAvailable: true,
+		AlliesCanBurst: true,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: false);
+	var committedTarget = looseTarget with { TargetCommitted = true };
+
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseWildfire(looseTarget), "Wildfire should reject targets that can leave before detonation");
+	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseWildfire(committedTarget), "Wildfire should accept committed targets with follow-up");
+}
+
+static void MachinistBishopAcceptsObjectiveTeamfight()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(1, healthRatio: 0.80f, currentMp: 10_000, isObjectiveRelevant: true),
+		SafeCloseRange: true,
+		FollowUpAvailable: false,
+		AlliesCanBurst: true,
+		ObjectiveControlNeeded: true,
+		TargetCommitted: true);
+
+	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseBishop(input), "Bishop should be used for objective teamfights");
+}
+
+static void MachinistBishopRejectsOutOfRangeTargets()
+{
+	var inRange = MachinistTarget(1, healthRatio: 0.80f, currentMp: 10_000, isInNormalRange: true);
+	var outOfRange = MachinistTarget(2, healthRatio: 0.10f, currentMp: 0, isInNormalRange: false);
+	var rankedTargets = MachinistPvPTargetPolicy.Rank(
+		[inRange, outOfRange],
+		MachinistPvPActionIntent.Bishop);
+
+	AssertEqual(1, rankedTargets.Count, "Bishop targeting should keep only reachable targets");
+	AssertEqual(1UL, rankedTargets[0].TargetId, "Bishop targeting should choose the reachable target");
+}
+
+static void MachinistMarksmanSpiteRejectsGuard()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(1, healthRatio: 0.10f, currentMp: 0, hasGuard: true),
+		SafeCloseRange: true,
+		FollowUpAvailable: true,
+		AlliesCanBurst: true,
+		ObjectiveControlNeeded: true,
+		TargetCommitted: true);
+
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should not be modeled as Guard piercing");
+}
+
+static void MachinistMarksmanSpiteAcceptsLowMpKillWindow()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(1, healthRatio: 0.55f, currentMp: 2_000),
+		SafeCloseRange: true,
+		FollowUpAvailable: true,
+		AlliesCanBurst: false,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: true);
+
+	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should convert low MP kill windows");
+}
+
+static void MachinistMarksmanSpiteAcceptsVulnerableTarget()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(1, healthRatio: 0.80f, currentMp: 10_000, isVulnerable: true),
+		SafeCloseRange: true,
+		FollowUpAvailable: true,
+		AlliesCanBurst: false,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: true);
+
+	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should accept vulnerable targets even above normal HP cutoff");
+}
+
+static void MachinistFullMetalRejectsUncommittedFollowUp()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(1, healthRatio: 0.90f, currentMp: 10_000),
+		SafeCloseRange: true,
+		FollowUpAvailable: true,
+		AlliesCanBurst: false,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: false);
+
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseFullMetalField(input), "Full Metal Field should not spend burst on an uncommitted durable target");
+}
+
+static MachinistPvPTargetSnapshot MachinistTarget(
+	ulong targetId,
+	float healthRatio,
+	uint currentMp,
+	bool hasGuard = false,
+	bool hasResilience = false,
+	bool isObjectiveRelevant = false,
+	bool hasAllyFocus = false,
+	bool isVulnerable = false,
+	bool isExposed = true,
+	bool isInNormalRange = true,
+	bool isInCloseRange = false)
+{
+	return new MachinistPvPTargetSnapshot(
+		TargetId: targetId,
+		HealthRatio: healthRatio,
+		CurrentMp: currentMp,
+		HasGuard: hasGuard,
+		HasResilience: hasResilience,
+		IsObjectiveRelevant: isObjectiveRelevant,
+		HasAllyFocus: hasAllyFocus,
+		IsVulnerable: isVulnerable,
+		IsExposed: isExposed,
+		IsInNormalRange: isInNormalRange,
+		IsInCloseRange: isInCloseRange);
 }
 
 static void PvpLbJsonContainsVerifiedEntries()
