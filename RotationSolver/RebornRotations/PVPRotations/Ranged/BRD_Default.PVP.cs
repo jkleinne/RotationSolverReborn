@@ -32,6 +32,7 @@ public sealed class BRD_DefaultPvP : BardRotation
 	private const float PaeanTankEngageWeight = 2.5f;
 	private const float PaeanMeleeEngageWeight = 2f;
 	private const float PaeanSmartTargetWeight = 1.5f;
+	private const double EagleEyeShotPotency = 12_000.0;
 
 	private readonly record struct PaeanCandidate(IBattleChara Target, float Score);
 
@@ -293,6 +294,20 @@ public sealed class BRD_DefaultPvP : BardRotation
 		return count;
 	}
 
+	private static int CountAlliesTargeting(IBattleChara target)
+	{
+		var count = 0;
+		foreach (var member in PartyMembers)
+		{
+			if (member != null && member.TargetObjectId == target.GameObjectId)
+			{
+				count++;
+			}
+		}
+
+		return count;
+	}
+
 	private static bool IsPushingIntoEnemies(IBattleChara ally)
 	{
 		var smartTarget = HostileTarget;
@@ -395,7 +410,7 @@ public sealed class BRD_DefaultPvP : BardRotation
 			}
 		}
 
-		if (EagleEyeShotPvP.CanUse(out action) && PvPBurstGate.ShouldUse(EagleEyeShotPvP))
+		if (TryUseFrontlineEagleEyeShot(out action))
 		{
 			return true;
 		}
@@ -407,6 +422,97 @@ public sealed class BRD_DefaultPvP : BardRotation
 		}
 
 		return base.AttackAbility(nextGCD, out action);
+	}
+
+	private bool TryUseFrontlineEagleEyeShot(out IAction? action)
+	{
+		action = null;
+		if (!EagleEyeShotPvP.CanUse(out var candidateAction))
+		{
+			return false;
+		}
+
+		var target = EagleEyeShotPvP.Target.Target;
+		if (target == null || target.CurrentHp == 0)
+		{
+			return false;
+		}
+
+		var input = new FrontlineEagleEyeShotInput(
+			Job: FrontlinePvPRangedJob.Bard,
+			IsInFrontline: DataCenter.IsInFrontline,
+			IsInCrystallineConflict: DataCenter.IsInCrystallineConflict,
+			Target: CreateEagleEyeShotTargetState(target));
+
+		if (!FrontlinePvPRoleActionPolicy.ShouldUseEagleEyeShot(input))
+		{
+			return false;
+		}
+
+		action = candidateAction;
+		return true;
+	}
+
+	private static FrontlineEagleEyeShotTargetState CreateEagleEyeShotTargetState(IBattleChara target)
+	{
+		return new FrontlineEagleEyeShotTargetState(
+			HealthRatio: target.GetHealthRatio(),
+			CurrentMp: target.CurrentMp,
+			HasGuard: target.HasStatus(false, StatusID.Guard),
+			HasResilience: target.HasStatus(false, StatusID.Resilience),
+			HasNonGuardInvulnerability: HasNonGuardInvulnerability(target),
+			HasAllyFocus: CountAlliesTargeting(target) > 0,
+			IsObjectiveRelevant: IsObjectiveRelevantTarget(target),
+			IsControlled: IsControlledForEagleEyeShot(target),
+			IsBurstWorthy: IsBurstWorthy(target),
+			TargetCommitted: target.TargetObjectId != 0,
+			ImmediateFollowUpAvailable: false,
+			HasWildfire: false,
+			ExpectedDamageRatio: ExpectedEagleEyeShotDamageRatio(target));
+	}
+
+	private static bool IsControlledForEagleEyeShot(IBattleChara target)
+	{
+		return target.HasStatus(
+			false,
+			StatusID.Silenced,
+			StatusID.Bind,
+			StatusID.Bind_1345,
+			StatusID.Stun,
+			StatusID.Stun_1343,
+			StatusID.DeepFreeze_3219,
+			StatusID.MiracleOfNature);
+	}
+
+	private static bool HasNonGuardInvulnerability(IBattleChara target)
+	{
+		var statusList = target.StatusList;
+		if (statusList == null)
+		{
+			return false;
+		}
+
+		var database = PvPMitigationDatabaseProvider.Current;
+		foreach (var status in statusList)
+		{
+			var statusId = (StatusID)status.StatusId;
+			if (statusId == StatusID.Guard)
+			{
+				continue;
+			}
+
+			if (database.TryGet(statusId, out var entry) && entry.Kind == MitigationKind.Invuln)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private static double ExpectedEagleEyeShotDamageRatio(IBattleChara target)
+	{
+		return target.MaxHp == 0 ? 0.0 : EagleEyeShotPotency / target.MaxHp;
 	}
 
 	private static BardPvPShutdownInput BuildShutdownInput(IBaseAction action, bool safeBackstepExists)

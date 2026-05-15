@@ -490,6 +490,15 @@ internal static class DataCenter
 		string.Equals(Territory?.ContentFinderName, "Crystalline Conflict", StringComparison.Ordinal);
 
 	/// <summary>
+	/// True iff the current territory is one of the large-scale Frontline campaigns.
+	/// </summary>
+	/// <remarks>
+	/// This intentionally excludes Crystalline Conflict and Rival Wings so mode-specific
+	/// PvP automation can stay scoped to Frontline.
+	/// </remarks>
+	public static bool IsInFrontline => FrontlinePvPRoleActionPolicy.IsFrontlineContentFinderName(Territory?.ContentFinderName);
+
+	/// <summary>
 	/// When set to <c>true</c> by an external plugin via IPC, the TargetFreely behaviour is
 	/// activated for the current session without modifying the user's <c>TargetFreely</c>
 	/// config value.  Reset to <c>false</c> by calling the corresponding IPC method.

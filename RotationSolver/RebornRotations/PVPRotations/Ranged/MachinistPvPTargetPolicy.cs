@@ -14,6 +14,7 @@ internal enum MachinistPvPActionIntent
 	MarksmanSpite,
 	FullMetalField,
 	BlazingShot,
+	EagleEyeShot,
 }
 
 internal readonly record struct MachinistPvPTargetSnapshot(
@@ -29,6 +30,7 @@ internal readonly record struct MachinistPvPTargetSnapshot(
 	bool IsInNormalRange,
 	bool IsInCloseRange,
 	bool HasInvulnerability = false,
+	bool HasWildfire = false,
 	double EffectiveHealthRatio = 1.0,
 	double ActiveDamageReduction = 0.0);
 
@@ -147,6 +149,11 @@ internal static class MachinistPvPTargetPolicy
 	private static double GuardCost(MachinistPvPTargetSnapshot target, MachinistPvPActionIntent intent)
 	{
 		if (!target.HasGuard)
+		{
+			return 0.0;
+		}
+
+		if (intent == MachinistPvPActionIntent.EagleEyeShot)
 		{
 			return 0.0;
 		}
