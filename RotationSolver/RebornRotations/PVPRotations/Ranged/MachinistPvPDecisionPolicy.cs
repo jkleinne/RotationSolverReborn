@@ -18,6 +18,7 @@ internal static class MachinistPvPDecisionPolicy
 	private const float MarksmanHealthRatio = 0.70f;
 	private const float MarksmanCleanupHealthRatio = 0.18f;
 	private const float MarksmanFocusedCleanupHealthRatio = 0.25f;
+	private const double MarksmanSecureSafetyMarginRatio = 0.01;
 
 	internal static bool ShouldUseAnalysisDrill(MachinistPvPDecisionInput input)
 	{
@@ -155,7 +156,7 @@ internal static class MachinistPvPDecisionPolicy
 
 		if (gateDecision == PvPBurstRecommendation.Secure)
 		{
-			return true;
+			return HasMarksmanSecureDamage(input) || HasMarksmanConversionSignal(input);
 		}
 
 		if (input.Target.HealthRatio > MarksmanHealthRatio && !input.Target.IsVulnerable)
@@ -163,10 +164,7 @@ internal static class MachinistPvPDecisionPolicy
 			return false;
 		}
 
-		return input.Target.CurrentMp <= PvPScoringFactors.MediumMp
-			|| (!input.Target.HasResilience && input.FollowUpAvailable)
-			|| input.Target.HasAllyFocus
-			|| input.ObjectiveControlNeeded;
+		return HasMarksmanConversionSignal(input);
 	}
 
 	internal static bool ShouldUseFullMetalField(MachinistPvPDecisionInput input)
@@ -225,6 +223,21 @@ internal static class MachinistPvPDecisionPolicy
 			|| input.TargetCommitted
 			|| input.Target.HasAllyFocus
 			|| input.Target.IsVulnerable;
+	}
+
+	private static bool HasMarksmanConversionSignal(MachinistPvPDecisionInput input)
+	{
+		if (input.Target.IsVulnerable || input.ObjectiveControlNeeded || input.AlliesCanBurst)
+		{
+			return true;
+		}
+
+		return input.FollowUpAvailable && input.Target.HasAllyFocus;
+	}
+
+	private static bool HasMarksmanSecureDamage(MachinistPvPDecisionInput input)
+	{
+		return input.Target.EffectiveHealthRatio + MarksmanSecureSafetyMarginRatio <= input.ExpectedDamageRatio;
 	}
 
 	private static bool CanDirectSecure(MachinistPvPDecisionInput input, bool ignoresGuard)

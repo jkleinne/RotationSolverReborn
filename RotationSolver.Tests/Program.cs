@@ -51,7 +51,10 @@ var tests = new (string Name, Action Test)[]
 	("machinist marksmans spite rejects guard", MachinistMarksmanSpiteRejectsGuard),
 	("machinist marksmans spite holds on dying ally focused target", MachinistMarksmanSpiteHoldsOnDyingAllyFocusedTarget),
 	("machinist marksmans spite accepts low mp kill window", MachinistMarksmanSpiteAcceptsLowMpKillWindow),
-	("machinist marksmans spite accepts pressured target above old cutoff", MachinistMarksmanSpiteAcceptsPressuredTargetAboveOldCutoff),
+	("machinist marksmans spite rejects low mp nonlethal target", MachinistMarksmanSpiteRejectsLowMpNonlethalTarget),
+	("machinist marksmans spite accepts ally backed nonlethal target", MachinistMarksmanSpiteAcceptsAllyBackedNonlethalTarget),
+	("machinist marksmans spite accepts allied burst nonlethal target", MachinistMarksmanSpiteAcceptsAlliedBurstNonlethalTarget),
+	("machinist marksmans spite rejects unsupported narrow lethal target", MachinistMarksmanSpiteRejectsUnsupportedNarrowLethalTarget),
 	("machinist marksmans spite accepts vulnerable target", MachinistMarksmanSpiteAcceptsVulnerableTarget),
 	("machinist marksmans spite rejects active invulnerability", MachinistMarksmanSpiteRejectsActiveInvulnerability),
 	("machinist marksmans spite accepts mitigated secure kill", MachinistMarksmanSpiteAcceptsMitigatedSecureKill),
@@ -973,7 +976,12 @@ static void MachinistMarksmanSpiteHoldsOnDyingAllyFocusedTarget()
 static void MachinistMarksmanSpiteAcceptsLowMpKillWindow()
 {
 	var input = new MachinistPvPDecisionInput(
-		Target: MachinistTarget(1, healthRatio: 0.55f, currentMp: 2_000),
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.55f,
+			currentMp: 2_000,
+			effectiveHealthRatio: 0.55),
+		ExpectedDamageRatio: 0.67,
 		SafeCloseRange: true,
 		FollowUpAvailable: true,
 		AlliesCanBurst: false,
@@ -983,17 +991,80 @@ static void MachinistMarksmanSpiteAcceptsLowMpKillWindow()
 	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should convert low MP kill windows");
 }
 
-static void MachinistMarksmanSpiteAcceptsPressuredTargetAboveOldCutoff()
+static void MachinistMarksmanSpiteRejectsLowMpNonlethalTarget()
 {
 	var input = new MachinistPvPDecisionInput(
-		Target: MachinistTarget(1, healthRatio: 0.68f, currentMp: 2_000),
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.68f,
+			currentMp: 2_000,
+			effectiveHealthRatio: 0.68,
+			expectedDamageRatio: 0.67),
+		ExpectedDamageRatio: 0.67,
 		SafeCloseRange: true,
 		FollowUpAvailable: true,
 		AlliesCanBurst: false,
 		ObjectiveControlNeeded: false,
 		TargetCommitted: true);
 
-	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should fire before a low MP target falls into cheap cleanup range");
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should not fire when low MP is the only nonlethal signal");
+}
+
+static void MachinistMarksmanSpiteAcceptsAllyBackedNonlethalTarget()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.68f,
+			currentMp: 2_000,
+			hasAllyFocus: true,
+			effectiveHealthRatio: 0.68,
+			expectedDamageRatio: 0.67),
+		ExpectedDamageRatio: 0.67,
+		SafeCloseRange: true,
+		FollowUpAvailable: true,
+		AlliesCanBurst: true,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: true);
+
+	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should fire when allies can convert the leftover health");
+}
+
+static void MachinistMarksmanSpiteAcceptsAlliedBurstNonlethalTarget()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.68f,
+			currentMp: 2_000,
+			effectiveHealthRatio: 0.68,
+			expectedDamageRatio: 0.67),
+		ExpectedDamageRatio: 0.67,
+		SafeCloseRange: true,
+		FollowUpAvailable: false,
+		AlliesCanBurst: true,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: true);
+
+	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should fire when allied burst can convert the leftover health");
+}
+
+static void MachinistMarksmanSpiteRejectsUnsupportedNarrowLethalTarget()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.665f,
+			currentMp: 2_000,
+			effectiveHealthRatio: 0.665),
+		ExpectedDamageRatio: 0.67,
+		SafeCloseRange: true,
+		FollowUpAvailable: false,
+		AlliesCanBurst: false,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: true);
+
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should hold narrow solo lethal reads without conversion support");
 }
 
 static void MachinistMarksmanSpiteAcceptsVulnerableTarget()
