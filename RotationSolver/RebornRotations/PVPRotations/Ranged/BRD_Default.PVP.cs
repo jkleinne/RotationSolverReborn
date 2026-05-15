@@ -522,14 +522,18 @@ public sealed class BRD_DefaultPvP : BardRotation
 
 	private static bool ShouldUseBurstOrPreventChargeOvercap(IBaseAction action)
 	{
-		return PvPBurstGate.ShouldUse(action)
-			|| action.Cooldown.WillHaveXChargesGCD(action.Cooldown.MaxCharges, BurstExpiryGcdWindow, BurstExpiryOffset);
+		return BardPvPDecisionPolicy.ShouldUseBurstOrForcedSpend(
+			targetIsBurstWorthy: PvPBurstGate.ShouldUse(action),
+			targetBlocksDamage: PvPBurstGate.TargetBlocksDamage(action),
+			forcedSpendWindow: action.Cooldown.WillHaveXChargesGCD(action.Cooldown.MaxCharges, BurstExpiryGcdWindow, BurstExpiryOffset));
 	}
 
 	private static bool ShouldUseBurstOrBeforeStatusExpires(IBaseAction action, StatusID status)
 	{
-		return PvPBurstGate.ShouldUse(action)
-			|| (StatusHelper.PlayerHasStatus(true, status)
+		return BardPvPDecisionPolicy.ShouldUseBurstOrForcedSpend(
+			targetIsBurstWorthy: PvPBurstGate.ShouldUse(action),
+			targetBlocksDamage: PvPBurstGate.TargetBlocksDamage(action),
+			forcedSpendWindow: StatusHelper.PlayerHasStatus(true, status)
 				&& StatusHelper.PlayerWillStatusEndGCD(BurstExpiryGcdWindow, BurstExpiryOffset, true, status));
 	}
 	#endregion

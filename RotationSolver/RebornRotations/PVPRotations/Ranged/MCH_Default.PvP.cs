@@ -1,5 +1,6 @@
 using System.Numerics;
 using RotationSolver.Basic.Actions.PvPTargetSelection;
+using RotationSolver.Basic.Actions.PvPTargetSelection.Factors;
 
 namespace RotationSolver.RebornRotations.PVPRotations.Ranged;
 
@@ -16,6 +17,7 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 	private const int ForcedTeamfightHostileCount = 2;
 	private const int SafeCloseRangeHostileLimit = 2;
 	private const uint MarksmansSpitePvPActionId = 29415;
+	private const double MarksmansSpitePotency = 40_000.0;
 
 	#region Configurations
 	#endregion
@@ -312,6 +314,11 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 		var distance = target.DistanceToPlayer();
 		var hasGuard = target.HasStatus(false, StatusID.Guard);
 		var hasResilience = target.HasStatus(false, StatusID.Resilience);
+		var mitigationDatabase = PvPMitigationDatabaseProvider.Current;
+		var effectiveHp = EffectiveHpCalculator.Compute(target, mitigationDatabase);
+		var effectiveHpRatio = target.MaxHp == 0 || double.IsPositiveInfinity(effectiveHp)
+			? double.PositiveInfinity
+			: effectiveHp / target.MaxHp;
 		var range = intent == MachinistPvPActionIntent.MarksmanSpite
 			? LimitBreakRangeYalms
 			: NormalToolRangeYalms;
@@ -325,9 +332,37 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 			IsObjectiveRelevant: objectiveTargets.Contains(target.GameObjectId),
 			HasAllyFocus: CountAlliesTargeting(target) > 0,
 			IsVulnerable: false,
+			HasInvulnerability: HasNonGuardInvulnerability(target, mitigationDatabase),
+			EffectiveHealthRatio: effectiveHpRatio,
+			ActiveDamageReduction: MitigationPenalty.Compute(target, mitigationDatabase),
 			IsExposed: !hasGuard && distance <= range,
 			IsInNormalRange: distance <= range,
 			IsInCloseRange: distance <= CloseToolRangeYalms);
+	}
+
+	private static bool HasNonGuardInvulnerability(IBattleChara target, IMitigationDatabase database)
+	{
+		var statusList = target.StatusList;
+		if (statusList == null)
+		{
+			return false;
+		}
+
+		foreach (var status in statusList)
+		{
+			var statusId = (StatusID)status.StatusId;
+			if (statusId == StatusID.Guard)
+			{
+				continue;
+			}
+
+			if (database.TryGet(statusId, out var entry) && entry.Kind == MitigationKind.Invuln)
+			{
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	private MachinistPvPDecisionInput CreateDecisionInput(
@@ -342,7 +377,20 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 			FollowUpAvailable: HasImmediateFollowUp(intent),
 			AlliesCanBurst: snapshot.HasAllyFocus || CountAlliesNear(target, TeamfightRadiusYalms) > 0,
 			ObjectiveControlNeeded: objectiveControlNeeded,
-			TargetCommitted: IsTargetCommitted(snapshot, target, objectiveControlNeeded));
+			TargetCommitted: IsTargetCommitted(snapshot, target, objectiveControlNeeded),
+			ExpectedDamageRatio: ExpectedDamageRatio(intent, target));
+	}
+
+	private static double ExpectedDamageRatio(MachinistPvPActionIntent intent, IBattleChara target)
+	{
+		if (target.MaxHp == 0)
+		{
+			return 0.0;
+		}
+
+		return intent == MachinistPvPActionIntent.MarksmanSpite
+			? MarksmansSpitePotency / target.MaxHp
+			: 0.0;
 	}
 
 	private static bool TryUseActionOn(

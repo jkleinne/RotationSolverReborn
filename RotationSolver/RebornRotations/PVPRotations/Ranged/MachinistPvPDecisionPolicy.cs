@@ -8,7 +8,8 @@ internal readonly record struct MachinistPvPDecisionInput(
 	bool FollowUpAvailable,
 	bool AlliesCanBurst,
 	bool ObjectiveControlNeeded,
-	bool TargetCommitted);
+	bool TargetCommitted,
+	double ExpectedDamageRatio = 0.0);
 
 internal static class MachinistPvPDecisionPolicy
 {
@@ -20,7 +21,7 @@ internal static class MachinistPvPDecisionPolicy
 
 	internal static bool ShouldUseAnalysisDrill(MachinistPvPDecisionInput input)
 	{
-		if (!input.Target.IsInNormalRange)
+		if (!input.Target.IsInNormalRange || input.Target.HasInvulnerability)
 		{
 			return false;
 		}
@@ -50,7 +51,7 @@ internal static class MachinistPvPDecisionPolicy
 
 	internal static bool ShouldUseAnalysisChainSaw(MachinistPvPDecisionInput input)
 	{
-		if (!input.Target.IsInNormalRange || input.Target.HasGuard)
+		if (HasBlockedDamage(input))
 		{
 			return false;
 		}
@@ -67,7 +68,7 @@ internal static class MachinistPvPDecisionPolicy
 	{
 		return input.SafeCloseRange
 			&& input.Target.IsInCloseRange
-			&& !input.Target.HasGuard
+			&& !HasBlockedDamage(input)
 			&& (input.ObjectiveControlNeeded || input.Target.HasAllyFocus || input.Target.IsVulnerable);
 	}
 
@@ -78,7 +79,12 @@ internal static class MachinistPvPDecisionPolicy
 			return false;
 		}
 
-		if ((input.Target.HasGuard || input.Target.HasResilience) && input.ObjectiveControlNeeded)
+		if (input.Target.HasGuard || input.Target.HasInvulnerability)
+		{
+			return false;
+		}
+
+		if (input.Target.HasResilience && input.ObjectiveControlNeeded)
 		{
 			return false;
 		}
@@ -91,7 +97,7 @@ internal static class MachinistPvPDecisionPolicy
 
 	internal static bool ShouldUseWildfire(MachinistPvPDecisionInput input)
 	{
-		if (!input.TargetCommitted || !input.FollowUpAvailable || input.Target.HasGuard)
+		if (!input.TargetCommitted || !input.FollowUpAvailable || HasBlockedDamage(input))
 		{
 			return false;
 		}
@@ -110,7 +116,7 @@ internal static class MachinistPvPDecisionPolicy
 
 	internal static bool ShouldUseMarksmanSpite(MachinistPvPDecisionInput input)
 	{
-		if (!input.Target.IsInNormalRange || input.Target.HasGuard)
+		if (!input.Target.IsInNormalRange)
 		{
 			return false;
 		}
@@ -118,6 +124,23 @@ internal static class MachinistPvPDecisionPolicy
 		if (!input.ObjectiveControlNeeded && IsLikelyAlreadyDying(input))
 		{
 			return false;
+		}
+
+		var gateDecision = PvPDamageGate.Evaluate(new PvPDamageGateInput(
+			Intent: PvPBurstIntent.Burst,
+			EffectiveHpRatio: input.Target.EffectiveHealthRatio,
+			ExpectedDamageRatio: input.ExpectedDamageRatio,
+			ActiveDamageReduction: input.Target.ActiveDamageReduction,
+			HasInvulnerability: input.Target.HasGuard || input.Target.HasInvulnerability,
+			HasPrioritySignal: HasDamagePriority(input)));
+		if (gateDecision == PvPBurstRecommendation.Hold)
+		{
+			return false;
+		}
+
+		if (gateDecision == PvPBurstRecommendation.Secure)
+		{
+			return true;
 		}
 
 		if (input.Target.HealthRatio > MarksmanHealthRatio && !input.Target.IsVulnerable)
@@ -133,7 +156,7 @@ internal static class MachinistPvPDecisionPolicy
 
 	internal static bool ShouldUseFullMetalField(MachinistPvPDecisionInput input)
 	{
-		if (!input.Target.IsInNormalRange || input.Target.HasGuard)
+		if (HasBlockedDamage(input))
 		{
 			return false;
 		}
@@ -146,7 +169,7 @@ internal static class MachinistPvPDecisionPolicy
 
 	internal static bool ShouldUseBlazingShot(MachinistPvPDecisionInput input)
 	{
-		if (!input.Target.IsInNormalRange || input.Target.HasGuard)
+		if (HasBlockedDamage(input))
 		{
 			return false;
 		}
@@ -160,7 +183,23 @@ internal static class MachinistPvPDecisionPolicy
 	{
 		return input.Target.IsInNormalRange
 			&& !input.Target.HasGuard
+			&& !input.Target.HasInvulnerability
 			&& !input.Target.HasResilience;
+	}
+
+	private static bool HasBlockedDamage(MachinistPvPDecisionInput input)
+	{
+		return !input.Target.IsInNormalRange || input.Target.HasGuard || input.Target.HasInvulnerability;
+	}
+
+	private static bool HasDamagePriority(MachinistPvPDecisionInput input)
+	{
+		return input.FollowUpAvailable
+			|| input.AlliesCanBurst
+			|| input.ObjectiveControlNeeded
+			|| input.TargetCommitted
+			|| input.Target.HasAllyFocus
+			|| input.Target.IsVulnerable;
 	}
 
 	private static bool IsKillWindow(MachinistPvPDecisionInput input)

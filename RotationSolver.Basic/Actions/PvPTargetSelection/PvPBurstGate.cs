@@ -23,6 +23,27 @@ public static class PvPBurstGate
         return ShouldUseTarget(ResolveBurstTarget(action), intent);
     }
 
+    /// <summary>
+    /// Return <see langword="true"/> when the action's resolved target has active
+    /// invulnerability or effective invulnerability, so forced-spend fallbacks should
+    /// not override conservation.
+    /// </summary>
+    public static bool TargetBlocksDamage(IBaseAction action)
+    {
+        if (!DataCenter.IsPvP)
+        {
+            return false;
+        }
+
+        var target = ResolveBurstTarget(action);
+        if (!IsUsableHostile(target))
+        {
+            return true;
+        }
+
+        return double.IsPositiveInfinity(EffectiveHpCalculator.Compute(target, PvPMitigationDatabaseProvider.Current));
+    }
+
     private static bool ShouldUseTarget(IBattleChara? target, PvPBurstIntent intent)
     {
         if (!IsUsableHostile(target))
