@@ -41,8 +41,9 @@ internal static class FrontlinePvPRoleActionPolicy
 	private const float BardControlledPressureHealthRatio = 0.55f;
 	private const float BardBurstPressureHealthRatio = 0.55f;
 	private const float BardGuardPressureHealthRatio = 0.45f;
-	private const float MachinistPickPressureHealthRatio = 0.65f;
-	private const float MachinistGuardPressureHealthRatio = 0.45f;
+	private const float MachinistInjuredPressureHealthRatio = 0.65f;
+	private const float MachinistBurstSetupHealthRatio = 0.80f;
+	private const float MachinistGuardPressureHealthRatio = 0.65f;
 
 	internal static readonly string[] FrontlineContentFinderNames =
 	[
@@ -144,7 +145,12 @@ internal static class FrontlinePvPRoleActionPolicy
 			return true;
 		}
 
-		if (!HasMachinistPickSignal(target))
+		if (target.HealthRatio <= MachinistInjuredPressureHealthRatio)
+		{
+			return true;
+		}
+
+		if (!HasMachinistBurstSetupSignal(target))
 		{
 			return false;
 		}
@@ -154,7 +160,7 @@ internal static class FrontlinePvPRoleActionPolicy
 			return target.HealthRatio <= MachinistGuardPressureHealthRatio;
 		}
 
-		return target.HealthRatio <= MachinistPickPressureHealthRatio
+		return target.HealthRatio <= MachinistBurstSetupHealthRatio
 			|| HasResourcePressure(target);
 	}
 
@@ -164,7 +170,7 @@ internal static class FrontlinePvPRoleActionPolicy
 			|| (target.ExpectedDamageRatio > 0.0 && target.HealthRatio <= target.ExpectedDamageRatio);
 	}
 
-	private static bool HasMachinistPickSignal(FrontlineEagleEyeShotTargetState target)
+	private static bool HasMachinistBurstSetupSignal(FrontlineEagleEyeShotTargetState target)
 	{
 		return target.TargetCommitted
 			|| target.ImmediateFollowUpAvailable

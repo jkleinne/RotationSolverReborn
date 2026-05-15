@@ -44,6 +44,40 @@ public static class PvPBurstGate
         return double.IsPositiveInfinity(EffectiveHpCalculator.Compute(target, PvPMitigationDatabaseProvider.Current));
     }
 
+    /// <summary>
+    /// Lets rotations spend direct-damage actions on lethal targets even when
+    /// the normal burst gate would wait for broader burst context.
+    /// </summary>
+    public static bool CanSecure(IBaseAction action, double expectedPotency)
+    {
+        if (!DataCenter.IsPvP || expectedPotency <= 0.0)
+        {
+            return false;
+        }
+
+        var target = ResolveBurstTarget(action);
+        if (!IsUsableHostile(target) || target.MaxHp == 0)
+        {
+            return false;
+        }
+
+        var database = PvPMitigationDatabaseProvider.Current;
+        var effectiveHp = EffectiveHpCalculator.Compute(target, database);
+        var effectiveHpRatio = double.IsPositiveInfinity(effectiveHp)
+            ? double.PositiveInfinity
+            : effectiveHp / target.MaxHp;
+        var expectedDamageRatio = expectedPotency / target.MaxHp;
+        var gateDecision = PvPDamageGate.Evaluate(new PvPDamageGateInput(
+            Intent: PvPBurstIntent.Secure,
+            EffectiveHpRatio: effectiveHpRatio,
+            ExpectedDamageRatio: expectedDamageRatio,
+            ActiveDamageReduction: MitigationPenalty.Compute(target, database),
+            HasInvulnerability: double.IsPositiveInfinity(effectiveHp),
+            HasPrioritySignal: true));
+
+        return gateDecision == PvPBurstRecommendation.Secure;
+    }
+
     private static bool ShouldUseTarget(IBattleChara? target, PvPBurstIntent intent)
     {
         if (!IsUsableHostile(target))

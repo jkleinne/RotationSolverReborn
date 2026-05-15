@@ -31,6 +31,7 @@ internal readonly record struct MachinistPvPTargetSnapshot(
 	bool IsInCloseRange,
 	bool HasInvulnerability = false,
 	bool HasWildfire = false,
+	double ExpectedDamageRatio = 0.0,
 	double EffectiveHealthRatio = 1.0,
 	double ActiveDamageReduction = 0.0);
 
@@ -44,6 +45,7 @@ internal static class MachinistPvPTargetPolicy
 	private const double ExposedScore = 1.0;
 	private const double NormalRangeScore = 0.5;
 	private const double CloseRangeScore = 0.5;
+	private const double DirectSecureScore = 8.0;
 	private const double GuardPenalty = 4.0;
 	private const double ResiliencePenalty = 2.5;
 	private const double DrillGuardPunishScore = 4.0;
@@ -95,6 +97,11 @@ internal static class MachinistPvPTargetPolicy
 		var score = HealthPressure(target.HealthRatio);
 		score += MpPressure(target.CurrentMp);
 
+		if (CanDirectSecure(target, intent))
+		{
+			score += DirectSecureScore;
+		}
+
 		if (target.IsObjectiveRelevant)
 		{
 			score += ObjectiveScore;
@@ -129,6 +136,30 @@ internal static class MachinistPvPTargetPolicy
 		score -= ResilienceCost(target, intent);
 
 		return score;
+	}
+
+	private static bool CanDirectSecure(MachinistPvPTargetSnapshot target, MachinistPvPActionIntent intent)
+	{
+		if (target.ExpectedDamageRatio <= 0.0 || target.HasInvulnerability)
+		{
+			return false;
+		}
+
+		var ignoresGuard = IgnoresGuard(intent);
+		if (target.HasGuard && !ignoresGuard)
+		{
+			return false;
+		}
+
+		var effectiveHealthRatio = target.HasGuard && ignoresGuard
+			? target.HealthRatio
+			: target.EffectiveHealthRatio;
+		return effectiveHealthRatio <= target.ExpectedDamageRatio;
+	}
+
+	private static bool IgnoresGuard(MachinistPvPActionIntent intent)
+	{
+		return intent is MachinistPvPActionIntent.AnalysisDrill or MachinistPvPActionIntent.EagleEyeShot;
 	}
 
 	private static double HealthPressure(float healthRatio)
