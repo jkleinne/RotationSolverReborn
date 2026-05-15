@@ -1,6 +1,7 @@
 using System.Text.Json;
 using RotationSolver.Commands;
 using RotationSolver.Basic.Actions.PvPTargetSelection;
+using RotationSolver.Basic.Rotations;
 using RotationSolver.RebornRotations.PVPRotations.Ranged;
 
 var tests = new (string Name, Action Test)[]
@@ -58,6 +59,17 @@ var tests = new (string Name, Action Test)[]
 	("pvp lb json contains verified entries", PvpLbJsonContainsVerifiedEntries),
 	("pvp mitigation json contains resilience", PvpMitigationJsonContainsResilience),
 	("pvp mitigation json contains ranked cc defensive coverage", PvpMitigationJsonContainsRankedCcDefensiveCoverage),
+	("frontline role action policy rejects crystalline conflict", FrontlineRoleActionPolicyRejectsCrystallineConflict),
+	("frontline role action policy allows frontline", FrontlineRoleActionPolicyAllowsFrontline),
+	("frontline role action policy detects frontline duties", FrontlineRoleActionPolicyDetectsFrontlineDuties),
+	("frontline role action policy keeps action passes separate", FrontlineRoleActionPolicyKeepsActionPassesSeparate),
+	("frontline role action policy defers bard and machinist eagle eye shot", FrontlineRoleActionPolicyDefersBardAndMachinistEagleEyeShot),
+	("frontline eagle eye shot rejects crystalline conflict", FrontlineEagleEyeShotRejectsCrystallineConflict),
+	("bard frontline eagle eye shot waits for controller window", BardFrontlineEagleEyeShotWaitsForControllerWindow),
+	("bard frontline eagle eye shot accepts controlled target", BardFrontlineEagleEyeShotAcceptsControlledTarget),
+	("machinist frontline eagle eye shot waits for pick window", MachinistFrontlineEagleEyeShotWaitsForPickWindow),
+	("machinist frontline eagle eye shot accepts wildfire target", MachinistFrontlineEagleEyeShotAcceptsWildfireTarget),
+	("machinist frontline eagle eye shot secures through guard", MachinistFrontlineEagleEyeShotSecuresThroughGuard),
 };
 
 var failures = new List<string>();
@@ -234,6 +246,192 @@ static void PvPSmartDefaultWeightsMatchRanked()
 	var expected = ScoringWeights.ForPreset(ScoringPreset.Ranked);
 
 	AssertEqual(expected, ScoringWeights.DefaultWeights, "PvPSmart default weights should match Ranked weights");
+}
+
+static void FrontlineRoleActionPolicyRejectsCrystallineConflict()
+{
+	var shouldTry = FrontlinePvPRoleActionPolicy.ShouldTryFrontlineRoleAction(
+		isInFrontline: false,
+		isInCrystallineConflict: true);
+
+	AssertFalse(shouldTry, "Crystalline Conflict must not use the Frontlines role action path");
+}
+
+static void FrontlineRoleActionPolicyAllowsFrontline()
+{
+	var shouldTry = FrontlinePvPRoleActionPolicy.ShouldTryFrontlineRoleAction(
+		isInFrontline: true,
+		isInCrystallineConflict: false);
+
+	AssertTrue(shouldTry, "Frontline should opt into PvP role action automation");
+}
+
+static void FrontlineRoleActionPolicyDetectsFrontlineDuties()
+{
+	foreach (var contentFinderName in FrontlinePvPRoleActionPolicy.FrontlineContentFinderNames)
+	{
+		AssertTrue(
+			FrontlinePvPRoleActionPolicy.IsFrontlineContentFinderName(contentFinderName),
+			$"{contentFinderName} should be detected as Frontline");
+	}
+
+	AssertFalse(
+		FrontlinePvPRoleActionPolicy.IsFrontlineContentFinderName("Crystalline Conflict"),
+		"Crystalline Conflict must not be detected as Frontline");
+}
+
+static void FrontlineRoleActionPolicyKeepsActionPassesSeparate()
+{
+	AssertTrue(
+		FrontlinePvPRoleActionPolicy.ShouldUseInCurrentPass(
+			isRealGcd: true,
+			requireGcdAction: true),
+		"GCD role actions should be evaluated in the GCD pass");
+
+	AssertFalse(
+		FrontlinePvPRoleActionPolicy.ShouldUseInCurrentPass(
+			isRealGcd: true,
+			requireGcdAction: false),
+		"GCD role actions must not be evaluated in the ability pass");
+
+	AssertTrue(
+		FrontlinePvPRoleActionPolicy.ShouldUseInCurrentPass(
+			isRealGcd: false,
+			requireGcdAction: false),
+		"ability role actions should be evaluated in the ability pass");
+
+	AssertFalse(
+		FrontlinePvPRoleActionPolicy.ShouldUseInCurrentPass(
+			isRealGcd: false,
+			requireGcdAction: true),
+		"ability role actions must not be evaluated in the GCD pass");
+}
+
+static void FrontlineRoleActionPolicyDefersBardAndMachinistEagleEyeShot()
+{
+	AssertTrue(
+		FrontlinePvPRoleActionPolicy.ShouldDeferEagleEyeShotToJobPolicy(FrontlinePvPRangedJob.Bard),
+		"Bard should route Eagle Eye Shot through its controller support policy");
+
+	AssertTrue(
+		FrontlinePvPRoleActionPolicy.ShouldDeferEagleEyeShotToJobPolicy(FrontlinePvPRangedJob.Machinist),
+		"Machinist should route Eagle Eye Shot through its burst pick policy");
+
+	AssertFalse(
+		FrontlinePvPRoleActionPolicy.ShouldDeferEagleEyeShotToJobPolicy(FrontlinePvPRangedJob.Other),
+		"Other physical ranged jobs should keep the generic Frontline role action path");
+}
+
+static void FrontlineEagleEyeShotRejectsCrystallineConflict()
+{
+	var input = FrontlineEagleEyeShotInput(
+		FrontlinePvPRangedJob.Machinist,
+		NeutralEagleEyeShotTarget() with { HasWildfire = true },
+		isInFrontline: false,
+		isInCrystallineConflict: true);
+
+	AssertFalse(
+		FrontlinePvPRoleActionPolicy.ShouldUseEagleEyeShot(input),
+		"Crystalline Conflict must not enter the Frontline Eagle Eye Shot policy");
+}
+
+static void BardFrontlineEagleEyeShotWaitsForControllerWindow()
+{
+	var input = FrontlineEagleEyeShotInput(
+		FrontlinePvPRangedJob.Bard,
+		NeutralEagleEyeShotTarget() with { HealthRatio = 0.90f });
+
+	AssertFalse(
+		FrontlinePvPRoleActionPolicy.ShouldUseEagleEyeShot(input),
+		"Bard should not spend Eagle Eye Shot as filler");
+}
+
+static void BardFrontlineEagleEyeShotAcceptsControlledTarget()
+{
+	var input = FrontlineEagleEyeShotInput(
+		FrontlinePvPRangedJob.Bard,
+		NeutralEagleEyeShotTarget() with
+		{
+			HealthRatio = 0.54f,
+			IsControlled = true,
+		});
+
+	AssertTrue(
+		FrontlinePvPRoleActionPolicy.ShouldUseEagleEyeShot(input),
+		"Bard should spend Eagle Eye Shot into a controlled pressure target");
+}
+
+static void MachinistFrontlineEagleEyeShotWaitsForPickWindow()
+{
+	var input = FrontlineEagleEyeShotInput(
+		FrontlinePvPRangedJob.Machinist,
+		NeutralEagleEyeShotTarget() with { HealthRatio = 0.55f });
+
+	AssertFalse(
+		FrontlinePvPRoleActionPolicy.ShouldUseEagleEyeShot(input),
+		"Machinist should hold Eagle Eye Shot until a pick window exists");
+}
+
+static void MachinistFrontlineEagleEyeShotAcceptsWildfireTarget()
+{
+	var input = FrontlineEagleEyeShotInput(
+		FrontlinePvPRangedJob.Machinist,
+		NeutralEagleEyeShotTarget() with
+		{
+			HealthRatio = 0.80f,
+			HasWildfire = true,
+		});
+
+	AssertTrue(
+		FrontlinePvPRoleActionPolicy.ShouldUseEagleEyeShot(input),
+		"Machinist should spend Eagle Eye Shot into its Wildfire pick window");
+}
+
+static void MachinistFrontlineEagleEyeShotSecuresThroughGuard()
+{
+	var input = FrontlineEagleEyeShotInput(
+		FrontlinePvPRangedJob.Machinist,
+		NeutralEagleEyeShotTarget() with
+		{
+			HealthRatio = 0.20f,
+			HasGuard = true,
+			ExpectedDamageRatio = 0.25,
+		});
+
+	AssertTrue(
+		FrontlinePvPRoleActionPolicy.ShouldUseEagleEyeShot(input),
+		"Machinist should secure killable Guard targets because Eagle Eye Shot ignores Guard");
+}
+
+static FrontlineEagleEyeShotInput FrontlineEagleEyeShotInput(
+	FrontlinePvPRangedJob job,
+	FrontlineEagleEyeShotTargetState target,
+	bool isInFrontline = true,
+	bool isInCrystallineConflict = false)
+{
+	return new FrontlineEagleEyeShotInput(
+		Job: job,
+		IsInFrontline: isInFrontline,
+		IsInCrystallineConflict: isInCrystallineConflict,
+		Target: target);
+}
+
+static FrontlineEagleEyeShotTargetState NeutralEagleEyeShotTarget()
+{
+	return new FrontlineEagleEyeShotTargetState(
+		HealthRatio: 1.0f,
+		CurrentMp: 10_000,
+		HasGuard: false,
+		HasResilience: false,
+		HasNonGuardInvulnerability: false,
+		HasAllyFocus: false,
+		IsObjectiveRelevant: false,
+		IsControlled: false,
+		IsBurstWorthy: false,
+		TargetCommitted: false,
+		ImmediateFollowUpAvailable: false,
+		HasWildfire: false,
+		ExpectedDamageRatio: 0.20);
 }
 
 static void LegacyCustomPvPWeightsFillNewControlDefaults()

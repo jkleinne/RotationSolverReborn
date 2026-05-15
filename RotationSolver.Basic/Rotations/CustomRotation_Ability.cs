@@ -360,6 +360,11 @@ public partial class CustomRotation
 		}
 		IBaseAction.ShouldEndSpecial = false;
 
+		if (TryUseFrontlinePvPRoleAction(role, requireGcdAction: false, out act))
+		{
+			return true;
+		}
+
 		if (HasHostilesInRange && DataCenter.CurrentDutyRotation?.AttackAbility(nextGCD, out act) == true)
 		{
 			return true;
@@ -379,6 +384,94 @@ public partial class CustomRotation
 		}
 
 		return UseMpPotion(nextGCD, out act) || GeneralUsingAbility(role, nextGCD, out act) || (DataCenter.AutoStatus.HasFlag(AutoStatus.Speed) && SpeedAbility(nextGCD, out act));
+	}
+
+	private bool TryUseFrontlinePvPRoleAction(JobRole role, bool requireGcdAction, out IAction? act)
+	{
+		act = null;
+		if (!FrontlinePvPRoleActionPolicy.ShouldTryFrontlineRoleAction(
+			DataCenter.IsInFrontline,
+			DataCenter.IsInCrystallineConflict))
+		{
+			return false;
+		}
+
+		return role switch
+		{
+			JobRole.Tank => TryUseFrontlineTankRoleAction(requireGcdAction, out act),
+			JobRole.Melee => TryUseFrontlineMeleeRoleAction(requireGcdAction, out act),
+			JobRole.RangedPhysical => TryUseFrontlinePhysicalRangedRoleAction(requireGcdAction, out act),
+			JobRole.RangedMagical => TryUseFrontlineMagicalRangedRoleAction(requireGcdAction, out act),
+			JobRole.Healer => TryUseFrontlineHealerRoleAction(requireGcdAction, out act),
+			_ => false,
+		};
+	}
+
+	private bool TryUseFrontlineTankRoleAction(bool requireGcdAction, out IAction? act)
+	{
+		return TryUseFrontlineRoleAction(RampagePvP, requireGcdAction, out act)
+			|| TryUseFrontlineRoleAction(RampartPvP, requireGcdAction, out act)
+			|| TryUseFrontlineRoleAction(FullSwingPvP, requireGcdAction, out act);
+	}
+
+	private bool TryUseFrontlineMeleeRoleAction(bool requireGcdAction, out IAction? act)
+	{
+		return TryUseFrontlineRoleAction(BloodbathPvP, requireGcdAction, out act)
+			|| TryUseFrontlineRoleAction(SwiftPvP, requireGcdAction, out act)
+			|| TryUseFrontlineRoleAction(SmitePvP, requireGcdAction, out act);
+	}
+
+	private bool TryUseFrontlinePhysicalRangedRoleAction(bool requireGcdAction, out IAction? act)
+	{
+		return TryUseFrontlineRoleAction(BraveryPvP, requireGcdAction, out act)
+			|| TryUseFrontlineRoleAction(DervishPvP, requireGcdAction, out act)
+			|| TryUseFrontlinePhysicalRangedEagleEyeShot(requireGcdAction, out act);
+	}
+
+	private bool TryUseFrontlinePhysicalRangedEagleEyeShot(bool requireGcdAction, out IAction? act)
+	{
+		act = null;
+		if (FrontlinePvPRoleActionPolicy.ShouldDeferEagleEyeShotToJobPolicy(GetFrontlinePvPRangedJob()))
+		{
+			return false;
+		}
+
+		return TryUseFrontlineRoleAction(EagleEyeShotPvP, requireGcdAction, out act);
+	}
+
+	private static FrontlinePvPRangedJob GetFrontlinePvPRangedJob()
+	{
+		return DataCenter.Job switch
+		{
+			ECommons.ExcelServices.Job.BRD => FrontlinePvPRangedJob.Bard,
+			ECommons.ExcelServices.Job.MCH => FrontlinePvPRangedJob.Machinist,
+			_ => FrontlinePvPRangedJob.Other,
+		};
+	}
+
+	private bool TryUseFrontlineMagicalRangedRoleAction(bool requireGcdAction, out IAction? act)
+	{
+		return TryUseFrontlineRoleAction(CometPvP, requireGcdAction, out act)
+			|| TryUseFrontlineRoleAction(RustPvP, requireGcdAction, out act)
+			|| TryUseFrontlineRoleAction(PhantomDartPvP, requireGcdAction, out act);
+	}
+
+	private bool TryUseFrontlineHealerRoleAction(bool requireGcdAction, out IAction? act)
+	{
+		return TryUseFrontlineRoleAction(HaelanPvP, requireGcdAction, out act)
+			|| TryUseFrontlineRoleAction(StoneskinIiPvP, requireGcdAction, out act)
+			|| TryUseFrontlineRoleAction(DiabrosisPvP, requireGcdAction, out act);
+	}
+
+	private static bool TryUseFrontlineRoleAction(IBaseAction roleAction, bool requireGcdAction, out IAction? act)
+	{
+		act = null;
+		if (!FrontlinePvPRoleActionPolicy.ShouldUseInCurrentPass(roleAction.Info.IsRealGCD, requireGcdAction))
+		{
+			return false;
+		}
+
+		return roleAction.CanUse(out act);
 	}
 
 	/// <summary>

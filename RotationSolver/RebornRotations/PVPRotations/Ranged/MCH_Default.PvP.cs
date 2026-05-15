@@ -10,6 +10,7 @@ namespace RotationSolver.RebornRotations.PVPRotations.Ranged;
 public sealed class MCH_DefaultPvP : MachinistRotation
 {
 	private const float NormalToolRangeYalms = 25f;
+	private const float EagleEyeShotRangeYalms = 40f;
 	private const float CloseToolRangeYalms = 12f;
 	private const float LimitBreakRangeYalms = 50f;
 	private const float TeamfightRadiusYalms = 8f;
@@ -18,6 +19,7 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 	private const int SafeCloseRangeHostileLimit = 2;
 	private const uint MarksmansSpitePvPActionId = 29415;
 	private const double MarksmansSpitePotency = 40_000.0;
+	private const double EagleEyeShotPotency = 12_000.0;
 
 	#region Configurations
 	#endregion
@@ -45,6 +47,11 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 			MachinistPvPActionIntent.Wildfire,
 			MachinistPvPDecisionPolicy.ShouldUseWildfire,
 			out action))
+		{
+			return true;
+		}
+
+		if (TryUseFrontlineEagleEyeShot(out action))
 		{
 			return true;
 		}
@@ -228,6 +235,42 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 		};
 	}
 
+	private bool TryUseFrontlineEagleEyeShot(out IAction? action)
+	{
+		action = null;
+
+		return TryUsePolicyAction(
+			EagleEyeShotPvP,
+			MachinistPvPActionIntent.EagleEyeShot,
+			ShouldUseFrontlineEagleEyeShot,
+			out action);
+	}
+
+	private static bool ShouldUseFrontlineEagleEyeShot(MachinistPvPDecisionInput input)
+	{
+		var target = input.Target;
+		var eagleEyeShotInput = new FrontlineEagleEyeShotInput(
+			Job: FrontlinePvPRangedJob.Machinist,
+			IsInFrontline: DataCenter.IsInFrontline,
+			IsInCrystallineConflict: DataCenter.IsInCrystallineConflict,
+			Target: new FrontlineEagleEyeShotTargetState(
+				HealthRatio: target.HealthRatio,
+				CurrentMp: target.CurrentMp,
+				HasGuard: target.HasGuard,
+				HasResilience: target.HasResilience,
+				HasNonGuardInvulnerability: target.HasInvulnerability,
+				HasAllyFocus: target.HasAllyFocus,
+				IsObjectiveRelevant: target.IsObjectiveRelevant,
+				IsControlled: false,
+				IsBurstWorthy: target.IsVulnerable,
+				TargetCommitted: input.TargetCommitted,
+				ImmediateFollowUpAvailable: input.FollowUpAvailable,
+				HasWildfire: target.HasWildfire,
+				ExpectedDamageRatio: input.ExpectedDamageRatio));
+
+		return FrontlinePvPRoleActionPolicy.ShouldUseEagleEyeShot(eagleEyeShotInput);
+	}
+
 	private bool TryUseMarksmanSpite(out IAction? action)
 	{
 		action = null;
@@ -319,9 +362,12 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 		var effectiveHpRatio = target.MaxHp == 0 || double.IsPositiveInfinity(effectiveHp)
 			? double.PositiveInfinity
 			: effectiveHp / target.MaxHp;
-		var range = intent == MachinistPvPActionIntent.MarksmanSpite
-			? LimitBreakRangeYalms
-			: NormalToolRangeYalms;
+		var range = intent switch
+		{
+			MachinistPvPActionIntent.MarksmanSpite => LimitBreakRangeYalms,
+			MachinistPvPActionIntent.EagleEyeShot => EagleEyeShotRangeYalms,
+			_ => NormalToolRangeYalms,
+		};
 
 		return new MachinistPvPTargetSnapshot(
 			TargetId: target.GameObjectId,
@@ -333,6 +379,7 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 			HasAllyFocus: CountAlliesTargeting(target) > 0,
 			IsVulnerable: false,
 			HasInvulnerability: HasNonGuardInvulnerability(target, mitigationDatabase),
+			HasWildfire: target.HasStatus(true, StatusID.Wildfire, StatusID.Wildfire_1323),
 			EffectiveHealthRatio: effectiveHpRatio,
 			ActiveDamageReduction: MitigationPenalty.Compute(target, mitigationDatabase),
 			IsExposed: !hasGuard && distance <= range,
@@ -388,9 +435,12 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 			return 0.0;
 		}
 
-		return intent == MachinistPvPActionIntent.MarksmanSpite
-			? MarksmansSpitePotency / target.MaxHp
-			: 0.0;
+		return intent switch
+		{
+			MachinistPvPActionIntent.MarksmanSpite => MarksmansSpitePotency / target.MaxHp,
+			MachinistPvPActionIntent.EagleEyeShot => EagleEyeShotPotency / target.MaxHp,
+			_ => 0.0,
+		};
 	}
 
 	private static bool TryUseActionOn(

@@ -452,6 +452,11 @@ public partial class CustomRotation
 
 			if (!DataCenter.MergedStatus.HasFlag(AutoStatus.NoCasting))
 			{
+				if (TryUseFrontlinePvPRoleAction(DataCenter.Role, requireGcdAction: true, out act))
+				{
+					return act;
+				}
+
 				if (DataCenter.CurrentDutyRotation?.GeneralGCD(out act) == true)
 				{
 					return act;
