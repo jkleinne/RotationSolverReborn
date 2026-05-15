@@ -506,8 +506,9 @@ public sealed class BRD_DefaultPvP : BardRotation
 			return true;
 		}
 
-		if (!StatusHelper.PlayerHasStatus(true, StatusID.BlastArrowReady_3142)
-			&& ApexArrowPvP.CanUse(out action))
+		if (BardPvPDecisionPolicy.ShouldUseApexArrow(
+				StatusHelper.PlayerHasStatus(true, StatusID.BlastArrowReady_3142))
+			&& ApexArrowPvP.CanUse(out action, skipStatusProvideCheck: true))
 		{
 			return true;
 		}

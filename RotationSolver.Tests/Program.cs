@@ -30,6 +30,8 @@ var tests = new (string Name, Action Test)[]
 	("bard forced burst rejects blocked target", BardForcedBurstRejectsBlockedTarget),
 	("bard burst gate cannot override blocked target", BardBurstGateCannotOverrideBlockedTarget),
 	("bard forced burst allows unblocked target", BardForcedBurstAllowsUnblockedTarget),
+	("bard apex arrow rejects active blast arrow window", BardApexArrowRejectsActiveBlastArrowWindow),
+	("bard apex arrow allows missing blast arrow window", BardApexArrowAllowsMissingBlastArrowWindow),
 	("protective paean rejects healthy unfocused ally", ProtectivePaeanRejectsHealthyUnfocusedAlly),
 	("protective paean allows focused ally", ProtectivePaeanAllowsFocusedAlly),
 	("machinist target policy prefers killable low resource target", MachinistTargetPolicyPrefersKillableLowResourceTarget),
@@ -458,6 +460,20 @@ static void BardForcedBurstAllowsUnblockedTarget()
 			targetBlocksDamage: false,
 			forcedSpendWindow: true),
 		"Bard forced burst may prevent expiry or overcap when damage is not blocked");
+}
+
+static void BardApexArrowRejectsActiveBlastArrowWindow()
+{
+	AssertFalse(
+		BardPvPDecisionPolicy.ShouldUseApexArrow(true),
+		"Apex Arrow must not overwrite an active Blast Arrow window");
+}
+
+static void BardApexArrowAllowsMissingBlastArrowWindow()
+{
+	AssertTrue(
+		BardPvPDecisionPolicy.ShouldUseApexArrow(false),
+		"Apex Arrow should remain available when Blast Arrow is not ready");
 }
 
 static void ProtectivePaeanRejectsHealthyUnfocusedAlly()

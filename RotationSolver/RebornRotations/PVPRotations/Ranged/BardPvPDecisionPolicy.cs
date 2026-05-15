@@ -65,6 +65,11 @@ internal static class BardPvPDecisionPolicy
         return forcedSpendWindow;
     }
 
+    internal static bool ShouldUseApexArrow(bool hasBlastArrowReady)
+    {
+        return !hasBlastArrowReady;
+    }
+
     internal static bool ShouldUseProtectivePaean(float healthRatio, int focusCount)
     {
         if (focusCount > 0)
