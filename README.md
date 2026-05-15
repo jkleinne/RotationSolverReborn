@@ -15,7 +15,7 @@ If you do not specifically want the PvP changes, install upstream RSR instead.
 
 A new `TargetingType.PvPSmart` mode that replaces the role-blind `Auto(LowHP)` cycle in PvP with a scoring-based selector. For each candidate hostile, the scorer composes a weighted scalar over pure factors and picks the argmax:
 
-- **Invuln short-circuit:** Guard, Hallowed Ground, Living Dead, Holmgang, Superbolide are skipped outright
+- **Invuln short-circuit:** Guard, Hallowed Ground, Living Dead, Holmgang, Superbolide, and PvP-specific invulnerability states such as Undead Redemption and Hidden are skipped outright
 - **Role value:** Healer / Ranged DPS weighted above Melee / Tank
 - **Effective HP & finish:** current HP scaled by active mitigation statuses, with a finish-kill bias when a candidate is within burst range
 - **Mitigation penalty:** heavy DR cooldowns deprioritize a target during the window they're active
@@ -25,7 +25,7 @@ A new `TargetingType.PvPSmart` mode that replaces the role-blind `Auto(LowHP)` c
 - **LB cast awareness:** hostiles mid-cast on a Limit Break gain a bonus (interrupt priority)
 - **Isolation factor:** sigmoid bonus the further a hostile is from its nearest ally (catches stragglers)
 - **Threat factor:** bonus when a hostile is targeting a low-HP ally or a party healer (peel priority)
-- **Burst conservation:** high-impact PvP burst actions are held through unclear windows and spent on valuable, vulnerable, or kill-secure targets
+- **Burst conservation:** high-impact PvP burst actions are held through unclear windows, blocked during active invulnerability, and spent on valuable, vulnerable, or kill-secure targets
 - **Bard support logic:** Warden's Paean prioritizes cleanse, peel, and engage targets, while Repelling Shot and Silent Nocturne check target value before firing
 - **PvP state handling:** optional auto on/off behavior follows PvP match start, match end, death, countdown, and duty transition signals
 
@@ -45,7 +45,7 @@ Conserve burst in PvP unless the target is valuable, vulnerable, or killable.
 
 For the intended Ranked Crystalline Conflict behavior, also make sure `Target` > `Hostile` has `PvPSmart` in the PvP hostile targeting list, preferably first. The same settings area exposes the PvP scoring preset and the debug overlay toggle.
 
-Some high-impact actions still honor the gate, but spend if a charge cap or ready timer would otherwise be wasted.
+Some high-impact actions still spend before a charge cap or ready timer would otherwise be wasted, but not while the selected target has active invulnerability or effective invulnerability.
 
 This setting may lower raw total damage because it avoids spending burst into Guard, heavy mitigation, tanks, or low-value targets that are unlikely to die. The goal is higher kill conversion, better secure-kill timing, and fewer wasted burst windows rather than higher scoreboard damage. When testing, compare kill participation, burst held for healer or ranged DPS windows, and missed opportunities where the gate felt too conservative.
 
