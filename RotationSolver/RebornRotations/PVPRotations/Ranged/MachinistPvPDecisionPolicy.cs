@@ -13,8 +13,10 @@ internal readonly record struct MachinistPvPDecisionInput(
 internal static class MachinistPvPDecisionPolicy
 {
 	private const float DrillKillHealthRatio = 0.35f;
-	private const float BurstHealthRatio = 0.55f;
-	private const float MarksmanHealthRatio = 0.60f;
+	private const float BurstHealthRatio = 0.65f;
+	private const float MarksmanHealthRatio = 0.70f;
+	private const float MarksmanCleanupHealthRatio = 0.18f;
+	private const float MarksmanFocusedCleanupHealthRatio = 0.25f;
 
 	internal static bool ShouldUseAnalysisDrill(MachinistPvPDecisionInput input)
 	{
@@ -54,6 +56,7 @@ internal static class MachinistPvPDecisionPolicy
 		}
 
 		return input.AlliesCanBurst
+			|| IsKillWindow(input)
 			|| (input.FollowUpAvailable && input.Target.IsVulnerable)
 			|| input.Target.HasAllyFocus
 			|| input.Target.IsVulnerable
@@ -112,6 +115,11 @@ internal static class MachinistPvPDecisionPolicy
 			return false;
 		}
 
+		if (!input.ObjectiveControlNeeded && IsLikelyAlreadyDying(input))
+		{
+			return false;
+		}
+
 		if (input.Target.HealthRatio > MarksmanHealthRatio && !input.Target.IsVulnerable)
 		{
 			return false;
@@ -166,5 +174,22 @@ internal static class MachinistPvPDecisionPolicy
 			|| input.Target.HasAllyFocus
 			|| input.Target.IsVulnerable
 			|| input.Target.IsObjectiveRelevant;
+	}
+
+	private static bool IsLikelyAlreadyDying(MachinistPvPDecisionInput input)
+	{
+		if (!input.Target.HasAllyFocus && !input.FollowUpAvailable)
+		{
+			return false;
+		}
+
+		if (input.Target.HealthRatio <= MarksmanCleanupHealthRatio)
+		{
+			return true;
+		}
+
+		return input.Target.HealthRatio <= MarksmanFocusedCleanupHealthRatio
+			&& input.Target.HasAllyFocus
+			&& input.FollowUpAvailable;
 	}
 }
