@@ -15,10 +15,10 @@ internal static class MachinistPvPDecisionPolicy
 {
 	private const float DrillKillHealthRatio = 0.35f;
 	private const float BurstHealthRatio = 0.65f;
-	private const float MarksmanHealthRatio = 0.70f;
 	private const float MarksmanCleanupHealthRatio = 0.18f;
 	private const float MarksmanFocusedCleanupHealthRatio = 0.25f;
 	private const double MarksmanSecureSafetyMarginRatio = 0.01;
+	private const double MarksmanConversionMaxLeftoverRatio = 0.08;
 
 	internal static bool ShouldUseAnalysisDrill(MachinistPvPDecisionInput input)
 	{
@@ -159,11 +159,6 @@ internal static class MachinistPvPDecisionPolicy
 			return HasMarksmanSecureDamage(input) || HasMarksmanConversionSignal(input);
 		}
 
-		if (input.Target.HealthRatio > MarksmanHealthRatio && !input.Target.IsVulnerable)
-		{
-			return false;
-		}
-
 		return HasMarksmanConversionSignal(input);
 	}
 
@@ -227,17 +222,32 @@ internal static class MachinistPvPDecisionPolicy
 
 	private static bool HasMarksmanConversionSignal(MachinistPvPDecisionInput input)
 	{
-		if (input.Target.IsVulnerable || input.ObjectiveControlNeeded || input.AlliesCanBurst)
+		if (input.Target.IsVulnerable)
+		{
+			return input.FollowUpAvailable || input.Target.HasAllyFocus || input.ObjectiveControlNeeded;
+		}
+
+		if (!HasMarksmanConvertibleLeftover(input))
+		{
+			return false;
+		}
+
+		if (input.ObjectiveControlNeeded)
 		{
 			return true;
 		}
 
-		return input.FollowUpAvailable && input.Target.HasAllyFocus;
+		return input.Target.HasAllyFocus && (input.FollowUpAvailable || input.AlliesCanBurst);
 	}
 
 	private static bool HasMarksmanSecureDamage(MachinistPvPDecisionInput input)
 	{
 		return input.Target.EffectiveHealthRatio + MarksmanSecureSafetyMarginRatio <= input.ExpectedDamageRatio;
+	}
+
+	private static bool HasMarksmanConvertibleLeftover(MachinistPvPDecisionInput input)
+	{
+		return input.Target.EffectiveHealthRatio - input.ExpectedDamageRatio <= MarksmanConversionMaxLeftoverRatio;
 	}
 
 	private static bool CanDirectSecure(MachinistPvPDecisionInput input, bool ignoresGuard)
