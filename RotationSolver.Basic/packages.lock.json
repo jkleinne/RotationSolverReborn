@@ -24,6 +24,12 @@
           "Microsoft.CodeAnalysis.Common": "[5.3.0]"
         }
       },
+      "Microsoft.Net.Compilers.Toolset": {
+        "type": "Direct",
+        "requested": "[5.3.0, )",
+        "resolved": "5.3.0",
+        "contentHash": "7TEP2rSGCvP7Y1H/Koktzt5xCkf/PWzbTmiDVxztkLTvTeZbj99LgpSjogWEZRpgOTAHlVJK9VfOAxrVKcR5pw=="
+      },
       "Svg": {
         "type": "Direct",
         "requested": "[3.4.7, )",
