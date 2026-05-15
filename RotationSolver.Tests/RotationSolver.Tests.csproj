@@ -14,5 +14,7 @@
 		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\ScoringWeights.cs" Link="ScoringWeights.cs" />
 		<Compile Include="..\RotationSolver\Commands\AutoOffPolicy.cs" Link="AutoOffPolicy.cs" />
 		<Compile Include="..\RotationSolver\RebornRotations\PVPRotations\Ranged\BardPvPDecisionPolicy.cs" Link="BardPvPDecisionPolicy.cs" />
+		<Compile Include="..\RotationSolver\RebornRotations\PVPRotations\Ranged\MachinistPvPDecisionPolicy.cs" Link="MachinistPvPDecisionPolicy.cs" />
+		<Compile Include="..\RotationSolver\RebornRotations\PVPRotations\Ranged\MachinistPvPTargetPolicy.cs" Link="MachinistPvPTargetPolicy.cs" />
 	</ItemGroup>
 </Project>

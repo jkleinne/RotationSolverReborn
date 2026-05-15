@@ -294,6 +294,13 @@ public partial class CustomRotation
 					list.Add(i);
 				}
 			}
+
+			var limitBreakPvP = LimitBreakPvP;
+			if (limitBreakPvP != null && limitBreakPvP.Action.IsInJob())
+			{
+				list.Add(limitBreakPvP);
+			}
+
 			foreach (var i in Medicines)
 			{
 				if (i.HasIt)
