@@ -27,6 +27,9 @@ var tests = new (string Name, Action Test)[]
 	("repelling rejects unsafe backstep", RepellingRejectsUnsafeBackstep),
 	("repelling rejects resilient target", RepellingRejectsResilientTarget),
 	("repelling accepts safe peel", RepellingAcceptsSafePeel),
+	("bard forced burst rejects blocked target", BardForcedBurstRejectsBlockedTarget),
+	("bard burst gate cannot override blocked target", BardBurstGateCannotOverrideBlockedTarget),
+	("bard forced burst allows unblocked target", BardForcedBurstAllowsUnblockedTarget),
 	("protective paean rejects healthy unfocused ally", ProtectivePaeanRejectsHealthyUnfocusedAlly),
 	("protective paean allows focused ally", ProtectivePaeanAllowsFocusedAlly),
 	("machinist target policy prefers killable low resource target", MachinistTargetPolicyPrefersKillableLowResourceTarget),
@@ -44,10 +47,15 @@ var tests = new (string Name, Action Test)[]
 	("machinist marksmans spite accepts low mp kill window", MachinistMarksmanSpiteAcceptsLowMpKillWindow),
 	("machinist marksmans spite accepts pressured target above old cutoff", MachinistMarksmanSpiteAcceptsPressuredTargetAboveOldCutoff),
 	("machinist marksmans spite accepts vulnerable target", MachinistMarksmanSpiteAcceptsVulnerableTarget),
+	("machinist marksmans spite rejects active invulnerability", MachinistMarksmanSpiteRejectsActiveInvulnerability),
+	("machinist marksmans spite accepts mitigated secure kill", MachinistMarksmanSpiteAcceptsMitigatedSecureKill),
 	("machinist analysis chain saw accepts low resource kill window", MachinistAnalysisChainSawAcceptsLowResourceKillWindow),
 	("machinist full metal rejects uncommitted follow up", MachinistFullMetalRejectsUncommittedFollowUp),
+	("pvp damage gate rejects invulnerability", PvpDamageGateRejectsInvulnerability),
+	("pvp damage gate allows mitigated secure kill", PvpDamageGateAllowsMitigatedSecureKill),
 	("pvp lb json contains verified entries", PvpLbJsonContainsVerifiedEntries),
 	("pvp mitigation json contains resilience", PvpMitigationJsonContainsResilience),
+	("pvp mitigation json contains ranked cc defensive coverage", PvpMitigationJsonContainsRankedCcDefensiveCoverage),
 };
 
 var failures = new List<string>();
@@ -422,6 +430,36 @@ static void RepellingAcceptsSafePeel()
 	AssertTrue(BardPvPDecisionPolicy.ShouldUseRepellingShot(input), "Repelling should peel safe short-range divers");
 }
 
+static void BardForcedBurstRejectsBlockedTarget()
+{
+	AssertFalse(
+		BardPvPDecisionPolicy.ShouldUseBurstOrForcedSpend(
+			targetIsBurstWorthy: false,
+			targetBlocksDamage: true,
+			forcedSpendWindow: true),
+		"Bard forced burst should not override a blocked damage target");
+}
+
+static void BardBurstGateCannotOverrideBlockedTarget()
+{
+	AssertFalse(
+		BardPvPDecisionPolicy.ShouldUseBurstOrForcedSpend(
+			targetIsBurstWorthy: true,
+			targetBlocksDamage: true,
+			forcedSpendWindow: true),
+		"Bard burst should not fire when active mitigation blocks the damage");
+}
+
+static void BardForcedBurstAllowsUnblockedTarget()
+{
+	AssertTrue(
+		BardPvPDecisionPolicy.ShouldUseBurstOrForcedSpend(
+			targetIsBurstWorthy: false,
+			targetBlocksDamage: false,
+			forcedSpendWindow: true),
+		"Bard forced burst may prevent expiry or overcap when damage is not blocked");
+}
+
 static void ProtectivePaeanRejectsHealthyUnfocusedAlly()
 {
 	AssertFalse(
@@ -591,7 +629,13 @@ static void MachinistMarksmanSpiteRejectsGuard()
 static void MachinistMarksmanSpiteHoldsOnDyingAllyFocusedTarget()
 {
 	var input = new MachinistPvPDecisionInput(
-		Target: MachinistTarget(1, healthRatio: 0.14f, currentMp: 2_000, hasAllyFocus: true),
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.14f,
+			currentMp: 2_000,
+			hasAllyFocus: true,
+			effectiveHealthRatio: 0.14),
+		ExpectedDamageRatio: 0.67,
 		SafeCloseRange: true,
 		FollowUpAvailable: true,
 		AlliesCanBurst: true,
@@ -631,6 +675,7 @@ static void MachinistMarksmanSpiteAcceptsVulnerableTarget()
 {
 	var input = new MachinistPvPDecisionInput(
 		Target: MachinistTarget(1, healthRatio: 0.80f, currentMp: 10_000, isVulnerable: true),
+		ExpectedDamageRatio: 0.67,
 		SafeCloseRange: true,
 		FollowUpAvailable: true,
 		AlliesCanBurst: false,
@@ -638,6 +683,39 @@ static void MachinistMarksmanSpiteAcceptsVulnerableTarget()
 		TargetCommitted: true);
 
 	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should accept vulnerable targets even above normal HP cutoff");
+}
+
+static void MachinistMarksmanSpiteRejectsActiveInvulnerability()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(1, healthRatio: 0.10f, currentMp: 0, hasInvulnerability: true),
+		ExpectedDamageRatio: 1.00,
+		SafeCloseRange: true,
+		FollowUpAvailable: true,
+		AlliesCanBurst: true,
+		ObjectiveControlNeeded: true,
+		TargetCommitted: true);
+
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should not fire into active invulnerability");
+}
+
+static void MachinistMarksmanSpiteAcceptsMitigatedSecureKill()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.45f,
+			currentMp: 10_000,
+			effectiveHealthRatio: 0.62,
+			activeDamageReduction: 0.25),
+		ExpectedDamageRatio: 0.67,
+		SafeCloseRange: true,
+		FollowUpAvailable: false,
+		AlliesCanBurst: false,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: false);
+
+	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should fire through mitigation when expected damage still kills");
 }
 
 static void MachinistAnalysisChainSawAcceptsLowResourceKillWindow()
@@ -666,6 +744,32 @@ static void MachinistFullMetalRejectsUncommittedFollowUp()
 	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseFullMetalField(input), "Full Metal Field should not spend burst on an uncommitted durable target");
 }
 
+static void PvpDamageGateRejectsInvulnerability()
+{
+	var decision = PvPDamageGate.Evaluate(new PvPDamageGateInput(
+		Intent: PvPBurstIntent.Secure,
+		EffectiveHpRatio: double.PositiveInfinity,
+		ExpectedDamageRatio: 1.00,
+		ActiveDamageReduction: 0.99,
+		HasInvulnerability: true,
+		HasPrioritySignal: true));
+
+	AssertEqual(PvPBurstRecommendation.Hold, decision, "damage gate should never spend into active invulnerability");
+}
+
+static void PvpDamageGateAllowsMitigatedSecureKill()
+{
+	var decision = PvPDamageGate.Evaluate(new PvPDamageGateInput(
+		Intent: PvPBurstIntent.Secure,
+		EffectiveHpRatio: 0.62,
+		ExpectedDamageRatio: 0.67,
+		ActiveDamageReduction: 0.25,
+		HasInvulnerability: false,
+		HasPrioritySignal: false));
+
+	AssertEqual(PvPBurstRecommendation.Secure, decision, "damage gate should allow mitigation when expected damage still kills");
+}
+
 static MachinistPvPTargetSnapshot MachinistTarget(
 	ulong targetId,
 	float healthRatio,
@@ -675,6 +779,9 @@ static MachinistPvPTargetSnapshot MachinistTarget(
 	bool isObjectiveRelevant = false,
 	bool hasAllyFocus = false,
 	bool isVulnerable = false,
+	bool hasInvulnerability = false,
+	double effectiveHealthRatio = 1.0,
+	double activeDamageReduction = 0.0,
 	bool isExposed = true,
 	bool isInNormalRange = true,
 	bool isInCloseRange = false)
@@ -688,6 +795,9 @@ static MachinistPvPTargetSnapshot MachinistTarget(
 		IsObjectiveRelevant: isObjectiveRelevant,
 		HasAllyFocus: hasAllyFocus,
 		IsVulnerable: isVulnerable,
+		HasInvulnerability: hasInvulnerability,
+		EffectiveHealthRatio: effectiveHealthRatio,
+		ActiveDamageReduction: activeDamageReduction,
 		IsExposed: isExposed,
 		IsInNormalRange: isInNormalRange,
 		IsInCloseRange: isInCloseRange);
@@ -760,6 +870,44 @@ static void PvpMitigationJsonContainsResilience()
 	}
 
 	throw new InvalidOperationException("PvPMitigations.json should represent Resilience as non-invulnerability control protection");
+}
+
+static void PvpMitigationJsonContainsRankedCcDefensiveCoverage()
+{
+	using var document = JsonDocument.Parse(File.ReadAllText(RepositoryPath("RotationSolver.Basic", "Data", "PvPMitigations.json")));
+	var root = document.RootElement;
+	var entries = new Dictionary<string, (string Kind, double DamageReductionPercent)>();
+
+	foreach (var entry in root.EnumerateArray())
+	{
+		entries[GetRequiredString(entry, "Id")] = (
+			GetRequiredString(entry, "Kind"),
+			GetRequiredDouble(entry, "DamageReductionPercent"));
+	}
+
+	var expected = new Dictionary<string, (string Kind, double DamageReductionPercent)>
+	{
+		["Guard"] = ("Invuln", 0.0),
+		["HallowedGround_1302"] = ("Invuln", 0.0),
+		["UndeadRedemption"] = ("Invuln", 0.0),
+		["Hidden_1316"] = ("Invuln", 0.0),
+		["HardenedScales"] = ("HeavyDR", 0.50),
+		["Forte"] = ("HeavyDR", 0.50),
+		["WardensGrace"] = ("HeavyDR", 0.25),
+		["RelentlessRush"] = ("HeavyDR", 0.25),
+		["RadiantAegis_3224"] = ("HeavyDR", 0.25),
+		["FanDance"] = ("HeavyDR", 0.20),
+		["SaltedEarth_3037"] = ("HeavyDR", 0.20),
+		["ClarityOfCorundum"] = ("HeavyDR", 0.10),
+		["Catalyze"] = ("HeavyDR", 0.10),
+	};
+
+	foreach (var (id, expectedEntry) in expected)
+	{
+		AssertTrue(entries.TryGetValue(id, out var actual), $"PvPMitigations.json should include ranked CC defensive status {id}");
+		AssertEqual(expectedEntry.Kind, actual.Kind, $"PvPMitigations.json should classify {id}");
+		AssertEqual(expectedEntry.DamageReductionPercent, actual.DamageReductionPercent, $"PvPMitigations.json should set DR for {id}");
+	}
 }
 
 static string RepositoryPath(params string[] parts)

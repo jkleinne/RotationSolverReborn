@@ -28,15 +28,27 @@ public sealed class MitigationDatabase : IMitigationDatabase
     /// </summary>
     public static IReadOnlyList<MitigationEntry> EmbeddedDefaults { get; } = new[]
     {
-        new MitigationEntry(StatusID.Guard,           MitigationKind.Invuln,  0.00, "PvP Guard: universal heavy DR, treated as effective invuln."),
-        new MitigationEntry(StatusID.HallowedGround,  MitigationKind.Invuln,  0.00, "PLD Hallowed Ground: true invulnerability."),
-        new MitigationEntry(StatusID.LivingDead,      MitigationKind.Invuln,  0.00, "DRK Living Dead: invulnerability state until expiration."),
-        new MitigationEntry(StatusID.Holmgang_409,    MitigationKind.Invuln,  0.00, "WAR Holmgang: true invulnerability."),
-        new MitigationEntry(StatusID.Superbolide,     MitigationKind.Invuln,  0.00, "GNB Superbolide: drops to 1 HP with self-recovery; conservative skip."),
-        new MitigationEntry(StatusID.Resilience,      MitigationKind.HeavyDR, 0.00, "PvP Resilience: control protection from Purify, modeled as non-DR for scoring."),
-        new MitigationEntry(StatusID.Bloodwhetting,   MitigationKind.HeavyDR, 0.50, "WAR Bloodwhetting: heavy DR plus self-heal."),
-        new MitigationEntry(StatusID.SacredSoil,      MitigationKind.Shield,  0.20, "SCH Sacred Soil: damage shield, modeled as DR equivalent."),
-        new MitigationEntry(StatusID.Macrocosmos,     MitigationKind.Shield,  0.20, "AST Macrocosmos: damage shield plus delayed heal."),
+        new MitigationEntry(StatusID.Guard,              MitigationKind.Invuln,  0.00, "PvP Guard: 99% damage reduction, treated as effective invuln for non-piercing burst."),
+        new MitigationEntry(StatusID.HallowedGround,     MitigationKind.Invuln,  0.00, "PLD Hallowed Ground: true invulnerability."),
+        new MitigationEntry(StatusID.HallowedGround_1302, MitigationKind.Invuln, 0.00, "PLD PvP Hallowed Ground from Phalanx: impervious to most attacks."),
+        new MitigationEntry(StatusID.LivingDead,         MitigationKind.Invuln,  0.00, "DRK Living Dead: invulnerability state until expiration."),
+        new MitigationEntry(StatusID.UndeadRedemption,   MitigationKind.Invuln,  0.00, "DRK PvP Undead Redemption: most attacks cannot reduce HP below 1."),
+        new MitigationEntry(StatusID.Holmgang_409,       MitigationKind.Invuln,  0.00, "WAR Holmgang: true invulnerability."),
+        new MitigationEntry(StatusID.Superbolide,        MitigationKind.Invuln,  0.00, "GNB Superbolide: drops to 1 HP with self-recovery; conservative skip."),
+        new MitigationEntry(StatusID.Hidden_1316,        MitigationKind.Invuln,  0.00, "NIN PvP Hidden: prevents enemy targeting, treated as blocked damage."),
+        new MitigationEntry(StatusID.Resilience,         MitigationKind.HeavyDR, 0.00, "PvP Resilience: control protection from Purify, modeled as non-DR for scoring."),
+        new MitigationEntry(StatusID.Bloodwhetting,      MitigationKind.HeavyDR, 0.50, "WAR Bloodwhetting: heavy DR plus self-heal."),
+        new MitigationEntry(StatusID.HardenedScales,     MitigationKind.HeavyDR, 0.50, "VPR Hardened Scales: 50% damage reduction."),
+        new MitigationEntry(StatusID.Forte,              MitigationKind.HeavyDR, 0.50, "RDM Forte: 50% damage reduction and barrier."),
+        new MitigationEntry(StatusID.WardensGrace,       MitigationKind.HeavyDR, 0.25, "BRD Warden's Grace: 25% damage reduction."),
+        new MitigationEntry(StatusID.RelentlessRush,     MitigationKind.HeavyDR, 0.25, "GNB Relentless Rush: 25% damage reduction while rushing."),
+        new MitigationEntry(StatusID.RadiantAegis_3224,  MitigationKind.HeavyDR, 0.25, "SMN PvP Radiant Aegis: 25% damage reduction and barrier."),
+        new MitigationEntry(StatusID.FanDance,           MitigationKind.HeavyDR, 0.20, "DNC Fan Dance: 20% damage reduction."),
+        new MitigationEntry(StatusID.SaltedEarth_3037,   MitigationKind.HeavyDR, 0.20, "DRK PvP Salted Earth: 20% damage reduction while inside the field."),
+        new MitigationEntry(StatusID.SacredSoil,         MitigationKind.Shield,  0.20, "SCH Sacred Soil: damage shield, modeled as DR equivalent."),
+        new MitigationEntry(StatusID.Macrocosmos,        MitigationKind.Shield,  0.20, "AST Macrocosmos: damage shield plus delayed heal."),
+        new MitigationEntry(StatusID.ClarityOfCorundum,  MitigationKind.HeavyDR, 0.10, "GNB Heart of Corundum: 10% damage reduction."),
+        new MitigationEntry(StatusID.Catalyze,           MitigationKind.HeavyDR, 0.10, "SCH Catalyze: 10% damage reduction."),
     };
 
     /// <summary>

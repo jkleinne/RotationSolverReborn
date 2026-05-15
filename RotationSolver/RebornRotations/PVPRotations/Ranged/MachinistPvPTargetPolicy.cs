@@ -27,7 +27,10 @@ internal readonly record struct MachinistPvPTargetSnapshot(
 	bool IsVulnerable,
 	bool IsExposed,
 	bool IsInNormalRange,
-	bool IsInCloseRange);
+	bool IsInCloseRange,
+	bool HasInvulnerability = false,
+	double EffectiveHealthRatio = 1.0,
+	double ActiveDamageReduction = 0.0);
 
 internal static class MachinistPvPTargetPolicy
 {

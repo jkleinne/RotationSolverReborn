@@ -50,6 +50,21 @@ internal static class BardPvPDecisionPolicy
             || input.TargetHealthRatio <= KillPressureHealthRatio;
     }
 
+    internal static bool ShouldUseBurstOrForcedSpend(bool targetIsBurstWorthy, bool targetBlocksDamage, bool forcedSpendWindow)
+    {
+        if (targetBlocksDamage)
+        {
+            return false;
+        }
+
+        if (targetIsBurstWorthy)
+        {
+            return true;
+        }
+
+        return forcedSpendWindow;
+    }
+
     internal static bool ShouldUseProtectivePaean(float healthRatio, int focusCount)
     {
         if (focusCount > 0)
