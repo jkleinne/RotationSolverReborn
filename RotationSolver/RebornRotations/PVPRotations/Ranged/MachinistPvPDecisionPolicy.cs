@@ -26,6 +26,11 @@ internal static class MachinistPvPDecisionPolicy
 			return false;
 		}
 
+		if (CanDirectSecure(input, ignoresGuard: true))
+		{
+			return true;
+		}
+
 		if (input.Target.HasGuard)
 		{
 			return input.Target.HealthRatio <= DrillKillHealthRatio
@@ -39,6 +44,11 @@ internal static class MachinistPvPDecisionPolicy
 
 	internal static bool ShouldUseAnalysisAirAnchor(MachinistPvPDecisionInput input)
 	{
+		if (CanDirectSecure(input, ignoresGuard: false))
+		{
+			return true;
+		}
+
 		if (!CanApplyControl(input))
 		{
 			return false;
@@ -51,6 +61,11 @@ internal static class MachinistPvPDecisionPolicy
 
 	internal static bool ShouldUseAnalysisChainSaw(MachinistPvPDecisionInput input)
 	{
+		if (CanDirectSecure(input, ignoresGuard: false))
+		{
+			return true;
+		}
+
 		if (HasBlockedDamage(input))
 		{
 			return false;
@@ -156,6 +171,11 @@ internal static class MachinistPvPDecisionPolicy
 
 	internal static bool ShouldUseFullMetalField(MachinistPvPDecisionInput input)
 	{
+		if (CanDirectSecure(input, ignoresGuard: false))
+		{
+			return true;
+		}
+
 		if (HasBlockedDamage(input))
 		{
 			return false;
@@ -169,6 +189,11 @@ internal static class MachinistPvPDecisionPolicy
 
 	internal static bool ShouldUseBlazingShot(MachinistPvPDecisionInput input)
 	{
+		if (CanDirectSecure(input, ignoresGuard: false))
+		{
+			return true;
+		}
+
 		if (HasBlockedDamage(input))
 		{
 			return false;
@@ -200,6 +225,28 @@ internal static class MachinistPvPDecisionPolicy
 			|| input.TargetCommitted
 			|| input.Target.HasAllyFocus
 			|| input.Target.IsVulnerable;
+	}
+
+	private static bool CanDirectSecure(MachinistPvPDecisionInput input, bool ignoresGuard)
+	{
+		if (!input.Target.IsInNormalRange || input.Target.ExpectedDamageRatio <= 0.0)
+		{
+			return false;
+		}
+
+		var blocksDamage = input.Target.HasInvulnerability || (input.Target.HasGuard && !ignoresGuard);
+		var effectiveHealthRatio = input.Target.HasGuard && ignoresGuard
+			? input.Target.HealthRatio
+			: input.Target.EffectiveHealthRatio;
+		var gateDecision = PvPDamageGate.Evaluate(new PvPDamageGateInput(
+			Intent: PvPBurstIntent.Secure,
+			EffectiveHpRatio: effectiveHealthRatio,
+			ExpectedDamageRatio: input.Target.ExpectedDamageRatio,
+			ActiveDamageReduction: input.Target.ActiveDamageReduction,
+			HasInvulnerability: blocksDamage,
+			HasPrioritySignal: HasDamagePriority(input)));
+
+		return gateDecision == PvPBurstRecommendation.Secure;
 	}
 
 	private static bool IsKillWindow(MachinistPvPDecisionInput input)

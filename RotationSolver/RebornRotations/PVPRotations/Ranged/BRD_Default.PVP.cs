@@ -32,6 +32,12 @@ public sealed class BRD_DefaultPvP : BardRotation
 	private const float PaeanTankEngageWeight = 2.5f;
 	private const float PaeanMeleeEngageWeight = 2f;
 	private const float PaeanSmartTargetWeight = 1.5f;
+	private const double PowerfulShotPotency = 6_000.0;
+	private const double PitchPerfectPotency = 9_000.0;
+	private const double ApexArrowPotency = 8_000.0;
+	private const double HarmonicArrowPotency = 9_000.0;
+	private const double BlastArrowPotency = 10_000.0;
+	private const double EncoreOfLightPotency = 10_000.0;
 	private const double EagleEyeShotPotency = 12_000.0;
 
 	private readonly record struct PaeanCandidate(IBattleChara Target, float Score);
@@ -415,8 +421,16 @@ public sealed class BRD_DefaultPvP : BardRotation
 			return true;
 		}
 
+		if (TryUseDirectSecureAction(EncoreOfLightPvP, EncoreOfLightPotency, out action, skipAoeCheck: true))
+		{
+			return true;
+		}
+
 		if (EncoreOfLightPvP.CanUse(out action, skipAoeCheck: true)
-			&& ShouldUseBurstOrBeforeStatusExpires(EncoreOfLightPvP, StatusID.EncoreOfLightReady))
+			&& ShouldUseBurstOrBeforeStatusExpires(
+				EncoreOfLightPvP,
+				StatusID.EncoreOfLightReady,
+				EncoreOfLightPotency))
 		{
 			return true;
 		}
@@ -595,8 +609,13 @@ public sealed class BRD_DefaultPvP : BardRotation
 	#region GCDs
 	protected override bool GeneralGCD(out IAction? action)
 	{
+		if (TryUseDirectSecureGcd(out action))
+		{
+			return true;
+		}
+
 		if (HarmonicArrowPvP.CanUse(out action)
-			&& ShouldUseBurstOrPreventChargeOvercap(HarmonicArrowPvP))
+			&& ShouldUseBurstOrPreventChargeOvercap(HarmonicArrowPvP, HarmonicArrowPotency))
 		{
 			return true;
 		}
@@ -607,7 +626,7 @@ public sealed class BRD_DefaultPvP : BardRotation
 		}
 
 		if (BlastArrowPvP.CanUse(out action)
-			&& ShouldUseBurstOrBeforeStatusExpires(BlastArrowPvP, StatusID.BlastArrowReady_3142))
+			&& ShouldUseBurstOrBeforeStatusExpires(BlastArrowPvP, StatusID.BlastArrowReady_3142, BlastArrowPotency))
 		{
 			return true;
 		}
@@ -627,21 +646,130 @@ public sealed class BRD_DefaultPvP : BardRotation
 		return base.GeneralGCD(out action);
 	}
 
-	private static bool ShouldUseBurstOrPreventChargeOvercap(IBaseAction action)
+	private static bool TryUseDirectSecureGcd(out IAction? action)
+	{
+		if (TryUseDirectSecureAction(HarmonicArrowPvP, HarmonicArrowPotency, out action))
+		{
+			return true;
+		}
+
+		if (TryUseDirectSecureAction(PitchPerfectPvP, PitchPerfectPotency, out action, skipAoeCheck: true))
+		{
+			return true;
+		}
+
+		if (TryUseDirectSecureAction(BlastArrowPvP, BlastArrowPotency, out action))
+		{
+			return true;
+		}
+
+		if (BardPvPDecisionPolicy.ShouldUseApexArrow(StatusHelper.PlayerHasStatus(true, StatusID.BlastArrowReady_3142))
+			&& TryUseDirectSecureAction(ApexArrowPvP, ApexArrowPotency, out action, skipStatusProvideCheck: true))
+		{
+			return true;
+		}
+
+		return TryUseDirectSecureAction(PowerfulShotPvP, PowerfulShotPotency, out action);
+	}
+
+	private static bool ShouldUseBurstOrPreventChargeOvercap(IBaseAction action, double expectedPotency)
 	{
 		return BardPvPDecisionPolicy.ShouldUseBurstOrForcedSpend(
 			targetIsBurstWorthy: PvPBurstGate.ShouldUse(action),
 			targetBlocksDamage: PvPBurstGate.TargetBlocksDamage(action),
-			forcedSpendWindow: action.Cooldown.WillHaveXChargesGCD(action.Cooldown.MaxCharges, BurstExpiryGcdWindow, BurstExpiryOffset));
+			forcedSpendWindow: action.Cooldown.WillHaveXChargesGCD(action.Cooldown.MaxCharges, BurstExpiryGcdWindow, BurstExpiryOffset),
+			targetCanBeKilled: PvPBurstGate.CanSecure(action, expectedPotency));
 	}
 
-	private static bool ShouldUseBurstOrBeforeStatusExpires(IBaseAction action, StatusID status)
+	private static bool ShouldUseBurstOrBeforeStatusExpires(IBaseAction action, StatusID status, double expectedPotency)
 	{
 		return BardPvPDecisionPolicy.ShouldUseBurstOrForcedSpend(
 			targetIsBurstWorthy: PvPBurstGate.ShouldUse(action),
 			targetBlocksDamage: PvPBurstGate.TargetBlocksDamage(action),
 			forcedSpendWindow: StatusHelper.PlayerHasStatus(true, status)
-				&& StatusHelper.PlayerWillStatusEndGCD(BurstExpiryGcdWindow, BurstExpiryOffset, true, status));
+				&& StatusHelper.PlayerWillStatusEndGCD(BurstExpiryGcdWindow, BurstExpiryOffset, true, status),
+			targetCanBeKilled: PvPBurstGate.CanSecure(action, expectedPotency));
+	}
+
+	private static bool TryUseDirectSecureAction(
+		IBaseAction baseAction,
+		double expectedPotency,
+		out IAction? action,
+		bool skipAoeCheck = false,
+		bool skipStatusProvideCheck = false)
+	{
+		action = null;
+
+		foreach (var targetId in RankDirectSecureTargets(baseAction, expectedPotency))
+		{
+			if (TryUseActionOn(baseAction, targetId, out action, skipAoeCheck, skipStatusProvideCheck))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private static List<ulong> RankDirectSecureTargets(IBaseAction baseAction, double expectedPotency)
+	{
+		List<BardPvPKillSecureSnapshot> snapshots = [];
+		var range = baseAction.TargetInfo.Range;
+		var database = PvPMitigationDatabaseProvider.Current;
+
+		foreach (var hostile in AllHostileTargets)
+		{
+			if (hostile == null
+				|| hostile.CurrentHp == 0
+				|| hostile.MaxHp == 0
+				|| hostile.DistanceToPlayer() > range)
+			{
+				continue;
+			}
+
+			var effectiveHp = EffectiveHpCalculator.Compute(hostile, database);
+			var effectiveHpRatio = double.IsPositiveInfinity(effectiveHp)
+				? double.PositiveInfinity
+				: effectiveHp / hostile.MaxHp;
+
+			snapshots.Add(new BardPvPKillSecureSnapshot(
+				TargetId: hostile.GameObjectId,
+				HealthRatio: hostile.GetHealthRatio(),
+				EffectiveHealthRatio: effectiveHpRatio,
+				ExpectedDamageRatio: expectedPotency / hostile.MaxHp,
+				ActiveDamageReduction: MitigationPenalty.Compute(hostile, database),
+				HasInvulnerability: double.IsPositiveInfinity(effectiveHp),
+				HasAllyFocus: CountAlliesTargeting(hostile) > 0,
+				IsObjectiveRelevant: IsObjectiveRelevantTarget(hostile)));
+		}
+
+		return BardPvPDecisionPolicy.RankDirectSecureTargets(snapshots);
+	}
+
+	private static bool TryUseActionOn(
+		IBaseAction baseAction,
+		ulong targetId,
+		out IAction? action,
+		bool skipAoeCheck,
+		bool skipStatusProvideCheck)
+	{
+		action = null;
+		var originalCanTarget = baseAction.Setting.CanTarget;
+		baseAction.Setting.CanTarget = candidate =>
+			originalCanTarget(candidate) && candidate.GameObjectId == targetId;
+
+		try
+		{
+			return baseAction.CanUse(
+				out action,
+				skipAoeCheck: skipAoeCheck,
+				skipStatusProvideCheck: skipStatusProvideCheck,
+				targetOverride: TargetType.Nearest);
+		}
+		finally
+		{
+			baseAction.Setting.CanTarget = originalCanTarget;
+		}
 	}
 	#endregion
 }

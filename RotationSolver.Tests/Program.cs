@@ -36,9 +36,12 @@ var tests = new (string Name, Action Test)[]
 	("protective paean rejects healthy unfocused ally", ProtectivePaeanRejectsHealthyUnfocusedAlly),
 	("protective paean allows focused ally", ProtectivePaeanAllowsFocusedAlly),
 	("machinist target policy prefers killable low resource target", MachinistTargetPolicyPrefersKillableLowResourceTarget),
+	("machinist target policy prefers direct secure target", MachinistTargetPolicyPrefersDirectSecureTarget),
 	("machinist target policy allows guarded drill punish", MachinistTargetPolicyAllowsGuardedDrillPunish),
 	("machinist analysis drill rejects full resource target", MachinistAnalysisDrillRejectsFullResourceTarget),
+	("machinist analysis drill accepts direct secure kill", MachinistAnalysisDrillAcceptsDirectSecureKill),
 	("machinist analysis air anchor rejects resilient target", MachinistAnalysisAirAnchorRejectsResilientTarget),
+	("machinist analysis air anchor accepts direct secure through resilience", MachinistAnalysisAirAnchorAcceptsDirectSecureThroughResilience),
 	("machinist analysis air anchor rejects isolated setup", MachinistAnalysisAirAnchorRejectsIsolatedSetup),
 	("machinist analysis chain saw requires follow up", MachinistAnalysisChainSawRequiresFollowUp),
 	("machinist scattergun rejects unsafe close range", MachinistScattergunRejectsUnsafeCloseRange),
@@ -54,8 +57,17 @@ var tests = new (string Name, Action Test)[]
 	("machinist marksmans spite accepts mitigated secure kill", MachinistMarksmanSpiteAcceptsMitigatedSecureKill),
 	("machinist analysis chain saw accepts low resource kill window", MachinistAnalysisChainSawAcceptsLowResourceKillWindow),
 	("machinist full metal rejects uncommitted follow up", MachinistFullMetalRejectsUncommittedFollowUp),
+	("machinist full metal accepts direct secure without follow up", MachinistFullMetalAcceptsDirectSecureWithoutFollowUp),
+	("machinist full metal rejects guarded direct secure", MachinistFullMetalRejectsGuardedDirectSecure),
+	("machinist full metal rejects out of range direct secure", MachinistFullMetalRejectsOutOfRangeDirectSecure),
+	("machinist blazing shot accepts direct secure without follow up", MachinistBlazingShotAcceptsDirectSecureWithoutFollowUp),
 	("pvp damage gate rejects invulnerability", PvpDamageGateRejectsInvulnerability),
 	("pvp damage gate allows mitigated secure kill", PvpDamageGateAllowsMitigatedSecureKill),
+	("bard forced burst allows direct secure target", BardForcedBurstAllowsDirectSecureTarget),
+	("bard forced burst rejects blocked direct secure target", BardForcedBurstRejectsBlockedDirectSecureTarget),
+	("bard kill secure ranks lethal hostile", BardKillSecureRanksLethalHostile),
+	("bard kill secure rejects invulnerability", BardKillSecureRejectsInvulnerability),
+	("bard kill secure prefers lowest lethal health", BardKillSecurePrefersLowestLethalHealth),
 	("pvp lb json contains verified entries", PvpLbJsonContainsVerifiedEntries),
 	("pvp mitigation json contains resilience", PvpMitigationJsonContainsResilience),
 	("pvp mitigation json contains ranked cc defensive coverage", PvpMitigationJsonContainsRankedCcDefensiveCoverage),
@@ -67,8 +79,11 @@ var tests = new (string Name, Action Test)[]
 	("frontline eagle eye shot rejects crystalline conflict", FrontlineEagleEyeShotRejectsCrystallineConflict),
 	("bard frontline eagle eye shot waits for controller window", BardFrontlineEagleEyeShotWaitsForControllerWindow),
 	("bard frontline eagle eye shot accepts controlled target", BardFrontlineEagleEyeShotAcceptsControlledTarget),
-	("machinist frontline eagle eye shot waits for pick window", MachinistFrontlineEagleEyeShotWaitsForPickWindow),
+	("machinist frontline eagle eye shot rejects healthy filler", MachinistFrontlineEagleEyeShotRejectsHealthyFiller),
+	("machinist frontline eagle eye shot accepts injured target", MachinistFrontlineEagleEyeShotAcceptsInjuredTarget),
+	("machinist frontline eagle eye shot accepts burst setup target", MachinistFrontlineEagleEyeShotAcceptsBurstSetupTarget),
 	("machinist frontline eagle eye shot accepts wildfire target", MachinistFrontlineEagleEyeShotAcceptsWildfireTarget),
+	("machinist frontline eagle eye shot accepts guard pressure target", MachinistFrontlineEagleEyeShotAcceptsGuardPressureTarget),
 	("machinist frontline eagle eye shot secures through guard", MachinistFrontlineEagleEyeShotSecuresThroughGuard),
 };
 
@@ -361,15 +376,41 @@ static void BardFrontlineEagleEyeShotAcceptsControlledTarget()
 		"Bard should spend Eagle Eye Shot into a controlled pressure target");
 }
 
-static void MachinistFrontlineEagleEyeShotWaitsForPickWindow()
+static void MachinistFrontlineEagleEyeShotRejectsHealthyFiller()
 {
 	var input = FrontlineEagleEyeShotInput(
 		FrontlinePvPRangedJob.Machinist,
-		NeutralEagleEyeShotTarget() with { HealthRatio = 0.55f });
+		NeutralEagleEyeShotTarget() with { HealthRatio = 0.90f });
 
 	AssertFalse(
 		FrontlinePvPRoleActionPolicy.ShouldUseEagleEyeShot(input),
-		"Machinist should hold Eagle Eye Shot until a pick window exists");
+		"Machinist should not spend Eagle Eye Shot on healthy filler targets");
+}
+
+static void MachinistFrontlineEagleEyeShotAcceptsInjuredTarget()
+{
+	var input = FrontlineEagleEyeShotInput(
+		FrontlinePvPRangedJob.Machinist,
+		NeutralEagleEyeShotTarget() with { HealthRatio = 0.65f });
+
+	AssertTrue(
+		FrontlinePvPRoleActionPolicy.ShouldUseEagleEyeShot(input),
+		"Machinist should spend Eagle Eye Shot on injured targets because it has a short recast");
+}
+
+static void MachinistFrontlineEagleEyeShotAcceptsBurstSetupTarget()
+{
+	var input = FrontlineEagleEyeShotInput(
+		FrontlinePvPRangedJob.Machinist,
+		NeutralEagleEyeShotTarget() with
+		{
+			HealthRatio = 0.80f,
+			ImmediateFollowUpAvailable = true,
+		});
+
+	AssertTrue(
+		FrontlinePvPRoleActionPolicy.ShouldUseEagleEyeShot(input),
+		"Machinist should spend Eagle Eye Shot as part of a normal burst setup");
 }
 
 static void MachinistFrontlineEagleEyeShotAcceptsWildfireTarget()
@@ -385,6 +426,22 @@ static void MachinistFrontlineEagleEyeShotAcceptsWildfireTarget()
 	AssertTrue(
 		FrontlinePvPRoleActionPolicy.ShouldUseEagleEyeShot(input),
 		"Machinist should spend Eagle Eye Shot into its Wildfire pick window");
+}
+
+static void MachinistFrontlineEagleEyeShotAcceptsGuardPressureTarget()
+{
+	var input = FrontlineEagleEyeShotInput(
+		FrontlinePvPRangedJob.Machinist,
+		NeutralEagleEyeShotTarget() with
+		{
+			HealthRatio = 0.60f,
+			HasGuard = true,
+			TargetCommitted = true,
+		});
+
+	AssertTrue(
+		FrontlinePvPRoleActionPolicy.ShouldUseEagleEyeShot(input),
+		"Machinist should pressure committed Guard targets because Eagle Eye Shot ignores Guard");
 }
 
 static void MachinistFrontlineEagleEyeShotSecuresThroughGuard()
@@ -700,6 +757,23 @@ static void MachinistTargetPolicyPrefersKillableLowResourceTarget()
 	AssertEqual(2UL, selected?.TargetId, "MCH should prefer the target that cannot answer with repeated Recuperates");
 }
 
+static void MachinistTargetPolicyPrefersDirectSecureTarget()
+{
+	var directSecureTarget = MachinistTarget(
+		1,
+		healthRatio: 0.15f,
+		currentMp: 10_000,
+		effectiveHealthRatio: 0.15,
+		expectedDamageRatio: 0.20);
+	var lowResourceTarget = MachinistTarget(2, healthRatio: 0.40f, currentMp: 2_000);
+
+	var selected = MachinistPvPTargetPolicy.SelectBest(
+		[directSecureTarget, lowResourceTarget],
+		MachinistPvPActionIntent.AnalysisDrill);
+
+	AssertEqual(1UL, selected?.TargetId, "MCH should prefer a direct secure target over a low MP pressure target");
+}
+
 static void MachinistTargetPolicyAllowsGuardedDrillPunish()
 {
 	var guardedLowTarget = MachinistTarget(
@@ -729,6 +803,24 @@ static void MachinistAnalysisDrillRejectsFullResourceTarget()
 	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseAnalysisDrill(input), "Analysis Drill should not pad into full-resource targets");
 }
 
+static void MachinistAnalysisDrillAcceptsDirectSecureKill()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.18f,
+			currentMp: 10_000,
+			effectiveHealthRatio: 0.18,
+			expectedDamageRatio: 0.25),
+		SafeCloseRange: true,
+		FollowUpAvailable: false,
+		AlliesCanBurst: false,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: false);
+
+	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseAnalysisDrill(input), "Analysis Drill should secure a lethal target even when MP is high");
+}
+
 static void MachinistAnalysisAirAnchorRejectsResilientTarget()
 {
 	var input = new MachinistPvPDecisionInput(
@@ -740,6 +832,25 @@ static void MachinistAnalysisAirAnchorRejectsResilientTarget()
 		TargetCommitted: true);
 
 	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseAnalysisAirAnchor(input), "Analysis Air Anchor should reject Resilience when stun value matters");
+}
+
+static void MachinistAnalysisAirAnchorAcceptsDirectSecureThroughResilience()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.18f,
+			currentMp: 10_000,
+			hasResilience: true,
+			effectiveHealthRatio: 0.18,
+			expectedDamageRatio: 0.20),
+		SafeCloseRange: true,
+		FollowUpAvailable: false,
+		AlliesCanBurst: false,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: false);
+
+	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseAnalysisAirAnchor(input), "Analysis Air Anchor damage should secure through Resilience");
 }
 
 static void MachinistAnalysisAirAnchorRejectsIsolatedSetup()
@@ -958,6 +1069,80 @@ static void MachinistFullMetalRejectsUncommittedFollowUp()
 	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseFullMetalField(input), "Full Metal Field should not spend burst on an uncommitted durable target");
 }
 
+static void MachinistFullMetalAcceptsDirectSecureWithoutFollowUp()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.20f,
+			currentMp: 10_000,
+			effectiveHealthRatio: 0.20,
+			expectedDamageRatio: 0.25),
+		SafeCloseRange: true,
+		FollowUpAvailable: false,
+		AlliesCanBurst: false,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: false);
+
+	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseFullMetalField(input), "Full Metal Field should secure lethal targets without setup signals");
+}
+
+static void MachinistFullMetalRejectsGuardedDirectSecure()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.20f,
+			currentMp: 10_000,
+			hasGuard: true,
+			effectiveHealthRatio: 0.20,
+			expectedDamageRatio: 0.25),
+		SafeCloseRange: true,
+		FollowUpAvailable: true,
+		AlliesCanBurst: true,
+		ObjectiveControlNeeded: true,
+		TargetCommitted: true);
+
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseFullMetalField(input), "Full Metal Field should not treat Guard as killable");
+}
+
+static void MachinistFullMetalRejectsOutOfRangeDirectSecure()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.20f,
+			currentMp: 10_000,
+			effectiveHealthRatio: 0.20,
+			expectedDamageRatio: 0.25,
+			isInNormalRange: false),
+		SafeCloseRange: true,
+		FollowUpAvailable: true,
+		AlliesCanBurst: true,
+		ObjectiveControlNeeded: true,
+		TargetCommitted: true);
+
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseFullMetalField(input), "Full Metal Field should not secure targets outside action range");
+}
+
+static void MachinistBlazingShotAcceptsDirectSecureWithoutFollowUp()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.12f,
+			currentMp: 10_000,
+			effectiveHealthRatio: 0.12,
+			expectedDamageRatio: 0.15),
+		SafeCloseRange: true,
+		FollowUpAvailable: false,
+		AlliesCanBurst: false,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: false);
+
+	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseBlazingShot(input), "Blazing Shot should secure lethal targets without setup signals");
+}
+
 static void PvpDamageGateRejectsInvulnerability()
 {
 	var decision = PvPDamageGate.Evaluate(new PvPDamageGateInput(
@@ -984,6 +1169,68 @@ static void PvpDamageGateAllowsMitigatedSecureKill()
 	AssertEqual(PvPBurstRecommendation.Secure, decision, "damage gate should allow mitigation when expected damage still kills");
 }
 
+static void BardForcedBurstAllowsDirectSecureTarget()
+{
+	AssertTrue(
+		BardPvPDecisionPolicy.ShouldUseBurstOrForcedSpend(
+			targetIsBurstWorthy: false,
+			targetBlocksDamage: false,
+			forcedSpendWindow: false,
+			targetCanBeKilled: true),
+		"Bard burst actions should spend when the current action can secure the target");
+}
+
+static void BardForcedBurstRejectsBlockedDirectSecureTarget()
+{
+	AssertFalse(
+		BardPvPDecisionPolicy.ShouldUseBurstOrForcedSpend(
+			targetIsBurstWorthy: true,
+			targetBlocksDamage: true,
+			forcedSpendWindow: true,
+			targetCanBeKilled: true),
+		"Bard burst actions should not spend into blocked damage even when HP looks lethal");
+}
+
+static void BardKillSecureRanksLethalHostile()
+{
+	var targets = new[]
+	{
+		BardKillTarget(1, healthRatio: 0.20f, effectiveHealthRatio: 0.20, expectedDamageRatio: 0.10),
+		BardKillTarget(2, healthRatio: 0.12f, effectiveHealthRatio: 0.09, expectedDamageRatio: 0.10),
+	};
+
+	var ranked = BardPvPDecisionPolicy.RankDirectSecureTargets(targets);
+
+	AssertEqual(1, ranked.Count, "only lethal Bard targets should be ranked");
+	AssertEqual(2UL, ranked[0], "Bard should force target selection onto the lethal hostile");
+}
+
+static void BardKillSecureRejectsInvulnerability()
+{
+	var targets = new[]
+	{
+		BardKillTarget(1, healthRatio: 0.05f, effectiveHealthRatio: 0.05, expectedDamageRatio: 0.10, hasInvulnerability: true),
+	};
+
+	var ranked = BardPvPDecisionPolicy.RankDirectSecureTargets(targets);
+
+	AssertEqual(0, ranked.Count, "Bard kill secure must not target active invulnerability");
+}
+
+static void BardKillSecurePrefersLowestLethalHealth()
+{
+	var targets = new[]
+	{
+		BardKillTarget(1, healthRatio: 0.18f, effectiveHealthRatio: 0.09, expectedDamageRatio: 0.10),
+		BardKillTarget(2, healthRatio: 0.08f, effectiveHealthRatio: 0.07, expectedDamageRatio: 0.10),
+	};
+
+	var ranked = BardPvPDecisionPolicy.RankDirectSecureTargets(targets);
+
+	AssertEqual(2, ranked.Count, "all lethal Bard targets should remain available");
+	AssertEqual(2UL, ranked[0], "Bard should target the lowest health lethal hostile first");
+}
+
 static MachinistPvPTargetSnapshot MachinistTarget(
 	ulong targetId,
 	float healthRatio,
@@ -996,6 +1243,7 @@ static MachinistPvPTargetSnapshot MachinistTarget(
 	bool hasInvulnerability = false,
 	double effectiveHealthRatio = 1.0,
 	double activeDamageReduction = 0.0,
+	double expectedDamageRatio = 0.0,
 	bool isExposed = true,
 	bool isInNormalRange = true,
 	bool isInCloseRange = false)
@@ -1010,11 +1258,28 @@ static MachinistPvPTargetSnapshot MachinistTarget(
 		HasAllyFocus: hasAllyFocus,
 		IsVulnerable: isVulnerable,
 		HasInvulnerability: hasInvulnerability,
+		ExpectedDamageRatio: expectedDamageRatio,
 		EffectiveHealthRatio: effectiveHealthRatio,
 		ActiveDamageReduction: activeDamageReduction,
 		IsExposed: isExposed,
 		IsInNormalRange: isInNormalRange,
 		IsInCloseRange: isInCloseRange);
+}
+
+static BardPvPKillSecureSnapshot BardKillTarget(
+	ulong targetId,
+	float healthRatio,
+	double effectiveHealthRatio,
+	double expectedDamageRatio,
+	bool hasInvulnerability = false)
+{
+	return new BardPvPKillSecureSnapshot(
+		TargetId: targetId,
+		HealthRatio: healthRatio,
+		EffectiveHealthRatio: effectiveHealthRatio,
+		ExpectedDamageRatio: expectedDamageRatio,
+		ActiveDamageReduction: 0.0,
+		HasInvulnerability: hasInvulnerability);
 }
 
 static void PvpLbJsonContainsVerifiedEntries()

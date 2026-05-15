@@ -20,6 +20,16 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 	private const uint MarksmansSpitePvPActionId = 29415;
 	private const double MarksmansSpitePotency = 40_000.0;
 	private const double EagleEyeShotPotency = 12_000.0;
+	private const double DrillPotency = 10_000.0;
+	private const double AnalysisDrillPotency = 20_000.0;
+	private const double BioblasterPotency = 4_000.0;
+	private const double AnalysisBioblasterPotency = 6_000.0;
+	private const double AirAnchorPotency = 8_000.0;
+	private const double AnalysisAirAnchorPotency = 12_000.0;
+	private const double ChainSawPotency = 12_000.0;
+	private const double ScattergunPotency = 8_000.0;
+	private const double FullMetalFieldPrimaryPotency = 15_000.0;
+	private const double BlazingShotPotency = 8_000.0;
 
 	#region Configurations
 	#endregion
@@ -183,7 +193,7 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 			return false;
 		}
 
-		var snapshot = CreateTargetSnapshot(target, intent);
+		var snapshot = CreateTargetSnapshot(target, intent, analysisWillBuffAction: true);
 		var input = CreateDecisionInput(snapshot, target, intent);
 		if (!ShouldUseAnalysis(intent, input))
 		{
@@ -336,6 +346,7 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 	private static List<MachinistPvPTargetSnapshot> RankTargets(MachinistPvPActionIntent intent)
 	{
 		List<MachinistPvPTargetSnapshot> snapshots = [];
+		var analysisWillBuffAction = StatusHelper.PlayerHasStatus(true, StatusID.Analysis);
 		foreach (var hostile in AllHostileTargets)
 		{
 			if (hostile == null || hostile.CurrentHp == 0)
@@ -343,7 +354,7 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 				continue;
 			}
 
-			snapshots.Add(CreateTargetSnapshot(hostile, intent));
+			snapshots.Add(CreateTargetSnapshot(hostile, intent, analysisWillBuffAction));
 		}
 
 		return MachinistPvPTargetPolicy.Rank(snapshots, intent);
@@ -351,7 +362,8 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 
 	private static MachinistPvPTargetSnapshot CreateTargetSnapshot(
 		IBattleChara target,
-		MachinistPvPActionIntent intent)
+		MachinistPvPActionIntent intent,
+		bool analysisWillBuffAction)
 	{
 		var objectiveTargets = PvPObjectiveState.BuildObjectiveRelevantTargetIds();
 		var distance = target.DistanceToPlayer();
@@ -380,6 +392,7 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 			IsVulnerable: false,
 			HasInvulnerability: HasNonGuardInvulnerability(target, mitigationDatabase),
 			HasWildfire: target.HasStatus(true, StatusID.Wildfire, StatusID.Wildfire_1323),
+			ExpectedDamageRatio: ExpectedDamageRatio(intent, target, analysisWillBuffAction),
 			EffectiveHealthRatio: effectiveHpRatio,
 			ActiveDamageReduction: MitigationPenalty.Compute(target, mitigationDatabase),
 			IsExposed: !hasGuard && distance <= range,
@@ -425,10 +438,13 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 			AlliesCanBurst: snapshot.HasAllyFocus || CountAlliesNear(target, TeamfightRadiusYalms) > 0,
 			ObjectiveControlNeeded: objectiveControlNeeded,
 			TargetCommitted: IsTargetCommitted(snapshot, target, objectiveControlNeeded),
-			ExpectedDamageRatio: ExpectedDamageRatio(intent, target));
+			ExpectedDamageRatio: snapshot.ExpectedDamageRatio);
 	}
 
-	private static double ExpectedDamageRatio(MachinistPvPActionIntent intent, IBattleChara target)
+	private static double ExpectedDamageRatio(
+		MachinistPvPActionIntent intent,
+		IBattleChara target,
+		bool analysisWillBuffAction)
 	{
 		if (target.MaxHp == 0)
 		{
@@ -439,6 +455,13 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 		{
 			MachinistPvPActionIntent.MarksmanSpite => MarksmansSpitePotency / target.MaxHp,
 			MachinistPvPActionIntent.EagleEyeShot => EagleEyeShotPotency / target.MaxHp,
+			MachinistPvPActionIntent.AnalysisDrill => (analysisWillBuffAction ? AnalysisDrillPotency : DrillPotency) / target.MaxHp,
+			MachinistPvPActionIntent.AnalysisBioblaster => (analysisWillBuffAction ? AnalysisBioblasterPotency : BioblasterPotency) / target.MaxHp,
+			MachinistPvPActionIntent.AnalysisAirAnchor => (analysisWillBuffAction ? AnalysisAirAnchorPotency : AirAnchorPotency) / target.MaxHp,
+			MachinistPvPActionIntent.AnalysisChainSaw => ChainSawPotency / target.MaxHp,
+			MachinistPvPActionIntent.Scattergun => ScattergunPotency / target.MaxHp,
+			MachinistPvPActionIntent.FullMetalField => FullMetalFieldPrimaryPotency / target.MaxHp,
+			MachinistPvPActionIntent.BlazingShot => BlazingShotPotency / target.MaxHp,
 			_ => 0.0,
 		};
 	}
