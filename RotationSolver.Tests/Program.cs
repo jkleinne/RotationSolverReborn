@@ -1902,6 +1902,8 @@ static void PvpMitigationJsonContainsRankedCcDefensiveCoverage()
 	{
 		["Guard"] = ("Invuln", 0.0),
 		["HallowedGround_1302"] = ("Invuln", 0.0),
+		["GuardiansWill"] = ("Invuln", 0.0),
+		["Phalanx"] = ("HeavyDR", 0.33),
 		["UndeadRedemption"] = ("Invuln", 0.0),
 		["Hidden_1316"] = ("Invuln", 0.0),
 		["HardenedScales"] = ("HeavyDR", 0.50),
