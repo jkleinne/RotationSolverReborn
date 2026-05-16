@@ -3,6 +3,7 @@ using ECommons.ExcelServices;
 using ECommons.GameFunctions;
 using ECommons.GameHelpers;
 using ECommons.Logging;
+using RotationSolver.Basic.Actions.PvPTargetSelection;
 
 namespace RotationSolver.Updaters;
 
@@ -21,6 +22,7 @@ internal static partial class TargetUpdater
 	{
 		DataCenter.TargetsByRange.Clear();
 		DataCenter.AllTargets = GetAllTargets();
+		UpdatePvpGuardCooldowns(DataCenter.AllTargets);
 
 		// Early-out: avoid downstream work and stale data when there are no potential targets
 		if (DataCenter.AllTargets == null || DataCenter.AllTargets.Count == 0)
@@ -45,6 +47,83 @@ internal static partial class TargetUpdater
 		DataCenter.InterruptTarget = GetFirstHostileTarget(ObjectHelper.CanInterrupt); // Tanks, Melee, RDM, and various phantom and duty actions can interrupt so just deal with it
 
 		UpdateTimeToKill();
+	}
+
+	private static void UpdatePvpGuardCooldowns(List<IBattleChara> allTargets)
+	{
+		if (!DataCenter.IsPvP)
+		{
+			DataCenter.PvPGuardCooldownTracker.Reset();
+			return;
+		}
+
+		var observedAt = TimeSpan.FromMilliseconds(Environment.TickCount64);
+		HashSet<ulong> observedTargetIds = [];
+		foreach (var target in allTargets)
+		{
+			if (target == null)
+			{
+				continue;
+			}
+
+			try
+			{
+				if (!target.IsEnemy() || target.GameObjectId == 0)
+				{
+					continue;
+				}
+
+				observedTargetIds.Add(target.GameObjectId);
+				if (target.CurrentHp == 0)
+				{
+					DataCenter.PvPGuardCooldownTracker.Forget(target.GameObjectId);
+					continue;
+				}
+
+				var hasGuard = TryGetGuardRemaining(target, out var guardRemaining);
+				DataCenter.PvPGuardCooldownTracker.Observe(new PvPGuardCooldownObservation(
+					TargetId: target.GameObjectId,
+					ObservedAt: observedAt,
+					HasGuard: hasGuard,
+					GuardRemaining: guardRemaining));
+			}
+			catch (Exception ex)
+			{
+				PluginLog.Error($"Error updating PvP Guard cooldown state for target {target.GameObjectId}: {ex.Message}");
+			}
+		}
+
+		DataCenter.PvPGuardCooldownTracker.ForgetUnseen(
+			observedAt,
+			observedTargetIds,
+			PvPGuardCooldownTracker.DefaultMaxUnseenDuration);
+	}
+
+	private static bool TryGetGuardRemaining(IBattleChara target, out TimeSpan remaining)
+	{
+		remaining = TimeSpan.Zero;
+		var statusList = target.StatusList;
+		if (statusList == null)
+		{
+			return false;
+		}
+
+		for (var i = 0; i < statusList.Length; i++)
+		{
+			var status = statusList[i];
+			if (status == null || (StatusID)status.StatusId != StatusID.Guard)
+			{
+				continue;
+			}
+
+			var remainingSeconds = status.RemainingTime <= 0f
+				? PvPGuardCooldownTracker.GuardDuration.TotalSeconds
+				: status.RemainingTime;
+			remaining = TimeSpan.FromSeconds(remainingSeconds);
+			return true;
+		}
+
+		return false;
 	}
 
 	private static unsafe void UpdateLists()

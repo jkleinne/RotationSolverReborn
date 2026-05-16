@@ -9,7 +9,8 @@ internal readonly record struct MachinistPvPDecisionInput(
 	bool AlliesCanBurst,
 	bool ObjectiveControlNeeded,
 	bool TargetCommitted,
-	double ExpectedDamageRatio = 0.0);
+	double ExpectedDamageRatio = 0.0,
+	bool HasGuardCooldownKnowledge = false);
 
 internal static class MachinistPvPDecisionPolicy
 {
@@ -137,6 +138,11 @@ internal static class MachinistPvPDecisionPolicy
 			return false;
 		}
 
+		if (input.Target.GuardAvailability == PvPGuardAvailability.Active)
+		{
+			return false;
+		}
+
 		if (!input.ObjectiveControlNeeded && IsLikelyAlreadyDying(input))
 		{
 			return false;
@@ -150,6 +156,11 @@ internal static class MachinistPvPDecisionPolicy
 			HasInvulnerability: input.Target.HasGuard || input.Target.HasInvulnerability,
 			HasPrioritySignal: HasDamagePriority(input)));
 		if (gateDecision == PvPBurstRecommendation.Hold)
+		{
+			return false;
+		}
+
+		if (input.HasGuardCooldownKnowledge && CanTargetReactWithGuard(input) && !HasMarksmanExtremeNecessity(input))
 		{
 			return false;
 		}
@@ -241,6 +252,24 @@ internal static class MachinistPvPDecisionPolicy
 	private static bool HasMarksmanSecureDamage(MachinistPvPDecisionInput input)
 	{
 		return input.Target.EffectiveHealthRatio + MarksmanSecureSafetyMarginRatio <= input.ExpectedDamageRatio;
+	}
+
+	private static bool HasMarksmanExtremeNecessity(MachinistPvPDecisionInput input)
+	{
+		if (!HasMarksmanSecureDamage(input))
+		{
+			return false;
+		}
+
+		return input.ObjectiveControlNeeded
+			|| input.Target.CurrentMp <= PvPScoringFactors.LowMp
+			|| input.Target.IsVulnerable
+			|| (input.Target.HasAllyFocus && input.FollowUpAvailable);
+	}
+
+	private static bool CanTargetReactWithGuard(MachinistPvPDecisionInput input)
+	{
+		return input.Target.GuardAvailability is PvPGuardAvailability.Ready or PvPGuardAvailability.Unknown;
 	}
 
 	private static bool HasMarksmanConvertibleLeftover(MachinistPvPDecisionInput input)

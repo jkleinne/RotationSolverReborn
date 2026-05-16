@@ -11,6 +11,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Fate;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using Lumina.Excel.Sheets;
+using RotationSolver.Basic.Actions.PvPTargetSelection;
 using RotationSolver.Basic.Configuration;
 using RotationSolver.Basic.Rotations.Duties;
 using System.Collections.Concurrent;
@@ -39,6 +40,7 @@ internal static class DataCenter
 
 	public static List<IBattleChara> AllTargets { get; set; } = [];
 	public static Dictionary<float, List<IBattleChara>> TargetsByRange { get; set; } = [];
+	internal static PvPGuardCooldownTracker PvPGuardCooldownTracker { get; } = new();
 
 	/// <summary>
 	/// The action most recently queued via interception (current).
