@@ -2,6 +2,7 @@ using ECommons.DalamudServices;
 using ECommons.GameHelpers;
 using ECommons.Logging;
 using FFXIVClientStructs.FFXIV.Client.Game;
+using RotationSolver.Basic.Actions.PvPTargetSelection;
 using Action = Lumina.Excel.Sheets.Action;
 
 namespace RotationSolver.Basic.Actions;
@@ -284,8 +285,20 @@ public class BaseAction : IBaseAction
 		else
 		{
 			var targetId = target.Target?.GameObjectId ?? Player.Object.GameObjectId;
+			var targetObject = Svc.Objects.SearchById(targetId);
 
-			if (targetId == 0 || Svc.Objects.SearchById(targetId) == null)
+			if (targetId == 0 || targetObject == null)
+			{
+				return false;
+			}
+
+			if (targetObject is IBattleChara battleTarget
+				&& PvPActionUseGuard.ShouldBlock(new PvPActionUseGuardInput(
+					IsPvP: DataCenter.IsPvP,
+					IsHostileAction: !Setting.IsFriendly && Setting.TargetType != TargetType.Self && targetId != Player.Object.GameObjectId,
+					IgnoresGuard: Setting.IgnoreGuard,
+					TargetHasGuard: battleTarget.HasStatus(false, StatusID.Guard),
+					GuardWillExpireBeforeAction: battleTarget.WillStatusEnd((float)Info.CastTime, false, StatusID.Guard))))
 			{
 				return false;
 			}
