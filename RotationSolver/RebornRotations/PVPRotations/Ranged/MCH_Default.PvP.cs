@@ -17,7 +17,6 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 	private const float CloseRangeCommitHealthRatio = 0.25f;
 	private const int ForcedTeamfightHostileCount = 2;
 	private const int SafeCloseRangeHostileLimit = 2;
-	private const uint MarksmansSpitePvPActionId = 29415;
 	private const double MarksmanGuardReactionWindowSeconds = 1.25;
 	private const double MarksmansSpitePotency = 40_000.0;
 	private const double EagleEyeShotPotency = 12_000.0;
@@ -303,13 +302,34 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 		foreach (var candidate in AllActions)
 		{
 			if (candidate is IBaseAction baseAction
-				&& (baseAction.ID == MarksmansSpitePvPActionId || baseAction.AdjustedID == MarksmansSpitePvPActionId))
+				&& MachinistPvPDecisionPolicy.IsDirectMarksmansSpiteAction(baseAction.ID, baseAction.AdjustedID))
 			{
 				return baseAction;
 			}
 		}
 
 		return null;
+	}
+
+	private static bool ShouldVetoMarksmanSpiteForLiveGuard(
+		MachinistPvPActionIntent intent,
+		IBaseAction action,
+		IBattleChara target,
+		out MachinistPvPLiveGuardInput input)
+	{
+		if (intent != MachinistPvPActionIntent.MarksmanSpite)
+		{
+			input = default;
+			return false;
+		}
+
+		var hasGuard = target.HasStatus(false, StatusID.Guard);
+		var guardWillExpire = target.WillStatusEnd((float)action.Info.CastTime, false, StatusID.Guard);
+		input = new MachinistPvPLiveGuardInput(
+			TargetHasGuard: hasGuard,
+			GuardWillExpireBeforeAction: guardWillExpire);
+
+		return MachinistPvPDecisionPolicy.ShouldVetoMarksmanSpiteForLiveGuard(input);
 	}
 
 	private bool TryUsePolicyAction(
@@ -332,16 +352,68 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 			var input = CreateDecisionInput(targetSnapshot, target, intent);
 			if (!shouldUse(input))
 			{
+				TraceMarksmanSpiteDecision("policy_reject", baseAction, target, targetSnapshot, input);
+				continue;
+			}
+
+			if (ShouldVetoMarksmanSpiteForLiveGuard(intent, baseAction, target, out var liveGuardInput))
+			{
+				TraceMarksmanSpiteDecision("live_guard_veto", baseAction, target, targetSnapshot, input, liveGuardInput);
 				continue;
 			}
 
 			if (TryUseActionOn(baseAction, targetSnapshot.TargetId, out action, usedUp, skipAoeCheck))
 			{
+				TraceMarksmanSpiteDecision("accepted", baseAction, target, targetSnapshot, input);
 				return true;
 			}
+
+			TraceMarksmanSpiteDecision("canuse_reject", baseAction, target, targetSnapshot, input);
 		}
 
 		return false;
+	}
+
+	private static void TraceMarksmanSpiteDecision(
+		string outcome,
+		IBaseAction action,
+		IBattleChara target,
+		MachinistPvPTargetSnapshot snapshot,
+		MachinistPvPDecisionInput decisionInput,
+		MachinistPvPLiveGuardInput? liveGuardInput = null)
+	{
+		if (!ActionTracer.Enabled || action.ID != MachinistPvPDecisionPolicy.MarksmansSpitePvPActionId)
+		{
+			return;
+		}
+
+		var liveGuard = liveGuardInput ?? new MachinistPvPLiveGuardInput(
+			TargetHasGuard: target.HasStatus(false, StatusID.Guard),
+			GuardWillExpireBeforeAction: target.WillStatusEnd((float)action.Info.CastTime, false, StatusID.Guard));
+		string[] traceFields =
+		[
+			$"outcome={outcome}",
+			$"actionId={action.ID}",
+			$"adjustedId={action.AdjustedID}",
+			$"ignoreGuard={action.Setting.IgnoreGuard}",
+			$"targetId={target.GameObjectId}",
+			$"hp={snapshot.HealthRatio:F3}",
+			$"mp={snapshot.CurrentMp}",
+			$"snapshotGuard={snapshot.HasGuard}",
+			$"liveGuard={liveGuard.TargetHasGuard}",
+			$"guardExpires={liveGuard.GuardWillExpireBeforeAction}",
+			$"guardAvailability={snapshot.GuardAvailability}",
+			$"effectiveHp={snapshot.EffectiveHealthRatio:F3}",
+			$"expectedDamage={decisionInput.ExpectedDamageRatio:F3}",
+			$"followUp={decisionInput.FollowUpAvailable}",
+			$"alliesBurst={decisionInput.AlliesCanBurst}",
+			$"objective={decisionInput.ObjectiveControlNeeded}",
+			$"committed={decisionInput.TargetCommitted}",
+		];
+		var message = string.Join(" ", traceFields);
+		ActionTracer.Note(
+			"MCH_LB",
+			message);
 	}
 
 	private static List<MachinistPvPTargetSnapshot> RankTargets(MachinistPvPActionIntent intent)

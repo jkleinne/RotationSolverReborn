@@ -71,6 +71,8 @@ var tests = new (string Name, Action Test)[]
 	("machinist marksmans spite rejects unknown guard conversion target", MachinistMarksmanSpiteRejectsUnknownGuardConversionTarget),
 	("machinist marksmans spite accepts guard cooldown conversion target", MachinistMarksmanSpiteAcceptsGuardCooldownConversionTarget),
 	("machinist marksmans spite accepts unknown guard lethal emergency", MachinistMarksmanSpiteAcceptsUnknownGuardLethalEmergency),
+	("machinist marksmans spite identity rejects adjusted drill", MachinistMarksmanSpiteIdentityRejectsAdjustedDrill),
+	("machinist marksmans spite live guard veto blocks inherited pierce", MachinistMarksmanSpiteLiveGuardVetoBlocksInheritedPierce),
 	("machinist analysis chain saw accepts low resource kill window", MachinistAnalysisChainSawAcceptsLowResourceKillWindow),
 	("machinist full metal rejects uncommitted follow up", MachinistFullMetalRejectsUncommittedFollowUp),
 	("machinist full metal accepts direct secure without follow up", MachinistFullMetalAcceptsDirectSecureWithoutFollowUp),
@@ -1394,6 +1396,36 @@ static void MachinistMarksmanSpiteAcceptsUnknownGuardLethalEmergency()
 		HasGuardCooldownKnowledge: true);
 
 	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should still fire when lethal objective pressure is worth the Guard reaction risk");
+}
+
+static void MachinistMarksmanSpiteIdentityRejectsAdjustedDrill()
+{
+	const uint drillPvPActionId = 29405;
+	const uint marksmanSpitePvPActionId = 29415;
+
+	AssertFalse(
+		MachinistPvPDecisionPolicy.IsDirectMarksmansSpiteAction(drillPvPActionId, marksmanSpitePvPActionId),
+		"Marksman's Spite lookup must not accept Drill only because Drill adjusted into the LB action");
+	AssertTrue(
+		MachinistPvPDecisionPolicy.IsDirectMarksmansSpiteAction(marksmanSpitePvPActionId, marksmanSpitePvPActionId),
+		"Marksman's Spite lookup should accept the direct PvP LB action");
+}
+
+static void MachinistMarksmanSpiteLiveGuardVetoBlocksInheritedPierce()
+{
+	var activeGuard = new MachinistPvPLiveGuardInput(
+		TargetHasGuard: true,
+		GuardWillExpireBeforeAction: false);
+	var expiringGuard = new MachinistPvPLiveGuardInput(
+		TargetHasGuard: true,
+		GuardWillExpireBeforeAction: true);
+
+	AssertTrue(
+		MachinistPvPDecisionPolicy.ShouldVetoMarksmanSpiteForLiveGuard(activeGuard),
+		"Marksman's Spite should be vetoed by live Guard even if the selected action object inherited Guard piercing settings");
+	AssertFalse(
+		MachinistPvPDecisionPolicy.ShouldVetoMarksmanSpiteForLiveGuard(expiringGuard),
+		"Marksman's Spite should not be vetoed when Guard expires before the LB resolves");
 }
 
 static void MachinistAnalysisChainSawAcceptsLowResourceKillWindow()

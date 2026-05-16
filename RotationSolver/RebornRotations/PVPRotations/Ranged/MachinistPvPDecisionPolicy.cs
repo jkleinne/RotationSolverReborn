@@ -12,8 +12,14 @@ internal readonly record struct MachinistPvPDecisionInput(
 	double ExpectedDamageRatio = 0.0,
 	bool HasGuardCooldownKnowledge = false);
 
+internal readonly record struct MachinistPvPLiveGuardInput(
+	bool TargetHasGuard,
+	bool GuardWillExpireBeforeAction);
+
 internal static class MachinistPvPDecisionPolicy
 {
+	internal const uint MarksmansSpitePvPActionId = 29415;
+
 	private const float DrillKillHealthRatio = 0.35f;
 	private const float BurstHealthRatio = 0.65f;
 	private const float MarksmanCleanupHealthRatio = 0.18f;
@@ -171,6 +177,16 @@ internal static class MachinistPvPDecisionPolicy
 		}
 
 		return HasMarksmanConversionSignal(input);
+	}
+
+	internal static bool IsDirectMarksmansSpiteAction(uint actionId, uint adjustedActionId)
+	{
+		return actionId == MarksmansSpitePvPActionId;
+	}
+
+	internal static bool ShouldVetoMarksmanSpiteForLiveGuard(MachinistPvPLiveGuardInput input)
+	{
+		return input.TargetHasGuard && !input.GuardWillExpireBeforeAction;
 	}
 
 	internal static bool ShouldUseFullMetalField(MachinistPvPDecisionInput input)
