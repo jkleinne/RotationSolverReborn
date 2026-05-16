@@ -33,7 +33,8 @@ internal readonly record struct MachinistPvPTargetSnapshot(
 	bool HasWildfire = false,
 	double ExpectedDamageRatio = 0.0,
 	double EffectiveHealthRatio = 1.0,
-	double ActiveDamageReduction = 0.0);
+	double ActiveDamageReduction = 0.0,
+	PvPGuardAvailability GuardAvailability = PvPGuardAvailability.Unknown);
 
 internal static class MachinistPvPTargetPolicy
 {

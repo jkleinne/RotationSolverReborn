@@ -18,6 +18,7 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 	private const int ForcedTeamfightHostileCount = 2;
 	private const int SafeCloseRangeHostileLimit = 2;
 	private const uint MarksmansSpitePvPActionId = 29415;
+	private const double MarksmanGuardReactionWindowSeconds = 1.25;
 	private const double MarksmansSpitePotency = 40_000.0;
 	private const double EagleEyeShotPotency = 12_000.0;
 	private const double DrillPotency = 10_000.0;
@@ -397,7 +398,16 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 			ActiveDamageReduction: MitigationPenalty.Compute(target, mitigationDatabase),
 			IsExposed: !hasGuard && distance <= range,
 			IsInNormalRange: distance <= range,
-			IsInCloseRange: distance <= CloseToolRangeYalms);
+			IsInCloseRange: distance <= CloseToolRangeYalms,
+			GuardAvailability: GetGuardAvailability(target));
+	}
+
+	private static PvPGuardAvailability GetGuardAvailability(IBattleChara target)
+	{
+		return DataCenter.PvPGuardCooldownTracker.GetAvailability(
+			target.GameObjectId,
+			TimeSpan.FromMilliseconds(Environment.TickCount64),
+			TimeSpan.FromSeconds(MarksmanGuardReactionWindowSeconds));
 	}
 
 	private static bool HasNonGuardInvulnerability(IBattleChara target, IMitigationDatabase database)
@@ -438,7 +448,8 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 			AlliesCanBurst: snapshot.HasAllyFocus || CountAlliesNear(target, TeamfightRadiusYalms) > 0,
 			ObjectiveControlNeeded: objectiveControlNeeded,
 			TargetCommitted: IsTargetCommitted(snapshot, target, objectiveControlNeeded),
-			ExpectedDamageRatio: snapshot.ExpectedDamageRatio);
+			ExpectedDamageRatio: snapshot.ExpectedDamageRatio,
+			HasGuardCooldownKnowledge: DataCenter.IsInCrystallineConflict);
 	}
 
 	private static double ExpectedDamageRatio(

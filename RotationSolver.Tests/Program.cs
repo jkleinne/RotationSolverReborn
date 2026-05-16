@@ -66,6 +66,11 @@ var tests = new (string Name, Action Test)[]
 	("machinist marksmans spite rejects unsupported vulnerable target", MachinistMarksmanSpiteRejectsUnsupportedVulnerableTarget),
 	("machinist marksmans spite rejects active invulnerability", MachinistMarksmanSpiteRejectsActiveInvulnerability),
 	("machinist marksmans spite accepts mitigated secure kill", MachinistMarksmanSpiteAcceptsMitigatedSecureKill),
+	("machinist marksmans spite ignores guard readiness without cooldown knowledge", MachinistMarksmanSpiteIgnoresGuardReadinessWithoutCooldownKnowledge),
+	("machinist marksmans spite rejects guard ready conversion target", MachinistMarksmanSpiteRejectsGuardReadyConversionTarget),
+	("machinist marksmans spite rejects unknown guard conversion target", MachinistMarksmanSpiteRejectsUnknownGuardConversionTarget),
+	("machinist marksmans spite accepts guard cooldown conversion target", MachinistMarksmanSpiteAcceptsGuardCooldownConversionTarget),
+	("machinist marksmans spite accepts unknown guard lethal emergency", MachinistMarksmanSpiteAcceptsUnknownGuardLethalEmergency),
 	("machinist analysis chain saw accepts low resource kill window", MachinistAnalysisChainSawAcceptsLowResourceKillWindow),
 	("machinist full metal rejects uncommitted follow up", MachinistFullMetalRejectsUncommittedFollowUp),
 	("machinist full metal accepts direct secure without follow up", MachinistFullMetalAcceptsDirectSecureWithoutFollowUp),
@@ -78,6 +83,11 @@ var tests = new (string Name, Action Test)[]
 	("pvp final guard gate allows guard piercing action", PvpFinalGuardGateAllowsGuardPiercingAction),
 	("pvp final guard gate allows expiring guard", PvpFinalGuardGateAllowsExpiringGuard),
 	("pvp final guard gate allows nonhostile action", PvpFinalGuardGateAllowsNonhostileAction),
+	("pvp guard cooldown tracker backdates observed guard", PvpGuardCooldownTrackerBackdatesObservedGuard),
+	("pvp guard cooldown tracker keeps cooldown after early cancel", PvpGuardCooldownTrackerKeepsCooldownAfterEarlyCancel),
+	("pvp guard cooldown tracker requires safe unavailable window", PvpGuardCooldownTrackerRequiresSafeUnavailableWindow),
+	("pvp guard cooldown tracker forgets stale unseen targets", PvpGuardCooldownTrackerForgetsStaleUnseenTargets),
+	("pvp guard cooldown tracker forgets target", PvpGuardCooldownTrackerForgetsTarget),
 	("bard forced burst allows direct secure target", BardForcedBurstAllowsDirectSecureTarget),
 	("bard forced burst rejects blocked direct secure target", BardForcedBurstRejectsBlockedDirectSecureTarget),
 	("bard kill secure ranks lethal hostile", BardKillSecureRanksLethalHostile),
@@ -1279,6 +1289,113 @@ static void MachinistMarksmanSpiteAcceptsMitigatedSecureKill()
 	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should fire through mitigation when expected damage still kills");
 }
 
+static void MachinistMarksmanSpiteIgnoresGuardReadinessWithoutCooldownKnowledge()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.68f,
+			currentMp: 2_000,
+			hasAllyFocus: true,
+			effectiveHealthRatio: 0.68,
+			expectedDamageRatio: 0.67,
+			guardAvailability: PvPGuardAvailability.Ready),
+		ExpectedDamageRatio: 0.67,
+		SafeCloseRange: true,
+		FollowUpAvailable: true,
+		AlliesCanBurst: true,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: true);
+
+	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should preserve existing non-CC conversion behavior without Guard cooldown knowledge");
+}
+
+static void MachinistMarksmanSpiteRejectsGuardReadyConversionTarget()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.68f,
+			currentMp: 2_000,
+			hasAllyFocus: true,
+			effectiveHealthRatio: 0.68,
+			expectedDamageRatio: 0.67,
+			guardAvailability: PvPGuardAvailability.Ready),
+		ExpectedDamageRatio: 0.67,
+		SafeCloseRange: true,
+		FollowUpAvailable: true,
+		AlliesCanBurst: true,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: true,
+		HasGuardCooldownKnowledge: true);
+
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should not spend on a narrow conversion target who can Guard on reaction");
+}
+
+static void MachinistMarksmanSpiteRejectsUnknownGuardConversionTarget()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.68f,
+			currentMp: 2_000,
+			hasAllyFocus: true,
+			effectiveHealthRatio: 0.68,
+			expectedDamageRatio: 0.67,
+			guardAvailability: PvPGuardAvailability.Unknown),
+		ExpectedDamageRatio: 0.67,
+		SafeCloseRange: true,
+		FollowUpAvailable: true,
+		AlliesCanBurst: true,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: true,
+		HasGuardCooldownKnowledge: true);
+
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should treat unknown Guard availability as too risky for nonlethal conversion");
+}
+
+static void MachinistMarksmanSpiteAcceptsGuardCooldownConversionTarget()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.68f,
+			currentMp: 2_000,
+			hasAllyFocus: true,
+			effectiveHealthRatio: 0.68,
+			expectedDamageRatio: 0.67,
+			guardAvailability: PvPGuardAvailability.CoolingDown),
+		ExpectedDamageRatio: 0.67,
+		SafeCloseRange: true,
+		FollowUpAvailable: true,
+		AlliesCanBurst: true,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: true,
+		HasGuardCooldownKnowledge: true);
+
+	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should allow existing conversion gates when Guard is confirmed unavailable");
+}
+
+static void MachinistMarksmanSpiteAcceptsUnknownGuardLethalEmergency()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.40f,
+			currentMp: 0,
+			effectiveHealthRatio: 0.40,
+			guardAvailability: PvPGuardAvailability.Unknown),
+		ExpectedDamageRatio: 0.67,
+		SafeCloseRange: true,
+		FollowUpAvailable: true,
+		AlliesCanBurst: true,
+		ObjectiveControlNeeded: true,
+		TargetCommitted: true,
+		HasGuardCooldownKnowledge: true);
+
+	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should still fire when lethal objective pressure is worth the Guard reaction risk");
+}
+
 static void MachinistAnalysisChainSawAcceptsLowResourceKillWindow()
 {
 	var input = new MachinistPvPDecisionInput(
@@ -1453,6 +1570,105 @@ static void PvpFinalGuardGateAllowsNonhostileAction()
 	AssertFalse(PvPActionUseGuard.ShouldBlock(input), "final action use should not block self or friendly actions because the target has Guard");
 }
 
+static void PvpGuardCooldownTrackerBackdatesObservedGuard()
+{
+	var tracker = new PvPGuardCooldownTracker();
+
+	tracker.Observe(new PvPGuardCooldownObservation(
+		TargetId: 10,
+		ObservedAt: TimeSpan.FromSeconds(10),
+		HasGuard: true,
+		GuardRemaining: TimeSpan.FromSeconds(2.5)));
+
+	AssertEqual(
+		PvPGuardAvailability.CoolingDown,
+		tracker.GetAvailability(10, TimeSpan.FromSeconds(38), TimeSpan.Zero),
+		"observed Guard should backdate use time from remaining duration");
+	AssertEqual(
+		PvPGuardAvailability.Ready,
+		tracker.GetAvailability(10, TimeSpan.FromSeconds(38.6), TimeSpan.Zero),
+		"Guard should become ready 30 seconds after inferred activation");
+}
+
+static void PvpGuardCooldownTrackerKeepsCooldownAfterEarlyCancel()
+{
+	var tracker = new PvPGuardCooldownTracker();
+
+	tracker.Observe(new PvPGuardCooldownObservation(
+		TargetId: 10,
+		ObservedAt: TimeSpan.Zero,
+		HasGuard: true,
+		GuardRemaining: TimeSpan.FromSeconds(4)));
+	tracker.Observe(new PvPGuardCooldownObservation(
+		TargetId: 10,
+		ObservedAt: TimeSpan.FromSeconds(1),
+		HasGuard: false,
+		GuardRemaining: TimeSpan.Zero));
+
+	AssertEqual(
+		PvPGuardAvailability.CoolingDown,
+		tracker.GetAvailability(10, TimeSpan.FromSeconds(10), TimeSpan.Zero),
+		"canceling Guard early should not make Guard available before the recast finishes");
+	AssertEqual(
+		PvPGuardAvailability.Ready,
+		tracker.GetAvailability(10, TimeSpan.FromSeconds(30.1), TimeSpan.Zero),
+		"Guard should be ready after its recast from activation");
+}
+
+static void PvpGuardCooldownTrackerRequiresSafeUnavailableWindow()
+{
+	var tracker = new PvPGuardCooldownTracker();
+
+	tracker.Observe(new PvPGuardCooldownObservation(
+		TargetId: 10,
+		ObservedAt: TimeSpan.Zero,
+		HasGuard: true,
+		GuardRemaining: TimeSpan.FromSeconds(4)));
+
+	AssertEqual(
+		PvPGuardAvailability.CoolingDown,
+		tracker.GetAvailability(10, TimeSpan.FromSeconds(28.5), TimeSpan.FromSeconds(1)),
+		"Guard should count as unavailable when it remains down through the required commit window");
+	AssertEqual(
+		PvPGuardAvailability.Ready,
+		tracker.GetAvailability(10, TimeSpan.FromSeconds(29.2), TimeSpan.FromSeconds(1)),
+		"Guard should count as ready when it returns during the required commit window");
+}
+
+static void PvpGuardCooldownTrackerForgetsStaleUnseenTargets()
+{
+	var tracker = new PvPGuardCooldownTracker();
+
+	tracker.Observe(new PvPGuardCooldownObservation(
+		TargetId: 10,
+		ObservedAt: TimeSpan.Zero,
+		HasGuard: true,
+		GuardRemaining: TimeSpan.FromSeconds(4)));
+	tracker.ForgetUnseen(TimeSpan.FromSeconds(8), new HashSet<ulong> { 20 }, TimeSpan.FromSeconds(5));
+
+	AssertEqual(
+		PvPGuardAvailability.Unknown,
+		tracker.GetAvailability(10, TimeSpan.FromSeconds(8), TimeSpan.Zero),
+		"stale unseen targets should become unknown because they may have used Guard out of sight");
+}
+
+static void PvpGuardCooldownTrackerForgetsTarget()
+{
+	var tracker = new PvPGuardCooldownTracker();
+
+	tracker.Observe(new PvPGuardCooldownObservation(
+		TargetId: 10,
+		ObservedAt: TimeSpan.Zero,
+		HasGuard: true,
+		GuardRemaining: TimeSpan.FromSeconds(4)));
+	tracker.Forget(10);
+
+	AssertEqual(
+		PvPGuardAvailability.Unknown,
+		tracker.GetAvailability(10, TimeSpan.FromSeconds(1), TimeSpan.Zero),
+		"death or match reset should clear a target's inferred Guard cooldown");
+}
+
 static void BardForcedBurstAllowsDirectSecureTarget()
 {
 	AssertTrue(
@@ -1530,7 +1746,8 @@ static MachinistPvPTargetSnapshot MachinistTarget(
 	double expectedDamageRatio = 0.0,
 	bool isExposed = true,
 	bool isInNormalRange = true,
-	bool isInCloseRange = false)
+	bool isInCloseRange = false,
+	PvPGuardAvailability guardAvailability = PvPGuardAvailability.CoolingDown)
 {
 	return new MachinistPvPTargetSnapshot(
 		TargetId: targetId,
@@ -1547,7 +1764,8 @@ static MachinistPvPTargetSnapshot MachinistTarget(
 		ActiveDamageReduction: activeDamageReduction,
 		IsExposed: isExposed,
 		IsInNormalRange: isInNormalRange,
-		IsInCloseRange: isInCloseRange);
+		IsInCloseRange: isInCloseRange,
+		GuardAvailability: guardAvailability);
 }
 
 static BardPvPKillSecureSnapshot BardKillTarget(

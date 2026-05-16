@@ -225,6 +225,7 @@ public sealed class RotationSolverPlugin : IAsyncDalamudPlugin
 		var newTerritory = new TerritoryInfo(territory);
 		var previousIsPvP = _previousTerritoryIsPvP;
 		DataCenter.Territory = newTerritory;
+		DataCenter.PvPGuardCooldownTracker.Reset();
 		_previousTerritoryIsPvP = newTerritory.IsPvP;
 
 		try
