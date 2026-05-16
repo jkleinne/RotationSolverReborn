@@ -18,7 +18,7 @@ internal static class MachinistPvPDecisionPolicy
 	private const float MarksmanCleanupHealthRatio = 0.18f;
 	private const float MarksmanFocusedCleanupHealthRatio = 0.25f;
 	private const double MarksmanSecureSafetyMarginRatio = 0.01;
-	private const double MarksmanConversionMaxLeftoverRatio = 0.08;
+	private const double MarksmanConversionMaxLeftoverRatio = 0.04;
 
 	internal static bool ShouldUseAnalysisDrill(MachinistPvPDecisionInput input)
 	{
@@ -222,22 +222,20 @@ internal static class MachinistPvPDecisionPolicy
 
 	private static bool HasMarksmanConversionSignal(MachinistPvPDecisionInput input)
 	{
-		if (input.Target.IsVulnerable)
-		{
-			return input.FollowUpAvailable || input.Target.HasAllyFocus || input.ObjectiveControlNeeded;
-		}
-
 		if (!HasMarksmanConvertibleLeftover(input))
 		{
 			return false;
 		}
 
-		if (input.ObjectiveControlNeeded)
+		if (!input.Target.HasAllyFocus)
 		{
-			return true;
+			return false;
 		}
 
-		return input.Target.HasAllyFocus && (input.FollowUpAvailable || input.AlliesCanBurst);
+		return input.FollowUpAvailable
+			|| input.AlliesCanBurst
+			|| input.ObjectiveControlNeeded
+			|| input.Target.IsVulnerable;
 	}
 
 	private static bool HasMarksmanSecureDamage(MachinistPvPDecisionInput input)

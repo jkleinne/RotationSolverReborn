@@ -55,11 +55,14 @@ var tests = new (string Name, Action Test)[]
 	("machinist marksmans spite accepts ally backed nonlethal target", MachinistMarksmanSpiteAcceptsAllyBackedNonlethalTarget),
 	("machinist marksmans spite accepts focused allied burst nonlethal target", MachinistMarksmanSpiteAcceptsFocusedAlliedBurstNonlethalTarget),
 	("machinist marksmans spite accepts objective backed nonlethal target", MachinistMarksmanSpiteAcceptsObjectiveBackedNonlethalTarget),
+	("machinist marksmans spite rejects objective pressure without focus", MachinistMarksmanSpiteRejectsObjectivePressureWithoutFocus),
 	("machinist marksmans spite rejects unfocused ally proximity", MachinistMarksmanSpiteRejectsUnfocusedAllyProximity),
 	("machinist marksmans spite rejects unsupported narrow lethal target", MachinistMarksmanSpiteRejectsUnsupportedNarrowLethalTarget),
 	("machinist marksmans spite rejects objective conversion above leftover cap", MachinistMarksmanSpiteRejectsObjectiveConversionAboveLeftoverCap),
 	("machinist marksmans spite rejects focused ally conversion above leftover cap", MachinistMarksmanSpiteRejectsFocusedAllyConversionAboveLeftoverCap),
+	("machinist marksmans spite rejects focused pressure above tight cap", MachinistMarksmanSpiteRejectsFocusedPressureAboveTightCap),
 	("machinist marksmans spite accepts vulnerable target", MachinistMarksmanSpiteAcceptsVulnerableTarget),
+	("machinist marksmans spite rejects vulnerable pressure target", MachinistMarksmanSpiteRejectsVulnerablePressureTarget),
 	("machinist marksmans spite rejects unsupported vulnerable target", MachinistMarksmanSpiteRejectsUnsupportedVulnerableTarget),
 	("machinist marksmans spite rejects active invulnerability", MachinistMarksmanSpiteRejectsActiveInvulnerability),
 	("machinist marksmans spite accepts mitigated secure kill", MachinistMarksmanSpiteAcceptsMitigatedSecureKill),
@@ -71,6 +74,10 @@ var tests = new (string Name, Action Test)[]
 	("machinist blazing shot accepts direct secure without follow up", MachinistBlazingShotAcceptsDirectSecureWithoutFollowUp),
 	("pvp damage gate rejects invulnerability", PvpDamageGateRejectsInvulnerability),
 	("pvp damage gate allows mitigated secure kill", PvpDamageGateAllowsMitigatedSecureKill),
+	("pvp final guard gate blocks stale guarded target", PvpFinalGuardGateBlocksStaleGuardedTarget),
+	("pvp final guard gate allows guard piercing action", PvpFinalGuardGateAllowsGuardPiercingAction),
+	("pvp final guard gate allows expiring guard", PvpFinalGuardGateAllowsExpiringGuard),
+	("pvp final guard gate allows nonhostile action", PvpFinalGuardGateAllowsNonhostileAction),
 	("bard forced burst allows direct secure target", BardForcedBurstAllowsDirectSecureTarget),
 	("bard forced burst rejects blocked direct secure target", BardForcedBurstRejectsBlockedDirectSecureTarget),
 	("bard kill secure ranks lethal hostile", BardKillSecureRanksLethalHostile),
@@ -1060,6 +1067,26 @@ static void MachinistMarksmanSpiteAcceptsObjectiveBackedNonlethalTarget()
 	var input = new MachinistPvPDecisionInput(
 		Target: MachinistTarget(
 			1,
+			healthRatio: 0.68f,
+			currentMp: 2_000,
+			hasAllyFocus: true,
+			effectiveHealthRatio: 0.68,
+			expectedDamageRatio: 0.67),
+		ExpectedDamageRatio: 0.67,
+		SafeCloseRange: true,
+		FollowUpAvailable: false,
+		AlliesCanBurst: true,
+		ObjectiveControlNeeded: true,
+		TargetCommitted: true);
+
+	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should fire when focused objective pressure can convert the leftover health");
+}
+
+static void MachinistMarksmanSpiteRejectsObjectivePressureWithoutFocus()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(
+			1,
 			healthRatio: 0.72f,
 			currentMp: 2_000,
 			effectiveHealthRatio: 0.72,
@@ -1071,7 +1098,7 @@ static void MachinistMarksmanSpiteAcceptsObjectiveBackedNonlethalTarget()
 		ObjectiveControlNeeded: true,
 		TargetCommitted: true);
 
-	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should fire when objective pressure can convert the leftover health");
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should not use LB as objective pressure when no one can convert the leftover health");
 }
 
 static void MachinistMarksmanSpiteRejectsUnfocusedAllyProximity()
@@ -1150,7 +1177,48 @@ static void MachinistMarksmanSpiteRejectsFocusedAllyConversionAboveLeftoverCap()
 	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should not fire on focused ally pressure above the leftover cap");
 }
 
+static void MachinistMarksmanSpiteRejectsFocusedPressureAboveTightCap()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.72f,
+			currentMp: 2_000,
+			hasAllyFocus: true,
+			effectiveHealthRatio: 0.72,
+			expectedDamageRatio: 0.67),
+		ExpectedDamageRatio: 0.67,
+		SafeCloseRange: true,
+		FollowUpAvailable: true,
+		AlliesCanBurst: true,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: true);
+
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should not spend LB when focused pressure leaves too much health to clean up");
+}
+
 static void MachinistMarksmanSpiteAcceptsVulnerableTarget()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.68f,
+			currentMp: 10_000,
+			hasAllyFocus: true,
+			isVulnerable: true,
+			effectiveHealthRatio: 0.68,
+			expectedDamageRatio: 0.67),
+		ExpectedDamageRatio: 0.67,
+		SafeCloseRange: true,
+		FollowUpAvailable: false,
+		AlliesCanBurst: true,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: true);
+
+	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should accept vulnerable targets when focused pressure can convert the leftover health");
+}
+
+static void MachinistMarksmanSpiteRejectsVulnerablePressureTarget()
 {
 	var input = new MachinistPvPDecisionInput(
 		Target: MachinistTarget(1, healthRatio: 0.80f, currentMp: 10_000, isVulnerable: true),
@@ -1161,7 +1229,7 @@ static void MachinistMarksmanSpiteAcceptsVulnerableTarget()
 		ObjectiveControlNeeded: false,
 		TargetCommitted: true);
 
-	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should accept vulnerable targets even above normal HP cutoff");
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should not spend LB only to leave a vulnerable target low");
 }
 
 static void MachinistMarksmanSpiteRejectsUnsupportedVulnerableTarget()
@@ -1335,6 +1403,54 @@ static void PvpDamageGateAllowsMitigatedSecureKill()
 		HasPrioritySignal: false));
 
 	AssertEqual(PvPBurstRecommendation.Secure, decision, "damage gate should allow mitigation when expected damage still kills");
+}
+
+static void PvpFinalGuardGateBlocksStaleGuardedTarget()
+{
+	var input = new PvPActionUseGuardInput(
+		IsPvP: true,
+		IsHostileAction: true,
+		IgnoresGuard: false,
+		TargetHasGuard: true,
+		GuardWillExpireBeforeAction: false);
+
+	AssertTrue(PvPActionUseGuard.ShouldBlock(input), "final action use should recheck Guard after target selection");
+}
+
+static void PvpFinalGuardGateAllowsGuardPiercingAction()
+{
+	var input = new PvPActionUseGuardInput(
+		IsPvP: true,
+		IsHostileAction: true,
+		IgnoresGuard: true,
+		TargetHasGuard: true,
+		GuardWillExpireBeforeAction: false);
+
+	AssertFalse(PvPActionUseGuard.ShouldBlock(input), "final action use should not block actions that ignore Guard");
+}
+
+static void PvpFinalGuardGateAllowsExpiringGuard()
+{
+	var input = new PvPActionUseGuardInput(
+		IsPvP: true,
+		IsHostileAction: true,
+		IgnoresGuard: false,
+		TargetHasGuard: true,
+		GuardWillExpireBeforeAction: true);
+
+	AssertFalse(PvPActionUseGuard.ShouldBlock(input), "final action use should allow targets whose Guard expires before resolution");
+}
+
+static void PvpFinalGuardGateAllowsNonhostileAction()
+{
+	var input = new PvPActionUseGuardInput(
+		IsPvP: true,
+		IsHostileAction: false,
+		IgnoresGuard: false,
+		TargetHasGuard: true,
+		GuardWillExpireBeforeAction: false);
+
+	AssertFalse(PvPActionUseGuard.ShouldBlock(input), "final action use should not block self or friendly actions because the target has Guard");
 }
 
 static void BardForcedBurstAllowsDirectSecureTarget()
