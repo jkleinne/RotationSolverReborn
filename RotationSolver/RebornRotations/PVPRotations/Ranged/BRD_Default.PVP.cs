@@ -662,7 +662,7 @@ public sealed class BRD_DefaultPvP : BardRotation
 				continue;
 			}
 
-			var refreshedSnapshot = RefreshTargetSnapshot(targetSnapshot, target);
+			var refreshedSnapshot = RefreshTargetSnapshot(targetSnapshot, target, baseAction.TargetInfo.Range);
 			var refreshedInput = CreateDecisionInput(refreshedSnapshot, target, intent, baseAction);
 			if (!shouldUse(refreshedInput))
 			{
@@ -738,12 +738,14 @@ public sealed class BRD_DefaultPvP : BardRotation
 			GuardAvailability: GetGuardAvailability(target));
 	}
 
-	private static BardPvPTargetSnapshot RefreshTargetSnapshot(BardPvPTargetSnapshot snapshot, IBattleChara target)
+	private static BardPvPTargetSnapshot RefreshTargetSnapshot(BardPvPTargetSnapshot snapshot, IBattleChara target, float range)
 	{
 		var database = PvPMitigationDatabaseProvider.Current;
 		var hasGuard = target.HasStatus(false, StatusID.Guard);
+		var distance = target.DistanceToPlayer();
+		var isInNormalRange = distance <= range;
 
-		return snapshot with
+		var refreshedSnapshot = snapshot with
 		{
 			HealthRatio = target.GetHealthRatio(),
 			CurrentMp = target.CurrentMp,
@@ -757,9 +759,15 @@ public sealed class BRD_DefaultPvP : BardRotation
 			EffectiveHealthRatio = ComputeEffectiveHealthRatio(target, database, ignoreGuard: false),
 			GuardPiercingEffectiveHealthRatio = ComputeEffectiveHealthRatio(target, database, ignoreGuard: true),
 			ActiveDamageReduction = MitigationPenalty.Compute(target, database),
-			IsExposed = !hasGuard && snapshot.IsInNormalRange,
 			GuardAvailability = GetGuardAvailability(target),
 		};
+
+		return BardPvPTargetSnapshotRefresher.RefreshSpatialState(
+			refreshedSnapshot,
+			new BardPvPTargetSpatialState(
+				IsInNormalRange: isInNormalRange,
+				LineTargetCount: CountHostilesInLine(target, range),
+				SplashTargetCount: CountHostilesNear(target.Position, OffensiveSplashRadiusYalms)));
 	}
 
 	private BardPvPOffensiveDecisionInput CreateDecisionInput(

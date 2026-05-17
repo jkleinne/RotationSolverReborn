@@ -34,6 +34,27 @@ internal readonly record struct BardPvPTargetSnapshot(
 	int SplashTargetCount,
 	PvPGuardAvailability GuardAvailability = PvPGuardAvailability.Unknown);
 
+internal readonly record struct BardPvPTargetSpatialState(
+	bool IsInNormalRange,
+	int LineTargetCount,
+	int SplashTargetCount);
+
+internal static class BardPvPTargetSnapshotRefresher
+{
+	internal static BardPvPTargetSnapshot RefreshSpatialState(
+		BardPvPTargetSnapshot snapshot,
+		BardPvPTargetSpatialState spatialState)
+	{
+		return snapshot with
+		{
+			IsExposed = !snapshot.HasGuard && spatialState.IsInNormalRange,
+			IsInNormalRange = spatialState.IsInNormalRange,
+			LineTargetCount = spatialState.LineTargetCount,
+			SplashTargetCount = spatialState.SplashTargetCount,
+		};
+	}
+}
+
 internal static class BardPvPTargetPolicy
 {
 	private const double HealthPressureWeight = 4.0;

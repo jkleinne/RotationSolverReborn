@@ -129,6 +129,7 @@ var tests = new (string Name, Action Test)[]
 	("bard powerful shot accepts neutral safe filler", BardPowerfulShotAcceptsNeutralSafeFiller),
 	("bard powerful shot rejects blocked target", BardPowerfulShotRejectsBlockedTarget),
 	("bard offensive decision policy reruns live guard state", BardOffensiveDecisionPolicyRerunsLiveGuardState),
+	("bard target refresh updates live spatial signals", BardTargetRefreshUpdatesLiveSpatialSignals),
 	("pvp lb json contains verified entries", PvpLbJsonContainsVerifiedEntries),
 	("pvp mitigation json contains resilience", PvpMitigationJsonContainsResilience),
 	("pvp mitigation json contains ranked cc defensive coverage", PvpMitigationJsonContainsRankedCcDefensiveCoverage),
@@ -2211,6 +2212,36 @@ static void BardOffensiveDecisionPolicyRerunsLiveGuardState()
 
 	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUsePowerfulShot(clearInput), "Bard should accept safe pressure before a live Guard refresh");
 	AssertFalse(BardPvPOffensiveDecisionPolicy.ShouldUsePowerfulShot(guardedInput), "Bard should reject the same target after live state refresh shows Guard");
+}
+
+static void BardTargetRefreshUpdatesLiveSpatialSignals()
+{
+	const ulong targetId = 1;
+	const float staleHealthRatio = 0.75f;
+	const uint fullMp = 10_000;
+	const int staleTargetCount = 1;
+	const int expectedLineTargetCount = 3;
+	const int expectedSplashTargetCount = 4;
+	var staleSnapshot = BardOffensiveTarget(
+		targetId,
+		healthRatio: staleHealthRatio,
+		currentMp: fullMp,
+		isExposed: false,
+		isInNormalRange: false,
+		lineTargetCount: staleTargetCount,
+		splashTargetCount: staleTargetCount);
+
+	var spatialState = new BardPvPTargetSpatialState(
+		IsInNormalRange: true,
+		LineTargetCount: expectedLineTargetCount,
+		SplashTargetCount: expectedSplashTargetCount);
+
+	var refreshedSnapshot = BardPvPTargetSnapshotRefresher.RefreshSpatialState(staleSnapshot, spatialState);
+
+	AssertTrue(refreshedSnapshot.IsInNormalRange, "refresh should replace stale range state");
+	AssertTrue(refreshedSnapshot.IsExposed, "refresh should recompute exposure from live Guard and range state");
+	AssertEqual(expectedLineTargetCount, refreshedSnapshot.LineTargetCount, "refresh should replace stale line target count");
+	AssertEqual(expectedSplashTargetCount, refreshedSnapshot.SplashTargetCount, "refresh should replace stale splash target count");
 }
 
 static MachinistPvPTargetSnapshot MachinistTarget(
