@@ -105,13 +105,22 @@ var tests = new (string Name, Action Test)[]
 	("bard harmonic arrow rejects guarded nonlethal target", BardHarmonicArrowRejectsGuardedNonlethalTarget),
 	("bard harmonic arrow accepts unblocked charge overcap", BardHarmonicArrowAcceptsUnblockedChargeOvercap),
 	("bard pitch perfect accepts repertoire ally focus follow up", BardPitchPerfectAcceptsRepertoireAllyFocusFollowUp),
+	("bard pitch perfect accepts repertoire low mp target", BardPitchPerfectAcceptsRepertoireLowMpTarget),
+	("bard pitch perfect accepts repertoire objective target", BardPitchPerfectAcceptsRepertoireObjectiveTarget),
+	("bard pitch perfect accepts repertoire ally burst", BardPitchPerfectAcceptsRepertoireAllyBurst),
 	("bard pitch perfect rejects repertoire filler", BardPitchPerfectRejectsRepertoireFiller),
 	("bard apex arrow accepts objective line value", BardApexArrowAcceptsObjectiveLineValue),
+	("bard apex arrow accepts guarded objective pressure", BardApexArrowAcceptsGuardedObjectivePressure),
+	("bard apex arrow accepts guarded forced timing", BardApexArrowAcceptsGuardedForcedTiming),
+	("bard apex arrow accepts standalone objective value", BardApexArrowAcceptsStandaloneObjectiveValue),
+	("bard apex arrow accepts standalone ally burst value", BardApexArrowAcceptsStandaloneAllyBurstValue),
 	("bard apex arrow rejects guarded filler", BardApexArrowRejectsGuardedFiller),
 	("bard blast arrow accepts objective displacement", BardBlastArrowAcceptsObjectiveDisplacement),
 	("bard blast arrow rejects resilience displacement", BardBlastArrowRejectsResilienceDisplacement),
 	("bard blast arrow rejects blast ready filler", BardBlastArrowRejectsBlastReadyFiller),
 	("bard encore of light accepts low mp conversion", BardEncoreOfLightAcceptsLowMpConversion),
+	("bard encore of light accepts ally burst window", BardEncoreOfLightAcceptsAllyBurstWindow),
+	("bard encore of light accepts final fantasia push window", BardEncoreOfLightAcceptsFinalFantasiaPushWindow),
 	("bard encore of light rejects blocked filler", BardEncoreOfLightRejectsBlockedFiller),
 	("bard encore of light rejects guard reaction conversion", BardEncoreOfLightRejectsGuardReactionConversion),
 	("bard powerful shot accepts safe pressure filler", BardPowerfulShotAcceptsSafePressureFiller),
@@ -1927,6 +1936,34 @@ static void BardPitchPerfectAcceptsRepertoireAllyFocusFollowUp()
 	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUsePitchPerfect(input), "Pitch Perfect should convert Repertoire into an ally focused follow up");
 }
 
+static void BardPitchPerfectAcceptsRepertoireLowMpTarget()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(1, healthRatio: 0.90f, currentMp: PvPScoringFactors.LowMp),
+		hasRepertoire: true);
+
+	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUsePitchPerfect(input), "Pitch Perfect should convert Repertoire into high-health low MP pressure");
+}
+
+static void BardPitchPerfectAcceptsRepertoireObjectiveTarget()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(1, healthRatio: 0.90f, currentMp: 10_000, isObjectiveRelevant: true),
+		hasRepertoire: true);
+
+	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUsePitchPerfect(input), "Pitch Perfect should convert Repertoire into objective pressure");
+}
+
+static void BardPitchPerfectAcceptsRepertoireAllyBurst()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(1, healthRatio: 0.90f, currentMp: 10_000),
+		alliesCanBurst: true,
+		hasRepertoire: true);
+
+	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUsePitchPerfect(input), "Pitch Perfect should convert Repertoire during allied burst");
+}
+
 static void BardPitchPerfectRejectsRepertoireFiller()
 {
 	var input = BardOffensiveInput(
@@ -1948,6 +1985,51 @@ static void BardApexArrowAcceptsObjectiveLineValue()
 		objectiveControlNeeded: true);
 
 	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUseApexArrow(input), "Apex Arrow should spend when the line pressures an objective target");
+}
+
+static void BardApexArrowAcceptsGuardedObjectivePressure()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(
+			1,
+			healthRatio: 0.85f,
+			currentMp: 10_000,
+			hasGuard: true,
+			isObjectiveRelevant: true),
+		objectiveControlNeeded: true);
+
+	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUseApexArrow(input), "Apex Arrow should spend into Guard when objective pressure is valuable");
+}
+
+static void BardApexArrowAcceptsGuardedForcedTiming()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(1, healthRatio: 0.85f, currentMp: 10_000, hasGuard: true),
+		forcedExpiryWindow: true);
+
+	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUseApexArrow(input), "Apex Arrow should spend into Guard when buff timing would be lost");
+}
+
+static void BardApexArrowAcceptsStandaloneObjectiveValue()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(
+			1,
+			healthRatio: 0.85f,
+			currentMp: 10_000,
+			isObjectiveRelevant: true),
+		objectiveControlNeeded: true);
+
+	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUseApexArrow(input), "Apex Arrow should spend for objective value without requiring line value");
+}
+
+static void BardApexArrowAcceptsStandaloneAllyBurstValue()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(1, healthRatio: 0.85f, currentMp: 10_000),
+		alliesCanBurst: true);
+
+	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUseApexArrow(input), "Apex Arrow should spend for ally burst without requiring line value");
 }
 
 static void BardApexArrowRejectsGuardedFiller()
@@ -2011,6 +2093,35 @@ static void BardEncoreOfLightAcceptsLowMpConversion()
 	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUseEncoreOfLight(input), "Encore of Light should convert low MP pressure when Guard is unavailable");
 }
 
+static void BardEncoreOfLightAcceptsAllyBurstWindow()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(
+			1,
+			healthRatio: 0.85f,
+			currentMp: 10_000,
+			guardAvailability: PvPGuardAvailability.Ready),
+		alliesCanBurst: true,
+		hasFrontlinersMarch: true,
+		hasGuardCooldownKnowledge: true);
+
+	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUseEncoreOfLight(input), "Encore of Light should spend for ally burst even when Guard can react");
+}
+
+static void BardEncoreOfLightAcceptsFinalFantasiaPushWindow()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(
+			1,
+			healthRatio: 0.85f,
+			currentMp: 10_000,
+			guardAvailability: PvPGuardAvailability.Ready),
+		hasFinalFantasia: true,
+		hasGuardCooldownKnowledge: true);
+
+	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUseEncoreOfLight(input), "Encore of Light should spend for Final Fantasia push windows");
+}
+
 static void BardEncoreOfLightRejectsBlockedFiller()
 {
 	var input = BardOffensiveInput(
@@ -2034,7 +2145,6 @@ static void BardEncoreOfLightRejectsGuardReactionConversion()
 			healthRatio: 0.85f,
 			currentMp: PvPScoringFactors.LowMp,
 			guardAvailability: PvPGuardAvailability.Ready),
-		hasFinalFantasia: true,
 		hasFrontlinersMarch: true,
 		hasGuardCooldownKnowledge: true);
 

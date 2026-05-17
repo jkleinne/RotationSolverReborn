@@ -54,18 +54,19 @@ internal static class BardPvPOffensiveDecisionPolicy
 			return true;
 		}
 
-		return HasSplashValue(input)
-			|| HasCommittedFollowUpValue(input)
-			|| (input.FollowUpAvailable && input.Target.HasAllyFocus)
-			|| (input.FollowUpAvailable && IsKillWindow(input))
-			|| input.ForcedExpiryWindow;
+		return HasPitchPerfectSpendValue(input);
 	}
 
 	internal static bool ShouldUseApexArrow(BardPvPOffensiveDecisionInput input)
 	{
-		if (input.HasBlastArrowReady || HasBlockedDamage(input))
+		if (input.HasBlastArrowReady || HasHardBlockedDamage(input))
 		{
 			return false;
+		}
+
+		if (input.Target.HasGuard)
+		{
+			return HasGuardedApexPressureValue(input);
 		}
 
 		if (CanDirectSecure(input))
@@ -73,11 +74,7 @@ internal static class BardPvPOffensiveDecisionPolicy
 			return true;
 		}
 
-		return HasObjectiveLineValue(input)
-			|| HasCommittedFollowUpValue(input)
-			|| input.ForcedExpiryWindow
-			|| (HasLineValue(input) && input.AlliesCanBurst)
-			|| IsKillWindow(input);
+		return HasApexPressureValue(input);
 	}
 
 	internal static bool ShouldUseBlastArrow(BardPvPOffensiveDecisionInput input)
@@ -114,15 +111,12 @@ internal static class BardPvPOffensiveDecisionPolicy
 			return true;
 		}
 
-		if (CanReactWithGuard(input) && !HasDamagePriority(input))
+		if (CanReactWithGuard(input) && !HasEncorePrioritySignal(input))
 		{
 			return false;
 		}
 
-		return HasLowMpConversionValue(input)
-			|| HasSplashValue(input)
-			|| HasCommittedFollowUpValue(input)
-			|| input.ForcedExpiryWindow;
+		return HasEncoreSpendValue(input);
 	}
 
 	internal static bool ShouldUsePowerfulShot(BardPvPOffensiveDecisionInput input)
@@ -148,6 +142,11 @@ internal static class BardPvPOffensiveDecisionPolicy
 	private static bool HasBlockedDamage(BardPvPOffensiveDecisionInput input)
 	{
 		return !input.Target.IsInNormalRange || input.Target.HasGuard || input.Target.HasInvulnerability;
+	}
+
+	private static bool HasHardBlockedDamage(BardPvPOffensiveDecisionInput input)
+	{
+		return !input.Target.IsInNormalRange || input.Target.HasInvulnerability;
 	}
 
 	private static bool CanDirectSecure(BardPvPOffensiveDecisionInput input)
@@ -201,6 +200,48 @@ internal static class BardPvPOffensiveDecisionPolicy
 			|| input.ForcedExpiryWindow;
 	}
 
+	private static bool HasPitchPerfectSpendValue(BardPvPOffensiveDecisionInput input)
+	{
+		return HasSplashValue(input)
+			|| HasCommittedFollowUpValue(input)
+			|| input.AlliesCanBurst
+			|| HasLowMpConversionValue(input)
+			|| input.Target.IsObjectiveRelevant
+			|| input.Target.HasAllyFocus
+			|| input.ForcedExpiryWindow
+			|| IsKillWindow(input);
+	}
+
+	private static bool HasApexPressureValue(BardPvPOffensiveDecisionInput input)
+	{
+		return HasLineValue(input)
+			|| HasObjectivePressureValue(input)
+			|| input.AlliesCanBurst
+			|| HasCommittedFollowUpValue(input)
+			|| input.ForcedExpiryWindow
+			|| IsKillWindow(input);
+	}
+
+	private static bool HasGuardedApexPressureValue(BardPvPOffensiveDecisionInput input)
+	{
+		return HasObjectivePressureValue(input) || input.ForcedExpiryWindow;
+	}
+
+	private static bool HasEncorePrioritySignal(BardPvPOffensiveDecisionInput input)
+	{
+		return HasDamagePriority(input) || input.HasFinalFantasia;
+	}
+
+	private static bool HasEncoreSpendValue(BardPvPOffensiveDecisionInput input)
+	{
+		return HasLowMpConversionValue(input)
+			|| HasSplashValue(input)
+			|| HasCommittedFollowUpValue(input)
+			|| input.AlliesCanBurst
+			|| input.HasFinalFantasia
+			|| input.ForcedExpiryWindow;
+	}
+
 	private static bool HasCommittedFollowUpValue(BardPvPOffensiveDecisionInput input)
 	{
 		return input.FollowUpAvailable && input.TargetCommitted;
@@ -216,9 +257,9 @@ internal static class BardPvPOffensiveDecisionPolicy
 		return input.Target.SplashTargetCount >= MultiTargetValueCount;
 	}
 
-	private static bool HasObjectiveLineValue(BardPvPOffensiveDecisionInput input)
+	private static bool HasObjectivePressureValue(BardPvPOffensiveDecisionInput input)
 	{
-		return HasLineValue(input) && (input.ObjectiveControlNeeded || input.Target.IsObjectiveRelevant);
+		return input.ObjectiveControlNeeded || input.Target.IsObjectiveRelevant;
 	}
 
 	private static bool HasObjectiveDisplacementValue(BardPvPOffensiveDecisionInput input)
