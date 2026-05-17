@@ -124,6 +124,7 @@ var tests = new (string Name, Action Test)[]
 	("bard encore of light accepts final fantasia push window", BardEncoreOfLightAcceptsFinalFantasiaPushWindow),
 	("bard encore of light rejects blocked filler", BardEncoreOfLightRejectsBlockedFiller),
 	("bard encore of light rejects guard reaction conversion", BardEncoreOfLightRejectsGuardReactionConversion),
+	("bard encore of light rejects unknown guard reaction conversion", BardEncoreOfLightRejectsUnknownGuardReactionConversion),
 	("bard powerful shot accepts safe pressure filler", BardPowerfulShotAcceptsSafePressureFiller),
 	("bard powerful shot rejects blocked target", BardPowerfulShotRejectsBlockedTarget),
 	("bard offensive decision policy reruns live guard state", BardOffensiveDecisionPolicyRerunsLiveGuardState),
@@ -2158,6 +2159,19 @@ static void BardEncoreOfLightRejectsGuardReactionConversion()
 		hasGuardCooldownKnowledge: true);
 
 	AssertFalse(BardPvPOffensiveDecisionPolicy.ShouldUseEncoreOfLight(input), "Encore of Light should hold low MP conversion when the target can Guard and no priority signal exists");
+}
+
+static void BardEncoreOfLightRejectsUnknownGuardReactionConversion()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(
+			1,
+			healthRatio: 0.85f,
+			currentMp: PvPScoringFactors.LowMp,
+			guardAvailability: PvPGuardAvailability.Unknown),
+		hasFrontlinersMarch: true);
+
+	AssertFalse(BardPvPOffensiveDecisionPolicy.ShouldUseEncoreOfLight(input), "Encore of Light should hold low MP conversion when Guard reaction knowledge is unavailable");
 }
 
 static void BardPowerfulShotAcceptsSafePressureFiller()

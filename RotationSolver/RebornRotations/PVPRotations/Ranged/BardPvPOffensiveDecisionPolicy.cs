@@ -280,7 +280,11 @@ internal static class BardPvPOffensiveDecisionPolicy
 
 	private static bool CanReactWithGuard(BardPvPOffensiveDecisionInput input)
 	{
-		return input.HasGuardCooldownKnowledge
-			&& input.Target.GuardAvailability is PvPGuardAvailability.Ready or PvPGuardAvailability.Unknown;
+		if (!input.HasGuardCooldownKnowledge)
+		{
+			return true;
+		}
+
+		return input.Target.GuardAvailability is PvPGuardAvailability.Ready or PvPGuardAvailability.Unknown;
 	}
 }
