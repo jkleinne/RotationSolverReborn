@@ -26,6 +26,7 @@ internal readonly record struct BardPvPTargetSnapshot(
 	bool HasInvulnerability,
 	double ExpectedDamageRatio,
 	double EffectiveHealthRatio,
+	double GuardPiercingEffectiveHealthRatio,
 	double ActiveDamageReduction,
 	bool IsExposed,
 	bool IsInNormalRange,
@@ -36,14 +37,12 @@ internal readonly record struct BardPvPTargetSnapshot(
 internal static class BardPvPTargetPolicy
 {
 	private const double HealthPressureWeight = 4.0;
-	private const double LowMpScore = 3.0;
-	private const double MediumMpScore = 1.5;
+	private const double MpPressureWeight = 3.0;
 	private const double ObjectiveScore = 1.5;
 	private const double AllyFocusScore = 1.25;
 	private const double VulnerableScore = 1.5;
 	private const double ControlledScore = 1.25;
 	private const double ExposedScore = 1.0;
-	private const double NormalRangeScore = 0.5;
 	private const double DirectSecureScore = 8.0;
 	private const double GuardPenalty = 4.0;
 	private const double BlastArrowResiliencePenalty = 2.5;
@@ -129,11 +128,6 @@ internal static class BardPvPTargetPolicy
 			score += ExposedScore;
 		}
 
-		if (target.IsInNormalRange)
-		{
-			score += NormalRangeScore;
-		}
-
 		score -= GuardCost(target, intent);
 		score -= ResilienceCost(target, intent);
 
@@ -170,7 +164,7 @@ internal static class BardPvPTargetPolicy
 		}
 
 		var effectiveHealthRatio = target.HasGuard && ignoresGuard
-			? target.HealthRatio
+			? target.GuardPiercingEffectiveHealthRatio
 			: target.EffectiveHealthRatio;
 
 		var gateDecision = PvPDamageGate.Evaluate(new PvPDamageGateInput(
@@ -196,7 +190,7 @@ internal static class BardPvPTargetPolicy
 
 	private static double MpPressure(uint currentMp)
 	{
-		return PvPScoringFactors.ComputeMpPressure(currentMp) * LowMpScore;
+		return PvPScoringFactors.ComputeMpPressure(currentMp) * MpPressureWeight;
 	}
 
 	private static double AreaValue(BardPvPTargetSnapshot target, BardPvPActionIntent intent)

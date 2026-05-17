@@ -100,6 +100,7 @@ var tests = new (string Name, Action Test)[]
 	("bard offensive target policy uses pitch perfect splash value", BardOffensiveTargetPolicyUsesPitchPerfectSplashValue),
 	("bard offensive target policy rejects out of range target", BardOffensiveTargetPolicyRejectsOutOfRangeTarget),
 	("bard offensive target policy keeps eagle eye guard target", BardOffensiveTargetPolicyKeepsEagleEyeGuardTarget),
+	("bard offensive target policy preserves eagle eye mitigation", BardOffensiveTargetPolicyPreservesEagleEyeMitigation),
 	("bard offensive target policy penalizes blast resilience", BardOffensiveTargetPolicyPenalizesBlastResilience),
 	("pvp lb json contains verified entries", PvpLbJsonContainsVerifiedEntries),
 	("pvp mitigation json contains resilience", PvpMitigationJsonContainsResilience),
@@ -1827,39 +1828,50 @@ static void BardOffensiveTargetPolicyKeepsEagleEyeGuardTarget()
 {
 	var guardedTarget = BardOffensiveTarget(
 		1,
-		healthRatio: 0.25f,
-		currentMp: 2_000,
+		healthRatio: 0.40f,
+		currentMp: 10_000,
 		hasGuard: true,
-		expectedDamageRatio: 0.30);
-	var exposedTarget = BardOffensiveTarget(2, healthRatio: 0.70f, currentMp: 2_000);
+		expectedDamageRatio: 0.0);
+	var exposedTarget = guardedTarget with { TargetId = 2, HasGuard = false };
 
-	var selected = BardPvPTargetPolicy.SelectBest(
-		[guardedTarget, exposedTarget],
-		BardPvPActionIntent.EagleEyeShot);
+	var guardedScore = BardPvPTargetPolicy.Score(guardedTarget, BardPvPActionIntent.EagleEyeShot);
+	var exposedScore = BardPvPTargetPolicy.Score(exposedTarget, BardPvPActionIntent.EagleEyeShot);
 
-	AssertEqual(1UL, selected?.TargetId, "Frontline Eagle Eye Shot may rank guarded targets because the role action ignores Guard");
+	AssertEqual(exposedScore, guardedScore, "Eagle Eye Shot should not penalize Guard because the role action ignores Guard");
+}
+
+static void BardOffensiveTargetPolicyPreservesEagleEyeMitigation()
+{
+	var mitigatedTarget = BardOffensiveTarget(
+		1,
+		healthRatio: 0.10f,
+		currentMp: 10_000,
+		hasGuard: true,
+		effectiveHealthRatio: 0.40,
+		guardPiercingEffectiveHealthRatio: 0.40,
+		expectedDamageRatio: 0.20);
+	var noDamageTarget = mitigatedTarget with { ExpectedDamageRatio = 0.0 };
+
+	var score = BardPvPTargetPolicy.Score(mitigatedTarget, BardPvPActionIntent.EagleEyeShot);
+	var noDamageScore = BardPvPTargetPolicy.Score(noDamageTarget, BardPvPActionIntent.EagleEyeShot);
+
+	AssertEqual(noDamageScore, score, "Eagle Eye Shot should not treat nonlethal mitigated targets as direct secure");
 }
 
 static void BardOffensiveTargetPolicyPenalizesBlastResilience()
 {
 	var resilientTarget = BardOffensiveTarget(
 		1,
-		healthRatio: 0.25f,
-		currentMp: 2_000,
+		healthRatio: 0.40f,
+		currentMp: 10_000,
 		hasResilience: true,
 		lineTargetCount: 1);
-	var objectiveTarget = BardOffensiveTarget(
-		2,
-		healthRatio: 0.40f,
-		currentMp: 2_000,
-		isObjectiveRelevant: true,
-		lineTargetCount: 1);
+	var exposedTarget = resilientTarget with { TargetId = 2, HasResilience = false };
 
-	var selected = BardPvPTargetPolicy.SelectBest(
-		[resilientTarget, objectiveTarget],
-		BardPvPActionIntent.BlastArrow);
+	var resilientScore = BardPvPTargetPolicy.Score(resilientTarget, BardPvPActionIntent.BlastArrow);
+	var exposedScore = BardPvPTargetPolicy.Score(exposedTarget, BardPvPActionIntent.BlastArrow);
 
-	AssertEqual(2UL, selected?.TargetId, "Blast Arrow should avoid Resilience when displacement value matters");
+	AssertTrue(resilientScore < exposedScore, "Blast Arrow should penalize Resilience when displacement value matters");
 }
 
 static MachinistPvPTargetSnapshot MachinistTarget(
@@ -1927,6 +1939,7 @@ static BardPvPTargetSnapshot BardOffensiveTarget(
 	bool isControlled = false,
 	bool hasInvulnerability = false,
 	double effectiveHealthRatio = 1.0,
+	double guardPiercingEffectiveHealthRatio = 1.0,
 	double activeDamageReduction = 0.0,
 	double expectedDamageRatio = 0.0,
 	bool isExposed = true,
@@ -1948,6 +1961,7 @@ static BardPvPTargetSnapshot BardOffensiveTarget(
 		HasInvulnerability: hasInvulnerability,
 		ExpectedDamageRatio: expectedDamageRatio,
 		EffectiveHealthRatio: effectiveHealthRatio,
+		GuardPiercingEffectiveHealthRatio: guardPiercingEffectiveHealthRatio,
 		ActiveDamageReduction: activeDamageReduction,
 		IsExposed: isExposed,
 		IsInNormalRange: isInNormalRange,
