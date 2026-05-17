@@ -122,22 +122,7 @@ internal static class BardPvPOffensiveDecisionPolicy
 
 	internal static bool ShouldUsePowerfulShot(BardPvPOffensiveDecisionInput input)
 	{
-		if (HasBlockedDamage(input))
-		{
-			return false;
-		}
-
-		if (CanDirectSecure(input))
-		{
-			return true;
-		}
-
-		return IsKillWindow(input)
-			|| input.Target.HasAllyFocus
-			|| input.Target.IsVulnerable
-			|| input.ObjectiveControlNeeded
-			|| input.TargetCommitted
-			|| input.ForcedExpiryWindow;
+		return !HasBlockedDamage(input);
 	}
 
 	private static bool HasBlockedDamage(BardPvPOffensiveDecisionInput input)

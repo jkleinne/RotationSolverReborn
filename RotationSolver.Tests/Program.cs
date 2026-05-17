@@ -126,6 +126,7 @@ var tests = new (string Name, Action Test)[]
 	("bard encore of light rejects guard reaction conversion", BardEncoreOfLightRejectsGuardReactionConversion),
 	("bard encore of light rejects unknown guard reaction conversion", BardEncoreOfLightRejectsUnknownGuardReactionConversion),
 	("bard powerful shot accepts safe pressure filler", BardPowerfulShotAcceptsSafePressureFiller),
+	("bard powerful shot accepts neutral safe filler", BardPowerfulShotAcceptsNeutralSafeFiller),
 	("bard powerful shot rejects blocked target", BardPowerfulShotRejectsBlockedTarget),
 	("bard offensive decision policy reruns live guard state", BardOffensiveDecisionPolicyRerunsLiveGuardState),
 	("pvp lb json contains verified entries", PvpLbJsonContainsVerifiedEntries),
@@ -2180,6 +2181,14 @@ static void BardPowerfulShotAcceptsSafePressureFiller()
 		BardOffensiveTarget(1, healthRatio: 0.55f, currentMp: PvPScoringFactors.MediumMp));
 
 	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUsePowerfulShot(input), "Powerful Shot should fill safe pressure into a low resource kill window");
+}
+
+static void BardPowerfulShotAcceptsNeutralSafeFiller()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(1, healthRatio: 0.90f, currentMp: 10_000));
+
+	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUsePowerfulShot(input), "Powerful Shot should remain available as safe neutral filler");
 }
 
 static void BardPowerfulShotRejectsBlockedTarget()
