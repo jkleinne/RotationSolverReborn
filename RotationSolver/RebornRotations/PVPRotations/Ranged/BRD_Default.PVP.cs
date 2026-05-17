@@ -32,6 +32,10 @@ public sealed class BRD_DefaultPvP : BardRotation
 	private const float PaeanTankEngageWeight = 2.5f;
 	private const float PaeanMeleeEngageWeight = 2f;
 	private const float PaeanSmartTargetWeight = 1.5f;
+	private const float OffensiveAllyBurstRadiusYalms = 8f;
+	private const float OffensiveSplashRadiusYalms = 5f;
+	private const float OffensiveLineHalfWidthYalms = 3f;
+	private const double GuardReactionWindowSeconds = 1.25;
 	private const double PowerfulShotPotency = 6_000.0;
 	private const double PitchPerfectPotency = 9_000.0;
 	private const double ApexArrowPotency = 8_000.0;
@@ -421,16 +425,12 @@ public sealed class BRD_DefaultPvP : BardRotation
 			return true;
 		}
 
-		if (TryUseDirectSecureAction(EncoreOfLightPvP, EncoreOfLightPotency, out action, skipAoeCheck: true))
-		{
-			return true;
-		}
-
-		if (EncoreOfLightPvP.CanUse(out action, skipAoeCheck: true)
-			&& ShouldUseBurstOrBeforeStatusExpires(
-				EncoreOfLightPvP,
-				StatusID.EncoreOfLightReady,
-				EncoreOfLightPotency))
+		if (TryUsePolicyAction(
+			EncoreOfLightPvP,
+			BardPvPActionIntent.EncoreOfLight,
+			BardPvPOffensiveDecisionPolicy.ShouldUseEncoreOfLight,
+			out action,
+			skipAoeCheck: true))
 		{
 			return true;
 		}
@@ -441,48 +441,37 @@ public sealed class BRD_DefaultPvP : BardRotation
 	private bool TryUseFrontlineEagleEyeShot(out IAction? action)
 	{
 		action = null;
-		if (!EagleEyeShotPvP.CanUse(out var candidateAction))
-		{
-			return false;
-		}
 
-		var target = EagleEyeShotPvP.Target.Target;
-		if (target == null || target.CurrentHp == 0)
-		{
-			return false;
-		}
+		return TryUsePolicyAction(
+			EagleEyeShotPvP,
+			BardPvPActionIntent.EagleEyeShot,
+			ShouldUseFrontlineEagleEyeShot,
+			out action);
+	}
 
-		var input = new FrontlineEagleEyeShotInput(
+	private static bool ShouldUseFrontlineEagleEyeShot(BardPvPOffensiveDecisionInput input)
+	{
+		var target = input.Target;
+		var eagleEyeShotInput = new FrontlineEagleEyeShotInput(
 			Job: FrontlinePvPRangedJob.Bard,
 			IsInFrontline: DataCenter.IsInFrontline,
 			IsInCrystallineConflict: DataCenter.IsInCrystallineConflict,
-			Target: CreateEagleEyeShotTargetState(target));
+			Target: new FrontlineEagleEyeShotTargetState(
+				HealthRatio: target.HealthRatio,
+				CurrentMp: target.CurrentMp,
+				HasGuard: target.HasGuard,
+				HasResilience: target.HasResilience,
+				HasNonGuardInvulnerability: target.HasInvulnerability,
+				HasAllyFocus: target.HasAllyFocus,
+				IsObjectiveRelevant: target.IsObjectiveRelevant,
+				IsControlled: target.IsControlled,
+				IsBurstWorthy: target.IsVulnerable,
+				TargetCommitted: input.TargetCommitted,
+				ImmediateFollowUpAvailable: input.FollowUpAvailable,
+				HasWildfire: false,
+				ExpectedDamageRatio: input.ExpectedDamageRatio));
 
-		if (!FrontlinePvPRoleActionPolicy.ShouldUseEagleEyeShot(input))
-		{
-			return false;
-		}
-
-		action = candidateAction;
-		return true;
-	}
-
-	private static FrontlineEagleEyeShotTargetState CreateEagleEyeShotTargetState(IBattleChara target)
-	{
-		return new FrontlineEagleEyeShotTargetState(
-			HealthRatio: target.GetHealthRatio(),
-			CurrentMp: target.CurrentMp,
-			HasGuard: target.HasStatus(false, StatusID.Guard),
-			HasResilience: target.HasStatus(false, StatusID.Resilience),
-			HasNonGuardInvulnerability: HasNonGuardInvulnerability(target),
-			HasAllyFocus: CountAlliesTargeting(target) > 0,
-			IsObjectiveRelevant: IsObjectiveRelevantTarget(target),
-			IsControlled: IsControlledForEagleEyeShot(target),
-			IsBurstWorthy: IsBurstWorthy(target),
-			TargetCommitted: target.TargetObjectId != 0,
-			ImmediateFollowUpAvailable: false,
-			HasWildfire: false,
-			ExpectedDamageRatio: ExpectedEagleEyeShotDamageRatio(target));
+		return FrontlinePvPRoleActionPolicy.ShouldUseEagleEyeShot(eagleEyeShotInput);
 	}
 
 	private static bool IsControlledForEagleEyeShot(IBattleChara target)
@@ -498,7 +487,7 @@ public sealed class BRD_DefaultPvP : BardRotation
 			StatusID.MiracleOfNature);
 	}
 
-	private static bool HasNonGuardInvulnerability(IBattleChara target)
+	private static bool HasNonGuardInvulnerability(IBattleChara target, IMitigationDatabase database)
 	{
 		var statusList = target.StatusList;
 		if (statusList == null)
@@ -506,7 +495,6 @@ public sealed class BRD_DefaultPvP : BardRotation
 			return false;
 		}
 
-		var database = PvPMitigationDatabaseProvider.Current;
 		foreach (var status in statusList)
 		{
 			var statusId = (StatusID)status.StatusId;
@@ -522,11 +510,6 @@ public sealed class BRD_DefaultPvP : BardRotation
 		}
 
 		return false;
-	}
-
-	private static double ExpectedEagleEyeShotDamageRatio(IBattleChara target)
-	{
-		return target.MaxHp == 0 ? 0.0 : EagleEyeShotPotency / target.MaxHp;
 	}
 
 	private static BardPvPShutdownInput BuildShutdownInput(IBaseAction action, bool safeBackstepExists)
@@ -609,100 +592,84 @@ public sealed class BRD_DefaultPvP : BardRotation
 	#region GCDs
 	protected override bool GeneralGCD(out IAction? action)
 	{
-		if (TryUseDirectSecureGcd(out action))
+		if (TryUsePolicyAction(
+			HarmonicArrowPvP,
+			BardPvPActionIntent.HarmonicArrow,
+			BardPvPOffensiveDecisionPolicy.ShouldUseHarmonicArrow,
+			out action))
 		{
 			return true;
 		}
 
-		if (HarmonicArrowPvP.CanUse(out action)
-			&& ShouldUseBurstOrPreventChargeOvercap(HarmonicArrowPvP, HarmonicArrowPotency))
+		if (TryUsePolicyAction(
+			PitchPerfectPvP,
+			BardPvPActionIntent.PitchPerfect,
+			BardPvPOffensiveDecisionPolicy.ShouldUsePitchPerfect,
+			out action,
+			skipAoeCheck: true))
 		{
 			return true;
 		}
 
-		if (PitchPerfectPvP.CanUse(out action, skipAoeCheck: true))
+		if (TryUsePolicyAction(
+			BlastArrowPvP,
+			BardPvPActionIntent.BlastArrow,
+			BardPvPOffensiveDecisionPolicy.ShouldUseBlastArrow,
+			out action))
 		{
 			return true;
 		}
 
-		if (BlastArrowPvP.CanUse(out action)
-			&& ShouldUseBurstOrBeforeStatusExpires(BlastArrowPvP, StatusID.BlastArrowReady_3142, BlastArrowPotency))
+		if (TryUsePolicyAction(
+			ApexArrowPvP,
+			BardPvPActionIntent.ApexArrow,
+			BardPvPOffensiveDecisionPolicy.ShouldUseApexArrow,
+			out action,
+			skipStatusProvideCheck: true))
 		{
 			return true;
 		}
 
-		if (BardPvPDecisionPolicy.ShouldUseApexArrow(
-				StatusHelper.PlayerHasStatus(true, StatusID.BlastArrowReady_3142))
-			&& ApexArrowPvP.CanUse(out action, skipStatusProvideCheck: true))
-		{
-			return true;
-		}
-
-		if (PowerfulShotPvP.CanUse(out action))
-		{
-			return true;
-		}
-
-		return base.GeneralGCD(out action);
+		return TryUsePolicyAction(
+				PowerfulShotPvP,
+				BardPvPActionIntent.PowerfulShot,
+				BardPvPOffensiveDecisionPolicy.ShouldUsePowerfulShot,
+				out action)
+			|| base.GeneralGCD(out action);
 	}
 
-	private bool TryUseDirectSecureGcd(out IAction? action)
-	{
-		if (TryUseDirectSecureAction(HarmonicArrowPvP, HarmonicArrowPotency, out action))
-		{
-			return true;
-		}
-
-		if (TryUseDirectSecureAction(PitchPerfectPvP, PitchPerfectPotency, out action, skipAoeCheck: true))
-		{
-			return true;
-		}
-
-		if (TryUseDirectSecureAction(BlastArrowPvP, BlastArrowPotency, out action))
-		{
-			return true;
-		}
-
-		if (BardPvPDecisionPolicy.ShouldUseApexArrow(StatusHelper.PlayerHasStatus(true, StatusID.BlastArrowReady_3142))
-			&& TryUseDirectSecureAction(ApexArrowPvP, ApexArrowPotency, out action, skipStatusProvideCheck: true))
-		{
-			return true;
-		}
-
-		return TryUseDirectSecureAction(PowerfulShotPvP, PowerfulShotPotency, out action);
-	}
-
-	private static bool ShouldUseBurstOrPreventChargeOvercap(IBaseAction action, double expectedPotency)
-	{
-		return BardPvPDecisionPolicy.ShouldUseBurstOrForcedSpend(
-			targetIsBurstWorthy: PvPBurstGate.ShouldUse(action),
-			targetBlocksDamage: PvPBurstGate.TargetBlocksDamage(action),
-			forcedSpendWindow: action.Cooldown.WillHaveXChargesGCD(action.Cooldown.MaxCharges, BurstExpiryGcdWindow, BurstExpiryOffset),
-			targetCanBeKilled: PvPBurstGate.CanSecure(action, expectedPotency));
-	}
-
-	private static bool ShouldUseBurstOrBeforeStatusExpires(IBaseAction action, StatusID status, double expectedPotency)
-	{
-		return BardPvPDecisionPolicy.ShouldUseBurstOrForcedSpend(
-			targetIsBurstWorthy: PvPBurstGate.ShouldUse(action),
-			targetBlocksDamage: PvPBurstGate.TargetBlocksDamage(action),
-			forcedSpendWindow: StatusHelper.PlayerHasStatus(true, status)
-				&& StatusHelper.PlayerWillStatusEndGCD(BurstExpiryGcdWindow, BurstExpiryOffset, true, status),
-			targetCanBeKilled: PvPBurstGate.CanSecure(action, expectedPotency));
-	}
-
-	private static bool TryUseDirectSecureAction(
+	private bool TryUsePolicyAction(
 		IBaseAction baseAction,
-		double expectedPotency,
+		BardPvPActionIntent intent,
+		Func<BardPvPOffensiveDecisionInput, bool> shouldUse,
 		out IAction? action,
 		bool skipAoeCheck = false,
 		bool skipStatusProvideCheck = false)
 	{
 		action = null;
 
-		foreach (var targetId in RankDirectSecureTargets(baseAction, expectedPotency))
+		foreach (var targetSnapshot in RankTargets(intent, baseAction.TargetInfo.Range))
 		{
-			if (TryUseActionOn(baseAction, targetId, out action, skipAoeCheck, skipStatusProvideCheck))
+			var target = FindHostileById(targetSnapshot.TargetId);
+			if (target == null)
+			{
+				continue;
+			}
+
+			var input = CreateDecisionInput(targetSnapshot, target, intent, baseAction);
+			if (!shouldUse(input))
+			{
+				continue;
+			}
+
+			var refreshedSnapshot = RefreshTargetSnapshot(targetSnapshot, target);
+			var refreshedInput = CreateDecisionInput(refreshedSnapshot, target, intent, baseAction);
+			if (!shouldUse(refreshedInput))
+			{
+				continue;
+			}
+
+			if (TryUseActionOn(baseAction, refreshedSnapshot.TargetId, out action, skipAoeCheck, skipStatusProvideCheck))
 			{
 				return true;
 			}
@@ -711,39 +678,317 @@ public sealed class BRD_DefaultPvP : BardRotation
 		return false;
 	}
 
-	private static List<ulong> RankDirectSecureTargets(IBaseAction baseAction, double expectedPotency)
+	private static IBattleChara? FindHostileById(ulong targetId)
 	{
-		List<BardPvPKillSecureSnapshot> snapshots = [];
-		var range = baseAction.TargetInfo.Range;
-		var database = PvPMitigationDatabaseProvider.Current;
+		foreach (var hostile in AllHostileTargets)
+		{
+			if (hostile != null && hostile.GameObjectId == targetId)
+			{
+				return hostile;
+			}
+		}
+
+		return null;
+	}
+
+	private static List<BardPvPTargetSnapshot> RankTargets(BardPvPActionIntent intent, float range)
+	{
+		List<BardPvPTargetSnapshot> snapshots = [];
 
 		foreach (var hostile in AllHostileTargets)
 		{
 			if (hostile == null
-				|| hostile.CurrentHp == 0
-				|| hostile.MaxHp == 0
-				|| hostile.DistanceToPlayer() > range)
+				|| hostile.CurrentHp == 0)
 			{
 				continue;
 			}
 
-			var effectiveHp = EffectiveHpCalculator.Compute(hostile, database);
-			var effectiveHpRatio = double.IsPositiveInfinity(effectiveHp)
-				? double.PositiveInfinity
-				: effectiveHp / hostile.MaxHp;
-
-			snapshots.Add(new BardPvPKillSecureSnapshot(
-				TargetId: hostile.GameObjectId,
-				HealthRatio: hostile.GetHealthRatio(),
-				EffectiveHealthRatio: effectiveHpRatio,
-				ExpectedDamageRatio: expectedPotency / hostile.MaxHp,
-				ActiveDamageReduction: MitigationPenalty.Compute(hostile, database),
-				HasInvulnerability: double.IsPositiveInfinity(effectiveHp),
-				HasAllyFocus: CountAlliesTargeting(hostile) > 0,
-				IsObjectiveRelevant: IsObjectiveRelevantTarget(hostile)));
+			snapshots.Add(CreateTargetSnapshot(hostile, intent, range));
 		}
 
-		return BardPvPDecisionPolicy.RankDirectSecureTargets(snapshots);
+		return BardPvPTargetPolicy.Rank(snapshots, intent);
+	}
+
+	private static BardPvPTargetSnapshot CreateTargetSnapshot(IBattleChara target, BardPvPActionIntent intent, float range)
+	{
+		var database = PvPMitigationDatabaseProvider.Current;
+		var healthRatio = target.GetHealthRatio();
+		var hasGuard = target.HasStatus(false, StatusID.Guard);
+		var distance = target.DistanceToPlayer();
+
+		return new BardPvPTargetSnapshot(
+			TargetId: target.GameObjectId,
+			HealthRatio: healthRatio,
+			CurrentMp: target.CurrentMp,
+			HasGuard: hasGuard,
+			HasResilience: target.HasStatus(false, StatusID.Resilience),
+			IsObjectiveRelevant: IsObjectiveRelevantTarget(target),
+			HasAllyFocus: CountAlliesTargeting(target) > 0,
+			IsVulnerable: IsBurstWorthy(target),
+			IsControlled: IsControlledForEagleEyeShot(target),
+			HasInvulnerability: HasNonGuardInvulnerability(target, database),
+			ExpectedDamageRatio: ExpectedDamageRatio(intent, target),
+			EffectiveHealthRatio: ComputeEffectiveHealthRatio(target, database, ignoreGuard: false),
+			GuardPiercingEffectiveHealthRatio: ComputeEffectiveHealthRatio(target, database, ignoreGuard: true),
+			ActiveDamageReduction: MitigationPenalty.Compute(target, database),
+			IsExposed: !hasGuard && distance <= range,
+			IsInNormalRange: distance <= range,
+			LineTargetCount: CountHostilesInLine(target, range),
+			SplashTargetCount: CountHostilesNear(target.Position, OffensiveSplashRadiusYalms),
+			GuardAvailability: GetGuardAvailability(target));
+	}
+
+	private static BardPvPTargetSnapshot RefreshTargetSnapshot(BardPvPTargetSnapshot snapshot, IBattleChara target)
+	{
+		var database = PvPMitigationDatabaseProvider.Current;
+		var hasGuard = target.HasStatus(false, StatusID.Guard);
+
+		return snapshot with
+		{
+			HealthRatio = target.GetHealthRatio(),
+			CurrentMp = target.CurrentMp,
+			HasGuard = hasGuard,
+			HasResilience = target.HasStatus(false, StatusID.Resilience),
+			IsObjectiveRelevant = IsObjectiveRelevantTarget(target),
+			HasAllyFocus = CountAlliesTargeting(target) > 0,
+			IsVulnerable = IsBurstWorthy(target),
+			IsControlled = IsControlledForEagleEyeShot(target),
+			HasInvulnerability = HasNonGuardInvulnerability(target, database),
+			EffectiveHealthRatio = ComputeEffectiveHealthRatio(target, database, ignoreGuard: false),
+			GuardPiercingEffectiveHealthRatio = ComputeEffectiveHealthRatio(target, database, ignoreGuard: true),
+			ActiveDamageReduction = MitigationPenalty.Compute(target, database),
+			IsExposed = !hasGuard && snapshot.IsInNormalRange,
+			GuardAvailability = GetGuardAvailability(target),
+		};
+	}
+
+	private BardPvPOffensiveDecisionInput CreateDecisionInput(
+		BardPvPTargetSnapshot snapshot,
+		IBattleChara target,
+		BardPvPActionIntent intent,
+		IBaseAction action)
+	{
+		var objectiveControlNeeded = snapshot.IsObjectiveRelevant;
+		return new BardPvPOffensiveDecisionInput(
+			Target: snapshot,
+			FollowUpAvailable: HasImmediateFollowUp(intent),
+			AlliesCanBurst: snapshot.HasAllyFocus || CountAlliesNear(target, OffensiveAllyBurstRadiusYalms) > 0,
+			ObjectiveControlNeeded: objectiveControlNeeded,
+			TargetCommitted: objectiveControlNeeded
+				|| snapshot.HasAllyFocus
+				|| snapshot.CurrentMp <= PvPScoringFactors.MediumMp
+				|| target.TargetObjectId != 0,
+			HasFinalFantasia: StatusHelper.PlayerHasStatus(true, StatusID.FinalFantasia),
+			HasFrontlinersMarch: StatusHelper.PlayerHasStatus(true, StatusID.FrontlinersMarch),
+			HasRepertoire: StatusHelper.PlayerHasStatus(true, StatusID.Repertoire),
+			HasBlastArrowReady: StatusHelper.PlayerHasStatus(true, StatusID.BlastArrowReady_3142),
+			HarmonicWouldOvercap: intent == BardPvPActionIntent.HarmonicArrow
+				&& action.Cooldown.WillHaveXChargesGCD(action.Cooldown.MaxCharges, BurstExpiryGcdWindow, BurstExpiryOffset),
+			ForcedExpiryWindow: HasForcedExpiryWindow(intent),
+			PeelValueNeeded: TargetThreatensProtectedAlly(target),
+			ExpectedDamageRatio: snapshot.ExpectedDamageRatio,
+			HasGuardCooldownKnowledge: DataCenter.IsInCrystallineConflict);
+	}
+
+	private static double ExpectedDamageRatio(BardPvPActionIntent intent, IBattleChara target)
+	{
+		if (target.MaxHp == 0)
+		{
+			return 0.0;
+		}
+
+		return intent switch
+		{
+			BardPvPActionIntent.PowerfulShot => PowerfulShotPotency / target.MaxHp,
+			BardPvPActionIntent.HarmonicArrow => HarmonicArrowPotency / target.MaxHp,
+			BardPvPActionIntent.PitchPerfect => PitchPerfectPotency / target.MaxHp,
+			BardPvPActionIntent.ApexArrow => ApexArrowPotency / target.MaxHp,
+			BardPvPActionIntent.BlastArrow => BlastArrowPotency / target.MaxHp,
+			BardPvPActionIntent.EncoreOfLight => EncoreOfLightPotency / target.MaxHp,
+			BardPvPActionIntent.EagleEyeShot => EagleEyeShotPotency / target.MaxHp,
+			_ => 0.0,
+		};
+	}
+
+	private bool HasForcedExpiryWindow(BardPvPActionIntent intent)
+	{
+		return intent switch
+		{
+			BardPvPActionIntent.HarmonicArrow => HarmonicArrowPvP.Cooldown.WillHaveXChargesGCD(
+				HarmonicArrowPvP.Cooldown.MaxCharges,
+				BurstExpiryGcdWindow,
+				BurstExpiryOffset),
+			BardPvPActionIntent.PitchPerfect => StatusHelper.PlayerHasStatus(true, StatusID.Repertoire)
+				&& StatusHelper.PlayerWillStatusEndGCD(BurstExpiryGcdWindow, BurstExpiryOffset, true, StatusID.Repertoire),
+			BardPvPActionIntent.ApexArrow => StatusHelper.PlayerHasStatus(true, StatusID.FrontlinersMarch)
+				&& StatusHelper.PlayerWillStatusEndGCD(BurstExpiryGcdWindow, BurstExpiryOffset, true, StatusID.FrontlinersMarch),
+			BardPvPActionIntent.BlastArrow => StatusHelper.PlayerHasStatus(true, StatusID.BlastArrowReady_3142)
+				&& StatusHelper.PlayerWillStatusEndGCD(BurstExpiryGcdWindow, BurstExpiryOffset, true, StatusID.BlastArrowReady_3142),
+			BardPvPActionIntent.EncoreOfLight => StatusHelper.PlayerHasStatus(true, StatusID.EncoreOfLightReady)
+				&& StatusHelper.PlayerWillStatusEndGCD(BurstExpiryGcdWindow, BurstExpiryOffset, true, StatusID.EncoreOfLightReady),
+			_ => false,
+		};
+	}
+
+	private static PvPGuardAvailability GetGuardAvailability(IBattleChara target)
+	{
+		return DataCenter.PvPGuardCooldownTracker.GetAvailability(
+			target.GameObjectId,
+			TimeSpan.FromMilliseconds(Environment.TickCount64),
+			TimeSpan.FromSeconds(GuardReactionWindowSeconds));
+	}
+
+	private bool HasImmediateFollowUp(BardPvPActionIntent intent)
+	{
+		if (intent != BardPvPActionIntent.HarmonicArrow && HarmonicArrowPvP.Cooldown.HasOneCharge)
+		{
+			return true;
+		}
+
+		if (intent != BardPvPActionIntent.PitchPerfect
+			&& PitchPerfectPvP.Cooldown.HasOneCharge
+			&& StatusHelper.PlayerHasStatus(true, StatusID.Repertoire))
+		{
+			return true;
+		}
+
+		if (intent != BardPvPActionIntent.ApexArrow
+			&& ApexArrowPvP.Cooldown.HasOneCharge
+			&& !StatusHelper.PlayerHasStatus(true, StatusID.BlastArrowReady_3142))
+		{
+			return true;
+		}
+
+		if (intent != BardPvPActionIntent.BlastArrow
+			&& BlastArrowPvP.Cooldown.HasOneCharge
+			&& StatusHelper.PlayerHasStatus(true, StatusID.BlastArrowReady_3142))
+		{
+			return true;
+		}
+
+		return intent != BardPvPActionIntent.EncoreOfLight
+			&& EncoreOfLightPvP.Cooldown.HasOneCharge
+			&& StatusHelper.PlayerHasStatus(true, StatusID.EncoreOfLightReady);
+	}
+
+	private static int CountAlliesNear(IBattleChara target, float radius)
+	{
+		var count = 0;
+		foreach (var member in PartyMembers)
+		{
+			if (member != null
+				&& member.CurrentHp > 0
+				&& Vector3.Distance(member.Position, target.Position) <= radius)
+			{
+				count++;
+			}
+		}
+
+		return count;
+	}
+
+	private static int CountHostilesNear(Vector3 position, float radius)
+	{
+		var count = 0;
+		foreach (var hostile in AllHostileTargets)
+		{
+			if (hostile != null
+				&& hostile.CurrentHp > 0
+				&& Vector3.Distance(hostile.Position, position) <= radius)
+			{
+				count++;
+			}
+		}
+
+		return count;
+	}
+
+	private static int CountHostilesInLine(IBattleChara target, float range)
+	{
+		if (Player == null)
+		{
+			return 0;
+		}
+
+		var origin = new Vector3(Player.Position.X, 0f, Player.Position.Z);
+		var targetPosition = new Vector3(target.Position.X, 0f, target.Position.Z);
+		var direction = targetPosition - origin;
+		if (direction.LengthSquared() <= float.Epsilon)
+		{
+			return 0;
+		}
+
+		var lineDirection = Vector3.Normalize(direction);
+		var count = 0;
+		foreach (var hostile in AllHostileTargets)
+		{
+			if (hostile == null || hostile.CurrentHp == 0)
+			{
+				continue;
+			}
+
+			var hostilePosition = new Vector3(hostile.Position.X, 0f, hostile.Position.Z);
+			var toHostile = hostilePosition - origin;
+			var forwardDistance = Vector3.Dot(lineDirection, toHostile);
+			if (forwardDistance < 0f || forwardDistance > range)
+			{
+				continue;
+			}
+
+			var perpendicularDistance = Vector3.Cross(lineDirection, toHostile).Length();
+			if (perpendicularDistance <= OffensiveLineHalfWidthYalms + hostile.HitboxRadius)
+			{
+				count++;
+			}
+		}
+
+		return count;
+	}
+
+	private static double ComputeEffectiveHealthRatio(
+		IBattleChara target,
+		IMitigationDatabase database,
+		bool ignoreGuard)
+	{
+		if (target.MaxHp == 0)
+		{
+			return double.PositiveInfinity;
+		}
+
+		var effectiveHp = ignoreGuard
+			? ComputeEffectiveHpIgnoringGuard(target, database)
+			: EffectiveHpCalculator.Compute(target, database);
+		return double.IsPositiveInfinity(effectiveHp)
+			? double.PositiveInfinity
+			: effectiveHp / target.MaxHp;
+	}
+
+	private static double ComputeEffectiveHpIgnoringGuard(IBattleChara target, IMitigationDatabase database)
+	{
+		var statusList = target.StatusList;
+		if (statusList == null)
+		{
+			return target.CurrentHp;
+		}
+
+		var damageMultiplier = 1.0;
+		foreach (var status in statusList)
+		{
+			var statusId = (StatusID)status.StatusId;
+			if (statusId == StatusID.Guard || !database.TryGet(statusId, out var entry))
+			{
+				continue;
+			}
+
+			if (entry.Kind == MitigationKind.Invuln)
+			{
+				return double.PositiveInfinity;
+			}
+
+			damageMultiplier *= 1.0 - entry.DamageReductionPercent;
+		}
+
+		return damageMultiplier <= 0.0 ? double.PositiveInfinity : target.CurrentHp / damageMultiplier;
 	}
 
 	private static bool TryUseActionOn(
