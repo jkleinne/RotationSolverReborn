@@ -104,6 +104,7 @@ var tests = new (string Name, Action Test)[]
 	("bard offensive target policy penalizes blast resilience", BardOffensiveTargetPolicyPenalizesBlastResilience),
 	("bard harmonic arrow rejects guarded nonlethal target", BardHarmonicArrowRejectsGuardedNonlethalTarget),
 	("bard harmonic arrow accepts unblocked charge overcap", BardHarmonicArrowAcceptsUnblockedChargeOvercap),
+	("bard harmonic arrow accepts low mp conversion", BardHarmonicArrowAcceptsLowMpConversion),
 	("bard pitch perfect accepts repertoire ally focus follow up", BardPitchPerfectAcceptsRepertoireAllyFocusFollowUp),
 	("bard pitch perfect accepts repertoire low mp target", BardPitchPerfectAcceptsRepertoireLowMpTarget),
 	("bard pitch perfect accepts repertoire objective target", BardPitchPerfectAcceptsRepertoireObjectiveTarget),
@@ -1924,6 +1925,14 @@ static void BardHarmonicArrowAcceptsUnblockedChargeOvercap()
 
 	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUseHarmonicArrow(input), "Harmonic Arrow should spend before wasting a charge on an unblocked target");
 	AssertFalse(BardPvPOffensiveDecisionPolicy.ShouldUseHarmonicArrow(guardedInput), "Harmonic Arrow overcap should still respect blocked damage");
+}
+
+static void BardHarmonicArrowAcceptsLowMpConversion()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(1, healthRatio: 0.90f, currentMp: PvPScoringFactors.LowMp));
+
+	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUseHarmonicArrow(input), "Harmonic Arrow should convert high-health low MP pressure");
 }
 
 static void BardPitchPerfectAcceptsRepertoireAllyFocusFollowUp()

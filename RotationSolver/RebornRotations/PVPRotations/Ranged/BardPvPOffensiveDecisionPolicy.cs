@@ -38,6 +38,7 @@ internal static class BardPvPOffensiveDecisionPolicy
 		return input.HarmonicWouldOvercap
 			|| input.ForcedExpiryWindow
 			|| HasCommittedFollowUpValue(input)
+			|| HasLowMpConversionValue(input)
 			|| HasDamagePriority(input)
 			|| IsKillWindow(input);
 	}
