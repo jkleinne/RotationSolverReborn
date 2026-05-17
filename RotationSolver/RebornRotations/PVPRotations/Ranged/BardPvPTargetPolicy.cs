@@ -196,12 +196,7 @@ internal static class BardPvPTargetPolicy
 
 	private static double MpPressure(uint currentMp)
 	{
-		if (currentMp <= PvPScoringFactors.LowMp)
-		{
-			return LowMpScore;
-		}
-
-		return currentMp <= PvPScoringFactors.MediumMp ? MediumMpScore : 0.0;
+		return PvPScoringFactors.ComputeMpPressure(currentMp) * LowMpScore;
 	}
 
 	private static double AreaValue(BardPvPTargetSnapshot target, BardPvPActionIntent intent)
@@ -209,8 +204,8 @@ internal static class BardPvPTargetPolicy
 		var targetCount = intent switch
 		{
 			BardPvPActionIntent.ApexArrow or BardPvPActionIntent.BlastArrow => target.LineTargetCount,
-			BardPvPActionIntent.HarmonicArrow or BardPvPActionIntent.EncoreOfLight => target.SplashTargetCount,
-			_ => 1,
+			BardPvPActionIntent.PitchPerfect or BardPvPActionIntent.EncoreOfLight => target.SplashTargetCount,
+			_ => 0,
 		};
 
 		return Math.Max(0, targetCount - 1) * AreaTargetScore;
@@ -239,13 +234,8 @@ internal static class BardPvPTargetPolicy
 
 	private static double ResilienceCost(BardPvPTargetSnapshot target, BardPvPActionIntent intent)
 	{
-		if (!target.HasResilience)
-		{
-			return 0.0;
-		}
-
 		return intent == BardPvPActionIntent.BlastArrow
-			? BlastArrowResiliencePenalty
+			? PvPScoringFactors.ComputeResiliencePenalty(target.HasResilience) * BlastArrowResiliencePenalty
 			: 0.0;
 	}
 }

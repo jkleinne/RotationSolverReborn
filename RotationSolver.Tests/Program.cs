@@ -97,6 +97,7 @@ var tests = new (string Name, Action Test)[]
 	("bard kill secure prefers lowest lethal health", BardKillSecurePrefersLowestLethalHealth),
 	("bard offensive target policy prefers direct secure target", BardOffensiveTargetPolicyPrefersDirectSecureTarget),
 	("bard offensive target policy prefers low mp target", BardOffensiveTargetPolicyPrefersLowMpTarget),
+	("bard offensive target policy uses pitch perfect splash value", BardOffensiveTargetPolicyUsesPitchPerfectSplashValue),
 	("bard offensive target policy rejects out of range target", BardOffensiveTargetPolicyRejectsOutOfRangeTarget),
 	("bard offensive target policy keeps eagle eye guard target", BardOffensiveTargetPolicyKeepsEagleEyeGuardTarget),
 	("bard offensive target policy penalizes blast resilience", BardOffensiveTargetPolicyPenalizesBlastResilience),
@@ -1795,6 +1796,18 @@ static void BardOffensiveTargetPolicyPrefersLowMpTarget()
 		BardPvPActionIntent.PowerfulShot);
 
 	AssertEqual(2UL, selected?.TargetId, "Bard should prefer pressure on enemies with limited Recuperate resources");
+}
+
+static void BardOffensiveTargetPolicyUsesPitchPerfectSplashValue()
+{
+	var isolatedTarget = BardOffensiveTarget(1, healthRatio: 0.40f, currentMp: 10_000, splashTargetCount: 1);
+	var splashTarget = BardOffensiveTarget(2, healthRatio: 0.40f, currentMp: 10_000, splashTargetCount: 3);
+
+	var selected = BardPvPTargetPolicy.SelectBest(
+		[isolatedTarget, splashTarget],
+		BardPvPActionIntent.PitchPerfect);
+
+	AssertEqual(2UL, selected?.TargetId, "Pitch Perfect should prefer targets that add splash value");
 }
 
 static void BardOffensiveTargetPolicyRejectsOutOfRangeTarget()
