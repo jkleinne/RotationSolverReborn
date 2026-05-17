@@ -1,0 +1,251 @@
+using RotationSolver.Basic.Actions.PvPTargetSelection;
+
+namespace RotationSolver.RebornRotations.PVPRotations.Ranged;
+
+internal enum BardPvPActionIntent
+{
+	PowerfulShot,
+	HarmonicArrow,
+	PitchPerfect,
+	ApexArrow,
+	BlastArrow,
+	EncoreOfLight,
+	EagleEyeShot,
+}
+
+internal readonly record struct BardPvPTargetSnapshot(
+	ulong TargetId,
+	float HealthRatio,
+	uint CurrentMp,
+	bool HasGuard,
+	bool HasResilience,
+	bool IsObjectiveRelevant,
+	bool HasAllyFocus,
+	bool IsVulnerable,
+	bool IsControlled,
+	bool HasInvulnerability,
+	double ExpectedDamageRatio,
+	double EffectiveHealthRatio,
+	double ActiveDamageReduction,
+	bool IsExposed,
+	bool IsInNormalRange,
+	int LineTargetCount,
+	int SplashTargetCount,
+	PvPGuardAvailability GuardAvailability = PvPGuardAvailability.Unknown);
+
+internal static class BardPvPTargetPolicy
+{
+	private const double HealthPressureWeight = 4.0;
+	private const double LowMpScore = 3.0;
+	private const double MediumMpScore = 1.5;
+	private const double ObjectiveScore = 1.5;
+	private const double AllyFocusScore = 1.25;
+	private const double VulnerableScore = 1.5;
+	private const double ControlledScore = 1.25;
+	private const double ExposedScore = 1.0;
+	private const double NormalRangeScore = 0.5;
+	private const double DirectSecureScore = 8.0;
+	private const double GuardPenalty = 4.0;
+	private const double BlastArrowResiliencePenalty = 2.5;
+	private const double AreaTargetScore = 0.75;
+	private const double EncoreMpDenyScore = 2.0;
+	private const uint FullMp = 10_000;
+
+	internal static BardPvPTargetSnapshot? SelectBest(
+		IReadOnlyList<BardPvPTargetSnapshot> targets,
+		BardPvPActionIntent intent)
+	{
+		var rankedTargets = Rank(targets, intent);
+		return rankedTargets.Count == 0 ? null : rankedTargets[0];
+	}
+
+	internal static List<BardPvPTargetSnapshot> Rank(
+		IReadOnlyList<BardPvPTargetSnapshot> targets,
+		BardPvPActionIntent intent)
+	{
+		List<(BardPvPTargetSnapshot Target, double Score)> scoredTargets = [];
+
+		foreach (var target in targets)
+		{
+			var score = Score(target, intent);
+			if (double.IsNegativeInfinity(score))
+			{
+				continue;
+			}
+
+			scoredTargets.Add((target, score));
+		}
+
+		scoredTargets.Sort(CompareScoredTargets);
+
+		List<BardPvPTargetSnapshot> rankedTargets = [];
+		foreach (var scoredTarget in scoredTargets)
+		{
+			rankedTargets.Add(scoredTarget.Target);
+		}
+
+		return rankedTargets;
+	}
+
+	internal static double Score(BardPvPTargetSnapshot target, BardPvPActionIntent intent)
+	{
+		if (!target.IsInNormalRange || target.HasInvulnerability)
+		{
+			return double.NegativeInfinity;
+		}
+
+		var score = HealthPressure(target.HealthRatio);
+		score += MpPressure(target.CurrentMp);
+		score += AreaValue(target, intent);
+		score += EncoreMpDenyValue(target, intent);
+
+		if (CanDirectSecure(target, intent))
+		{
+			score += DirectSecureScore;
+		}
+
+		if (target.IsObjectiveRelevant)
+		{
+			score += ObjectiveScore;
+		}
+
+		if (target.HasAllyFocus)
+		{
+			score += AllyFocusScore;
+		}
+
+		if (target.IsVulnerable)
+		{
+			score += VulnerableScore;
+		}
+
+		if (target.IsControlled)
+		{
+			score += ControlledScore;
+		}
+
+		if (target.IsExposed)
+		{
+			score += ExposedScore;
+		}
+
+		if (target.IsInNormalRange)
+		{
+			score += NormalRangeScore;
+		}
+
+		score -= GuardCost(target, intent);
+		score -= ResilienceCost(target, intent);
+
+		return score;
+	}
+
+	private static int CompareScoredTargets(
+		(BardPvPTargetSnapshot Target, double Score) left,
+		(BardPvPTargetSnapshot Target, double Score) right)
+	{
+		var scoreComparison = right.Score.CompareTo(left.Score);
+		if (scoreComparison != 0)
+		{
+			return scoreComparison;
+		}
+
+		var healthComparison = left.Target.HealthRatio.CompareTo(right.Target.HealthRatio);
+		return healthComparison != 0
+			? healthComparison
+			: left.Target.TargetId.CompareTo(right.Target.TargetId);
+	}
+
+	private static bool CanDirectSecure(BardPvPTargetSnapshot target, BardPvPActionIntent intent)
+	{
+		if (target.ExpectedDamageRatio <= 0.0 || target.HasInvulnerability)
+		{
+			return false;
+		}
+
+		var ignoresGuard = IgnoresGuard(intent);
+		if (target.HasGuard && !ignoresGuard)
+		{
+			return false;
+		}
+
+		var effectiveHealthRatio = target.HasGuard && ignoresGuard
+			? target.HealthRatio
+			: target.EffectiveHealthRatio;
+
+		var gateDecision = PvPDamageGate.Evaluate(new PvPDamageGateInput(
+			Intent: PvPBurstIntent.Secure,
+			EffectiveHpRatio: effectiveHealthRatio,
+			ExpectedDamageRatio: target.ExpectedDamageRatio,
+			ActiveDamageReduction: target.ActiveDamageReduction,
+			HasInvulnerability: target.HasInvulnerability,
+			HasPrioritySignal: true));
+
+		return gateDecision == PvPBurstRecommendation.Secure;
+	}
+
+	private static bool IgnoresGuard(BardPvPActionIntent intent)
+	{
+		return intent == BardPvPActionIntent.EagleEyeShot;
+	}
+
+	private static double HealthPressure(float healthRatio)
+	{
+		return (1.0 - Math.Clamp(healthRatio, 0f, 1f)) * HealthPressureWeight;
+	}
+
+	private static double MpPressure(uint currentMp)
+	{
+		if (currentMp <= PvPScoringFactors.LowMp)
+		{
+			return LowMpScore;
+		}
+
+		return currentMp <= PvPScoringFactors.MediumMp ? MediumMpScore : 0.0;
+	}
+
+	private static double AreaValue(BardPvPTargetSnapshot target, BardPvPActionIntent intent)
+	{
+		var targetCount = intent switch
+		{
+			BardPvPActionIntent.ApexArrow or BardPvPActionIntent.BlastArrow => target.LineTargetCount,
+			BardPvPActionIntent.HarmonicArrow or BardPvPActionIntent.EncoreOfLight => target.SplashTargetCount,
+			_ => 1,
+		};
+
+		return Math.Max(0, targetCount - 1) * AreaTargetScore;
+	}
+
+	private static double EncoreMpDenyValue(BardPvPTargetSnapshot target, BardPvPActionIntent intent)
+	{
+		if (intent != BardPvPActionIntent.EncoreOfLight)
+		{
+			return 0.0;
+		}
+
+		var spentMpRatio = 1.0 - Math.Clamp((double)target.CurrentMp / FullMp, 0.0, 1.0);
+		return spentMpRatio * EncoreMpDenyScore;
+	}
+
+	private static double GuardCost(BardPvPTargetSnapshot target, BardPvPActionIntent intent)
+	{
+		if (!target.HasGuard || IgnoresGuard(intent))
+		{
+			return 0.0;
+		}
+
+		return GuardPenalty;
+	}
+
+	private static double ResilienceCost(BardPvPTargetSnapshot target, BardPvPActionIntent intent)
+	{
+		if (!target.HasResilience)
+		{
+			return 0.0;
+		}
+
+		return intent == BardPvPActionIntent.BlastArrow
+			? BlastArrowResiliencePenalty
+			: 0.0;
+	}
+}

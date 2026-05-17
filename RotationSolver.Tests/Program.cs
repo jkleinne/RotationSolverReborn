@@ -95,6 +95,11 @@ var tests = new (string Name, Action Test)[]
 	("bard kill secure ranks lethal hostile", BardKillSecureRanksLethalHostile),
 	("bard kill secure rejects invulnerability", BardKillSecureRejectsInvulnerability),
 	("bard kill secure prefers lowest lethal health", BardKillSecurePrefersLowestLethalHealth),
+	("bard offensive target policy prefers direct secure target", BardOffensiveTargetPolicyPrefersDirectSecureTarget),
+	("bard offensive target policy prefers low mp target", BardOffensiveTargetPolicyPrefersLowMpTarget),
+	("bard offensive target policy rejects out of range target", BardOffensiveTargetPolicyRejectsOutOfRangeTarget),
+	("bard offensive target policy keeps eagle eye guard target", BardOffensiveTargetPolicyKeepsEagleEyeGuardTarget),
+	("bard offensive target policy penalizes blast resilience", BardOffensiveTargetPolicyPenalizesBlastResilience),
 	("pvp lb json contains verified entries", PvpLbJsonContainsVerifiedEntries),
 	("pvp mitigation json contains resilience", PvpMitigationJsonContainsResilience),
 	("pvp mitigation json contains ranked cc defensive coverage", PvpMitigationJsonContainsRankedCcDefensiveCoverage),
@@ -1763,6 +1768,87 @@ static void BardKillSecurePrefersLowestLethalHealth()
 	AssertEqual(2UL, ranked[0], "Bard should target the lowest health lethal hostile first");
 }
 
+static void BardOffensiveTargetPolicyPrefersDirectSecureTarget()
+{
+	var directSecureTarget = BardOffensiveTarget(
+		1,
+		healthRatio: 0.15f,
+		currentMp: 10_000,
+		effectiveHealthRatio: 0.15,
+		expectedDamageRatio: 0.20);
+	var lowMpTarget = BardOffensiveTarget(2, healthRatio: 0.40f, currentMp: 2_000);
+
+	var selected = BardPvPTargetPolicy.SelectBest(
+		[directSecureTarget, lowMpTarget],
+		BardPvPActionIntent.HarmonicArrow);
+
+	AssertEqual(1UL, selected?.TargetId, "Bard should prefer a target that the current action can secure");
+}
+
+static void BardOffensiveTargetPolicyPrefersLowMpTarget()
+{
+	var highMpTarget = BardOffensiveTarget(1, healthRatio: 0.40f, currentMp: 10_000);
+	var lowMpTarget = BardOffensiveTarget(2, healthRatio: 0.40f, currentMp: 2_000);
+
+	var selected = BardPvPTargetPolicy.SelectBest(
+		[highMpTarget, lowMpTarget],
+		BardPvPActionIntent.PowerfulShot);
+
+	AssertEqual(2UL, selected?.TargetId, "Bard should prefer pressure on enemies with limited Recuperate resources");
+}
+
+static void BardOffensiveTargetPolicyRejectsOutOfRangeTarget()
+{
+	var inRangeTarget = BardOffensiveTarget(1, healthRatio: 0.80f, currentMp: 10_000, isInNormalRange: true);
+	var outOfRangeTarget = BardOffensiveTarget(2, healthRatio: 0.10f, currentMp: 0, isInNormalRange: false);
+
+	var rankedTargets = BardPvPTargetPolicy.Rank(
+		[inRangeTarget, outOfRangeTarget],
+		BardPvPActionIntent.HarmonicArrow);
+
+	AssertEqual(1, rankedTargets.Count, "Bard offensive targeting should keep only reachable targets");
+	AssertEqual(1UL, rankedTargets[0].TargetId, "Bard offensive targeting should choose the reachable target");
+}
+
+static void BardOffensiveTargetPolicyKeepsEagleEyeGuardTarget()
+{
+	var guardedTarget = BardOffensiveTarget(
+		1,
+		healthRatio: 0.25f,
+		currentMp: 2_000,
+		hasGuard: true,
+		expectedDamageRatio: 0.30);
+	var exposedTarget = BardOffensiveTarget(2, healthRatio: 0.70f, currentMp: 2_000);
+
+	var selected = BardPvPTargetPolicy.SelectBest(
+		[guardedTarget, exposedTarget],
+		BardPvPActionIntent.EagleEyeShot);
+
+	AssertEqual(1UL, selected?.TargetId, "Frontline Eagle Eye Shot may rank guarded targets because the role action ignores Guard");
+}
+
+static void BardOffensiveTargetPolicyPenalizesBlastResilience()
+{
+	var resilientTarget = BardOffensiveTarget(
+		1,
+		healthRatio: 0.25f,
+		currentMp: 2_000,
+		hasResilience: true,
+		lineTargetCount: 1);
+	var objectiveTarget = BardOffensiveTarget(
+		2,
+		healthRatio: 0.40f,
+		currentMp: 2_000,
+		isObjectiveRelevant: true,
+		lineTargetCount: 1);
+
+	var selected = BardPvPTargetPolicy.SelectBest(
+		[resilientTarget, objectiveTarget],
+		BardPvPActionIntent.BlastArrow);
+
+	AssertEqual(2UL, selected?.TargetId, "Blast Arrow should avoid Resilience when displacement value matters");
+}
+
 static MachinistPvPTargetSnapshot MachinistTarget(
 	ulong targetId,
 	float healthRatio,
@@ -1814,6 +1900,47 @@ static BardPvPKillSecureSnapshot BardKillTarget(
 		ExpectedDamageRatio: expectedDamageRatio,
 		ActiveDamageReduction: 0.0,
 		HasInvulnerability: hasInvulnerability);
+}
+
+static BardPvPTargetSnapshot BardOffensiveTarget(
+	ulong targetId,
+	float healthRatio,
+	uint currentMp,
+	bool hasGuard = false,
+	bool hasResilience = false,
+	bool isObjectiveRelevant = false,
+	bool hasAllyFocus = false,
+	bool isVulnerable = false,
+	bool isControlled = false,
+	bool hasInvulnerability = false,
+	double effectiveHealthRatio = 1.0,
+	double activeDamageReduction = 0.0,
+	double expectedDamageRatio = 0.0,
+	bool isExposed = true,
+	bool isInNormalRange = true,
+	int lineTargetCount = 1,
+	int splashTargetCount = 1,
+	PvPGuardAvailability guardAvailability = PvPGuardAvailability.CoolingDown)
+{
+	return new BardPvPTargetSnapshot(
+		TargetId: targetId,
+		HealthRatio: healthRatio,
+		CurrentMp: currentMp,
+		HasGuard: hasGuard,
+		HasResilience: hasResilience,
+		IsObjectiveRelevant: isObjectiveRelevant,
+		HasAllyFocus: hasAllyFocus,
+		IsVulnerable: isVulnerable,
+		IsControlled: isControlled,
+		HasInvulnerability: hasInvulnerability,
+		ExpectedDamageRatio: expectedDamageRatio,
+		EffectiveHealthRatio: effectiveHealthRatio,
+		ActiveDamageReduction: activeDamageReduction,
+		IsExposed: isExposed,
+		IsInNormalRange: isInNormalRange,
+		LineTargetCount: lineTargetCount,
+		SplashTargetCount: splashTargetCount,
+		GuardAvailability: guardAvailability);
 }
 
 static void PvpLbJsonContainsVerifiedEntries()
