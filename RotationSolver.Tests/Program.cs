@@ -102,6 +102,21 @@ var tests = new (string Name, Action Test)[]
 	("bard offensive target policy keeps eagle eye guard target", BardOffensiveTargetPolicyKeepsEagleEyeGuardTarget),
 	("bard offensive target policy preserves eagle eye mitigation", BardOffensiveTargetPolicyPreservesEagleEyeMitigation),
 	("bard offensive target policy penalizes blast resilience", BardOffensiveTargetPolicyPenalizesBlastResilience),
+	("bard harmonic arrow rejects guarded nonlethal target", BardHarmonicArrowRejectsGuardedNonlethalTarget),
+	("bard harmonic arrow accepts unblocked charge overcap", BardHarmonicArrowAcceptsUnblockedChargeOvercap),
+	("bard pitch perfect accepts repertoire ally focus follow up", BardPitchPerfectAcceptsRepertoireAllyFocusFollowUp),
+	("bard pitch perfect rejects repertoire filler", BardPitchPerfectRejectsRepertoireFiller),
+	("bard apex arrow accepts objective line value", BardApexArrowAcceptsObjectiveLineValue),
+	("bard apex arrow rejects guarded filler", BardApexArrowRejectsGuardedFiller),
+	("bard blast arrow accepts objective displacement", BardBlastArrowAcceptsObjectiveDisplacement),
+	("bard blast arrow rejects resilience displacement", BardBlastArrowRejectsResilienceDisplacement),
+	("bard blast arrow rejects blast ready filler", BardBlastArrowRejectsBlastReadyFiller),
+	("bard encore of light accepts low mp conversion", BardEncoreOfLightAcceptsLowMpConversion),
+	("bard encore of light rejects blocked filler", BardEncoreOfLightRejectsBlockedFiller),
+	("bard encore of light rejects guard reaction conversion", BardEncoreOfLightRejectsGuardReactionConversion),
+	("bard powerful shot accepts safe pressure filler", BardPowerfulShotAcceptsSafePressureFiller),
+	("bard powerful shot rejects blocked target", BardPowerfulShotRejectsBlockedTarget),
+	("bard offensive decision policy reruns live guard state", BardOffensiveDecisionPolicyRerunsLiveGuardState),
 	("pvp lb json contains verified entries", PvpLbJsonContainsVerifiedEntries),
 	("pvp mitigation json contains resilience", PvpMitigationJsonContainsResilience),
 	("pvp mitigation json contains ranked cc defensive coverage", PvpMitigationJsonContainsRankedCcDefensiveCoverage),
@@ -1874,6 +1889,188 @@ static void BardOffensiveTargetPolicyPenalizesBlastResilience()
 	AssertTrue(resilientScore < exposedScore, "Blast Arrow should penalize Resilience when displacement value matters");
 }
 
+static void BardHarmonicArrowRejectsGuardedNonlethalTarget()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(
+			1,
+			healthRatio: 0.42f,
+			currentMp: 10_000,
+			hasGuard: true,
+			effectiveHealthRatio: 0.42,
+			expectedDamageRatio: 0.30),
+		alliesCanBurst: true,
+		objectiveControlNeeded: true,
+		harmonicWouldOvercap: true);
+
+	AssertFalse(BardPvPOffensiveDecisionPolicy.ShouldUseHarmonicArrow(input), "Harmonic Arrow should not spend into Guard when the target survives");
+}
+
+static void BardHarmonicArrowAcceptsUnblockedChargeOvercap()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(1, healthRatio: 0.90f, currentMp: 10_000),
+		harmonicWouldOvercap: true);
+	var guardedInput = input with { Target = input.Target with { HasGuard = true } };
+
+	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUseHarmonicArrow(input), "Harmonic Arrow should spend before wasting a charge on an unblocked target");
+	AssertFalse(BardPvPOffensiveDecisionPolicy.ShouldUseHarmonicArrow(guardedInput), "Harmonic Arrow overcap should still respect blocked damage");
+}
+
+static void BardPitchPerfectAcceptsRepertoireAllyFocusFollowUp()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(1, healthRatio: 0.75f, currentMp: 10_000, hasAllyFocus: true),
+		followUpAvailable: true,
+		hasRepertoire: true);
+
+	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUsePitchPerfect(input), "Pitch Perfect should convert Repertoire into an ally focused follow up");
+}
+
+static void BardPitchPerfectRejectsRepertoireFiller()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(1, healthRatio: 0.90f, currentMp: 10_000),
+		hasRepertoire: true);
+
+	AssertFalse(BardPvPOffensiveDecisionPolicy.ShouldUsePitchPerfect(input), "Pitch Perfect should hold Repertoire when the target has no pressure value");
+}
+
+static void BardApexArrowAcceptsObjectiveLineValue()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(
+			1,
+			healthRatio: 0.85f,
+			currentMp: 10_000,
+			isObjectiveRelevant: true,
+			lineTargetCount: 2),
+		objectiveControlNeeded: true);
+
+	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUseApexArrow(input), "Apex Arrow should spend when the line pressures an objective target");
+}
+
+static void BardApexArrowRejectsGuardedFiller()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(1, healthRatio: 0.85f, currentMp: 10_000, hasGuard: true));
+
+	AssertFalse(BardPvPOffensiveDecisionPolicy.ShouldUseApexArrow(input), "Apex Arrow should not spend filler into Guard");
+}
+
+static void BardBlastArrowAcceptsObjectiveDisplacement()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(
+			1,
+			healthRatio: 0.85f,
+			currentMp: 10_000,
+			isObjectiveRelevant: true),
+		objectiveControlNeeded: true,
+		hasBlastArrowReady: true);
+
+	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUseBlastArrow(input), "Blast Arrow should spend for objective displacement");
+}
+
+static void BardBlastArrowRejectsResilienceDisplacement()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(
+			1,
+			healthRatio: 0.85f,
+			currentMp: 10_000,
+			isObjectiveRelevant: true),
+		objectiveControlNeeded: true,
+		hasBlastArrowReady: true);
+	var resilientInput = input with { Target = input.Target with { HasResilience = true } };
+
+	AssertFalse(BardPvPOffensiveDecisionPolicy.ShouldUseBlastArrow(resilientInput), "Blast Arrow should reject Resilience when displacement is the primary value");
+}
+
+static void BardBlastArrowRejectsBlastReadyFiller()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(1, healthRatio: 0.85f, currentMp: 10_000),
+		hasBlastArrowReady: true);
+
+	AssertFalse(BardPvPOffensiveDecisionPolicy.ShouldUseBlastArrow(input), "Blast Arrow should not spend Blast Ready without line, objective, peel, or committed follow up value");
+}
+
+static void BardEncoreOfLightAcceptsLowMpConversion()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(
+			1,
+			healthRatio: 0.85f,
+			currentMp: PvPScoringFactors.LowMp,
+			guardAvailability: PvPGuardAvailability.CoolingDown),
+		hasFinalFantasia: true,
+		hasFrontlinersMarch: true,
+		hasGuardCooldownKnowledge: true);
+
+	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUseEncoreOfLight(input), "Encore of Light should convert low MP pressure when Guard is unavailable");
+}
+
+static void BardEncoreOfLightRejectsBlockedFiller()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(
+			1,
+			healthRatio: 0.85f,
+			currentMp: PvPScoringFactors.LowMp,
+			hasGuard: true,
+			guardAvailability: PvPGuardAvailability.Active),
+		hasFinalFantasia: true,
+		hasFrontlinersMarch: true);
+
+	AssertFalse(BardPvPOffensiveDecisionPolicy.ShouldUseEncoreOfLight(input), "Encore of Light should not spend into blocked damage");
+}
+
+static void BardEncoreOfLightRejectsGuardReactionConversion()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(
+			1,
+			healthRatio: 0.85f,
+			currentMp: PvPScoringFactors.LowMp,
+			guardAvailability: PvPGuardAvailability.Ready),
+		hasFinalFantasia: true,
+		hasFrontlinersMarch: true,
+		hasGuardCooldownKnowledge: true);
+
+	AssertFalse(BardPvPOffensiveDecisionPolicy.ShouldUseEncoreOfLight(input), "Encore of Light should hold low MP conversion when the target can Guard and no priority signal exists");
+}
+
+static void BardPowerfulShotAcceptsSafePressureFiller()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(1, healthRatio: 0.55f, currentMp: PvPScoringFactors.MediumMp));
+
+	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUsePowerfulShot(input), "Powerful Shot should fill safe pressure into a low resource kill window");
+}
+
+static void BardPowerfulShotRejectsBlockedTarget()
+{
+	var input = BardOffensiveInput(
+		BardOffensiveTarget(
+			1,
+			healthRatio: 0.55f,
+			currentMp: PvPScoringFactors.MediumMp,
+			hasGuard: true));
+
+	AssertFalse(BardPvPOffensiveDecisionPolicy.ShouldUsePowerfulShot(input), "Powerful Shot should not spend into blocked targets");
+}
+
+static void BardOffensiveDecisionPolicyRerunsLiveGuardState()
+{
+	var target = BardOffensiveTarget(1, healthRatio: 0.55f, currentMp: PvPScoringFactors.MediumMp);
+	var clearInput = BardOffensiveInput(target);
+	var guardedInput = clearInput with { Target = target with { HasGuard = true } };
+
+	AssertTrue(BardPvPOffensiveDecisionPolicy.ShouldUsePowerfulShot(clearInput), "Bard should accept safe pressure before a live Guard refresh");
+	AssertFalse(BardPvPOffensiveDecisionPolicy.ShouldUsePowerfulShot(guardedInput), "Bard should reject the same target after live state refresh shows Guard");
+}
+
 static MachinistPvPTargetSnapshot MachinistTarget(
 	ulong targetId,
 	float healthRatio,
@@ -1968,6 +2165,39 @@ static BardPvPTargetSnapshot BardOffensiveTarget(
 		LineTargetCount: lineTargetCount,
 		SplashTargetCount: splashTargetCount,
 		GuardAvailability: guardAvailability);
+}
+
+static BardPvPOffensiveDecisionInput BardOffensiveInput(
+	BardPvPTargetSnapshot target,
+	bool followUpAvailable = false,
+	bool alliesCanBurst = false,
+	bool objectiveControlNeeded = false,
+	bool targetCommitted = false,
+	bool hasFinalFantasia = false,
+	bool hasFrontlinersMarch = false,
+	bool hasRepertoire = false,
+	bool hasBlastArrowReady = false,
+	bool harmonicWouldOvercap = false,
+	bool forcedExpiryWindow = false,
+	bool peelValueNeeded = false,
+	double expectedDamageRatio = 0.0,
+	bool hasGuardCooldownKnowledge = false)
+{
+	return new BardPvPOffensiveDecisionInput(
+		Target: target,
+		FollowUpAvailable: followUpAvailable,
+		AlliesCanBurst: alliesCanBurst,
+		ObjectiveControlNeeded: objectiveControlNeeded,
+		TargetCommitted: targetCommitted,
+		HasFinalFantasia: hasFinalFantasia,
+		HasFrontlinersMarch: hasFrontlinersMarch,
+		HasRepertoire: hasRepertoire,
+		HasBlastArrowReady: hasBlastArrowReady,
+		HarmonicWouldOvercap: harmonicWouldOvercap,
+		ForcedExpiryWindow: forcedExpiryWindow,
+		PeelValueNeeded: peelValueNeeded,
+		ExpectedDamageRatio: expectedDamageRatio,
+		HasGuardCooldownKnowledge: hasGuardCooldownKnowledge);
 }
 
 static void PvpLbJsonContainsVerifiedEntries()
