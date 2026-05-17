@@ -144,7 +144,7 @@ internal static class BardPvPTargetPolicy
 			score += ControlledScore;
 		}
 
-		if (target.IsExposed)
+		if (HasExposureValue(target, intent))
 		{
 			score += ExposedScore;
 		}
@@ -202,6 +202,11 @@ internal static class BardPvPTargetPolicy
 	private static bool IgnoresGuard(BardPvPActionIntent intent)
 	{
 		return intent == BardPvPActionIntent.EagleEyeShot;
+	}
+
+	private static bool HasExposureValue(BardPvPTargetSnapshot target, BardPvPActionIntent intent)
+	{
+		return target.IsExposed || (IgnoresGuard(intent) && target.HasGuard && target.IsInNormalRange);
 	}
 
 	private static double HealthPressure(float healthRatio)

@@ -100,6 +100,7 @@ var tests = new (string Name, Action Test)[]
 	("bard offensive target policy uses pitch perfect splash value", BardOffensiveTargetPolicyUsesPitchPerfectSplashValue),
 	("bard offensive target policy rejects out of range target", BardOffensiveTargetPolicyRejectsOutOfRangeTarget),
 	("bard offensive target policy keeps eagle eye guard target", BardOffensiveTargetPolicyKeepsEagleEyeGuardTarget),
+	("bard offensive target policy treats guarded eagle eye target as exposed", BardOffensiveTargetPolicyTreatsGuardedEagleEyeTargetAsExposed),
 	("bard offensive target policy preserves eagle eye mitigation", BardOffensiveTargetPolicyPreservesEagleEyeMitigation),
 	("bard offensive target policy penalizes blast resilience", BardOffensiveTargetPolicyPenalizesBlastResilience),
 	("bard harmonic arrow rejects guarded nonlethal target", BardHarmonicArrowRejectsGuardedNonlethalTarget),
@@ -1866,6 +1867,29 @@ static void BardOffensiveTargetPolicyKeepsEagleEyeGuardTarget()
 	var exposedScore = BardPvPTargetPolicy.Score(exposedTarget, BardPvPActionIntent.EagleEyeShot);
 
 	AssertEqual(exposedScore, guardedScore, "Eagle Eye Shot should not penalize Guard because the role action ignores Guard");
+}
+
+static void BardOffensiveTargetPolicyTreatsGuardedEagleEyeTargetAsExposed()
+{
+	const ulong guardedTargetId = 1;
+	const ulong exposedTargetId = 2;
+	const float targetHealthRatio = 0.40f;
+	const uint fullMp = 10_000;
+	const double noExpectedDamage = 0.0;
+	var guardedTarget = BardOffensiveTarget(
+		guardedTargetId,
+		healthRatio: targetHealthRatio,
+		currentMp: fullMp,
+		hasGuard: true,
+		isExposed: false,
+		isInNormalRange: true,
+		expectedDamageRatio: noExpectedDamage);
+	var exposedTarget = guardedTarget with { TargetId = exposedTargetId, HasGuard = false, IsExposed = true };
+
+	var guardedScore = BardPvPTargetPolicy.Score(guardedTarget, BardPvPActionIntent.EagleEyeShot);
+	var exposedScore = BardPvPTargetPolicy.Score(exposedTarget, BardPvPActionIntent.EagleEyeShot);
+
+	AssertEqual(exposedScore, guardedScore, "Eagle Eye Shot should treat guarded in-range targets as exposed because it ignores Guard");
 }
 
 static void BardOffensiveTargetPolicyPreservesEagleEyeMitigation()
