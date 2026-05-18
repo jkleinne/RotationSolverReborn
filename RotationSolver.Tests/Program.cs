@@ -51,6 +51,8 @@ var tests = new (string Name, Action Test)[]
 	("machinist marksmans spite rejects guard", MachinistMarksmanSpiteRejectsGuard),
 	("machinist marksmans spite holds on dying ally focused target", MachinistMarksmanSpiteHoldsOnDyingAllyFocusedTarget),
 	("machinist marksmans spite accepts secure damage", MachinistMarksmanSpiteAcceptsSecureDamage),
+	("machinist marksmans spite rejects guard ready solo execute target", MachinistMarksmanSpiteRejectsGuardReadySoloExecuteTarget),
+	("machinist marksmans spite rejects unknown guard solo execute target", MachinistMarksmanSpiteRejectsUnknownGuardSoloExecuteTarget),
 	("machinist marksmans spite rejects low mp nonlethal target", MachinistMarksmanSpiteRejectsLowMpNonlethalTarget),
 	("machinist marksmans spite accepts ally backed nonlethal target", MachinistMarksmanSpiteAcceptsAllyBackedNonlethalTarget),
 	("machinist marksmans spite accepts focused allied burst nonlethal target", MachinistMarksmanSpiteAcceptsFocusedAlliedBurstNonlethalTarget),
@@ -66,11 +68,13 @@ var tests = new (string Name, Action Test)[]
 	("machinist marksmans spite rejects unsupported vulnerable target", MachinistMarksmanSpiteRejectsUnsupportedVulnerableTarget),
 	("machinist marksmans spite rejects active invulnerability", MachinistMarksmanSpiteRejectsActiveInvulnerability),
 	("machinist marksmans spite accepts mitigated secure kill", MachinistMarksmanSpiteAcceptsMitigatedSecureKill),
-	("machinist marksmans spite ignores guard readiness without cooldown knowledge", MachinistMarksmanSpiteIgnoresGuardReadinessWithoutCooldownKnowledge),
+	("machinist marksmans spite rejects conversion without guard cooldown knowledge", MachinistMarksmanSpiteRejectsConversionWithoutGuardCooldownKnowledge),
 	("machinist marksmans spite rejects guard ready conversion target", MachinistMarksmanSpiteRejectsGuardReadyConversionTarget),
 	("machinist marksmans spite rejects unknown guard conversion target", MachinistMarksmanSpiteRejectsUnknownGuardConversionTarget),
 	("machinist marksmans spite accepts guard cooldown conversion target", MachinistMarksmanSpiteAcceptsGuardCooldownConversionTarget),
-	("machinist marksmans spite accepts unknown guard lethal emergency", MachinistMarksmanSpiteAcceptsUnknownGuardLethalEmergency),
+	("machinist marksmans spite rejects focused finisher in strict mode", MachinistMarksmanSpiteRejectsFocusedFinisherInStrictMode),
+	("machinist marksmans spite accepts strict execute on guard cooldown", MachinistMarksmanSpiteAcceptsStrictExecuteOnGuardCooldown),
+	("machinist marksmans spite rejects unknown guard lethal emergency", MachinistMarksmanSpiteRejectsUnknownGuardLethalEmergency),
 	("machinist marksmans spite identity rejects adjusted drill", MachinistMarksmanSpiteIdentityRejectsAdjustedDrill),
 	("machinist marksmans spite live guard veto blocks inherited pierce", MachinistMarksmanSpiteLiveGuardVetoBlocksInheritedPierce),
 	("machinist analysis chain saw accepts low resource kill window", MachinistAnalysisChainSawAcceptsLowResourceKillWindow),
@@ -1051,6 +1055,48 @@ static void MachinistMarksmanSpiteAcceptsSecureDamage()
 	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should convert targets inside secure damage range");
 }
 
+static void MachinistMarksmanSpiteRejectsGuardReadySoloExecuteTarget()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.55f,
+			currentMp: 2_000,
+			effectiveHealthRatio: 0.55,
+			expectedDamageRatio: 0.67,
+			guardAvailability: PvPGuardAvailability.Ready),
+		ExpectedDamageRatio: 0.67,
+		SafeCloseRange: true,
+		FollowUpAvailable: false,
+		AlliesCanBurst: false,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: true,
+		HasGuardCooldownKnowledge: true);
+
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should not spend on a solo execute target who can Guard on reaction");
+}
+
+static void MachinistMarksmanSpiteRejectsUnknownGuardSoloExecuteTarget()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.55f,
+			currentMp: 2_000,
+			effectiveHealthRatio: 0.55,
+			expectedDamageRatio: 0.67,
+			guardAvailability: PvPGuardAvailability.Unknown),
+		ExpectedDamageRatio: 0.67,
+		SafeCloseRange: true,
+		FollowUpAvailable: false,
+		AlliesCanBurst: false,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: true,
+		HasGuardCooldownKnowledge: true);
+
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should not spend on a solo execute target with unknown Guard availability");
+}
+
 static void MachinistMarksmanSpiteRejectsLowMpNonlethalTarget()
 {
 	var input = new MachinistPvPDecisionInput(
@@ -1079,13 +1125,15 @@ static void MachinistMarksmanSpiteAcceptsAllyBackedNonlethalTarget()
 			currentMp: 2_000,
 			hasAllyFocus: true,
 			effectiveHealthRatio: 0.68,
-			expectedDamageRatio: 0.67),
+			expectedDamageRatio: 0.67,
+			guardAvailability: PvPGuardAvailability.CoolingDown),
 		ExpectedDamageRatio: 0.67,
 		SafeCloseRange: true,
 		FollowUpAvailable: true,
 		AlliesCanBurst: true,
 		ObjectiveControlNeeded: false,
-		TargetCommitted: true);
+		TargetCommitted: true,
+		HasGuardCooldownKnowledge: true);
 
 	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should fire when allies can convert the leftover health");
 }
@@ -1099,13 +1147,15 @@ static void MachinistMarksmanSpiteAcceptsFocusedAlliedBurstNonlethalTarget()
 			currentMp: 2_000,
 			hasAllyFocus: true,
 			effectiveHealthRatio: 0.68,
-			expectedDamageRatio: 0.67),
+			expectedDamageRatio: 0.67,
+			guardAvailability: PvPGuardAvailability.CoolingDown),
 		ExpectedDamageRatio: 0.67,
 		SafeCloseRange: true,
 		FollowUpAvailable: false,
 		AlliesCanBurst: true,
 		ObjectiveControlNeeded: false,
-		TargetCommitted: true);
+		TargetCommitted: true,
+		HasGuardCooldownKnowledge: true);
 
 	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should fire when allied burst can convert the leftover health");
 }
@@ -1119,13 +1169,15 @@ static void MachinistMarksmanSpiteAcceptsObjectiveBackedNonlethalTarget()
 			currentMp: 2_000,
 			hasAllyFocus: true,
 			effectiveHealthRatio: 0.68,
-			expectedDamageRatio: 0.67),
+			expectedDamageRatio: 0.67,
+			guardAvailability: PvPGuardAvailability.CoolingDown),
 		ExpectedDamageRatio: 0.67,
 		SafeCloseRange: true,
 		FollowUpAvailable: false,
 		AlliesCanBurst: true,
 		ObjectiveControlNeeded: true,
-		TargetCommitted: true);
+		TargetCommitted: true,
+		HasGuardCooldownKnowledge: true);
 
 	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should fire when focused objective pressure can convert the leftover health");
 }
@@ -1255,13 +1307,15 @@ static void MachinistMarksmanSpiteAcceptsVulnerableTarget()
 			hasAllyFocus: true,
 			isVulnerable: true,
 			effectiveHealthRatio: 0.68,
-			expectedDamageRatio: 0.67),
+			expectedDamageRatio: 0.67,
+			guardAvailability: PvPGuardAvailability.CoolingDown),
 		ExpectedDamageRatio: 0.67,
 		SafeCloseRange: true,
 		FollowUpAvailable: false,
 		AlliesCanBurst: true,
 		ObjectiveControlNeeded: false,
-		TargetCommitted: true);
+		TargetCommitted: true,
+		HasGuardCooldownKnowledge: true);
 
 	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should accept vulnerable targets when focused pressure can convert the leftover health");
 }
@@ -1327,7 +1381,7 @@ static void MachinistMarksmanSpiteAcceptsMitigatedSecureKill()
 	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should fire through mitigation when expected damage still kills");
 }
 
-static void MachinistMarksmanSpiteIgnoresGuardReadinessWithoutCooldownKnowledge()
+static void MachinistMarksmanSpiteRejectsConversionWithoutGuardCooldownKnowledge()
 {
 	var input = new MachinistPvPDecisionInput(
 		Target: MachinistTarget(
@@ -1345,7 +1399,7 @@ static void MachinistMarksmanSpiteIgnoresGuardReadinessWithoutCooldownKnowledge(
 		ObjectiveControlNeeded: false,
 		TargetCommitted: true);
 
-	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should preserve existing non-CC conversion behavior without Guard cooldown knowledge");
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should require Guard cooldown knowledge before spending on a focused conversion target");
 }
 
 static void MachinistMarksmanSpiteRejectsGuardReadyConversionTarget()
@@ -1414,7 +1468,52 @@ static void MachinistMarksmanSpiteAcceptsGuardCooldownConversionTarget()
 	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should allow existing conversion gates when Guard is confirmed unavailable");
 }
 
-static void MachinistMarksmanSpiteAcceptsUnknownGuardLethalEmergency()
+static void MachinistMarksmanSpiteRejectsFocusedFinisherInStrictMode()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.68f,
+			currentMp: 2_000,
+			hasAllyFocus: true,
+			effectiveHealthRatio: 0.68,
+			expectedDamageRatio: 0.67,
+			guardAvailability: PvPGuardAvailability.CoolingDown),
+		ExpectedDamageRatio: 0.67,
+		SafeCloseRange: true,
+		FollowUpAvailable: true,
+		AlliesCanBurst: true,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: true,
+		HasGuardCooldownKnowledge: true,
+		StrictMarksmanExecuteOnly: true);
+
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Strict Marksman's Spite mode should reject focused team finishers");
+}
+
+static void MachinistMarksmanSpiteAcceptsStrictExecuteOnGuardCooldown()
+{
+	var input = new MachinistPvPDecisionInput(
+		Target: MachinistTarget(
+			1,
+			healthRatio: 0.40f,
+			currentMp: 2_000,
+			effectiveHealthRatio: 0.40,
+			expectedDamageRatio: 0.67,
+			guardAvailability: PvPGuardAvailability.CoolingDown),
+		ExpectedDamageRatio: 0.67,
+		SafeCloseRange: true,
+		FollowUpAvailable: false,
+		AlliesCanBurst: false,
+		ObjectiveControlNeeded: false,
+		TargetCommitted: true,
+		HasGuardCooldownKnowledge: true,
+		StrictMarksmanExecuteOnly: true);
+
+	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Strict Marksman's Spite mode should still accept a clear execute when Guard is cooling down");
+}
+
+static void MachinistMarksmanSpiteRejectsUnknownGuardLethalEmergency()
 {
 	var input = new MachinistPvPDecisionInput(
 		Target: MachinistTarget(
@@ -1431,7 +1530,7 @@ static void MachinistMarksmanSpiteAcceptsUnknownGuardLethalEmergency()
 		TargetCommitted: true,
 		HasGuardCooldownKnowledge: true);
 
-	AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite should still fire when lethal objective pressure is worth the Guard reaction risk");
+	AssertFalse(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Marksman's Spite objective pressure should not override unknown Guard availability");
 }
 
 static void MachinistMarksmanSpiteIdentityRejectsAdjustedDrill()

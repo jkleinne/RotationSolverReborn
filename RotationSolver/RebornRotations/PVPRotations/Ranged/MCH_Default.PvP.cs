@@ -521,7 +521,8 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 			ObjectiveControlNeeded: objectiveControlNeeded,
 			TargetCommitted: IsTargetCommitted(snapshot, target, objectiveControlNeeded),
 			ExpectedDamageRatio: snapshot.ExpectedDamageRatio,
-			HasGuardCooldownKnowledge: DataCenter.IsInCrystallineConflict);
+			HasGuardCooldownKnowledge: DataCenter.IsInCrystallineConflict,
+			StrictMarksmanExecuteOnly: Service.Config.MachinistMarksmansSpiteStrictExecuteOnly);
 	}
 
 	private static double ExpectedDamageRatio(
