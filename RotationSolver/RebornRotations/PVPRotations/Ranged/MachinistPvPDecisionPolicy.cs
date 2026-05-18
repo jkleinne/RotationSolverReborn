@@ -10,7 +10,8 @@ internal readonly record struct MachinistPvPDecisionInput(
 	bool ObjectiveControlNeeded,
 	bool TargetCommitted,
 	double ExpectedDamageRatio = 0.0,
-	bool HasGuardCooldownKnowledge = false);
+	bool HasGuardCooldownKnowledge = false,
+	bool StrictMarksmanExecuteOnly = false);
 
 internal readonly record struct MachinistPvPLiveGuardInput(
 	bool TargetHasGuard,
@@ -166,17 +167,17 @@ internal static class MachinistPvPDecisionPolicy
 			return false;
 		}
 
-		if (input.HasGuardCooldownKnowledge && CanTargetReactWithGuard(input) && !HasMarksmanExtremeNecessity(input))
+		if (HasMarksmanTrueExecute(input))
+		{
+			return true;
+		}
+
+		if (input.StrictMarksmanExecuteOnly)
 		{
 			return false;
 		}
 
-		if (gateDecision == PvPBurstRecommendation.Secure)
-		{
-			return HasMarksmanSecureDamage(input) || HasMarksmanConversionSignal(input);
-		}
-
-		return HasMarksmanConversionSignal(input);
+		return HasMarksmanFocusedTeamFinisher(input);
 	}
 
 	internal static bool IsDirectMarksmansSpiteAction(uint actionId, uint adjustedActionId)
@@ -270,22 +271,23 @@ internal static class MachinistPvPDecisionPolicy
 		return input.Target.EffectiveHealthRatio + MarksmanSecureSafetyMarginRatio <= input.ExpectedDamageRatio;
 	}
 
-	private static bool HasMarksmanExtremeNecessity(MachinistPvPDecisionInput input)
+	private static bool HasMarksmanTrueExecute(MachinistPvPDecisionInput input)
 	{
-		if (!HasMarksmanSecureDamage(input))
-		{
-			return false;
-		}
-
-		return input.ObjectiveControlNeeded
-			|| input.Target.CurrentMp <= PvPScoringFactors.LowMp
-			|| input.Target.IsVulnerable
-			|| (input.Target.HasAllyFocus && input.FollowUpAvailable);
+		return HasMarksmanSecureDamage(input)
+			&& CanSpendMarksmanBeforeGuard(input);
 	}
 
-	private static bool CanTargetReactWithGuard(MachinistPvPDecisionInput input)
+	private static bool CanSpendMarksmanBeforeGuard(MachinistPvPDecisionInput input)
 	{
-		return input.Target.GuardAvailability is PvPGuardAvailability.Ready or PvPGuardAvailability.Unknown;
+		return !input.HasGuardCooldownKnowledge
+			|| input.Target.GuardAvailability == PvPGuardAvailability.CoolingDown;
+	}
+
+	private static bool HasMarksmanFocusedTeamFinisher(MachinistPvPDecisionInput input)
+	{
+		return input.HasGuardCooldownKnowledge
+			&& input.Target.GuardAvailability == PvPGuardAvailability.CoolingDown
+			&& HasMarksmanConversionSignal(input);
 	}
 
 	private static bool HasMarksmanConvertibleLeftover(MachinistPvPDecisionInput input)

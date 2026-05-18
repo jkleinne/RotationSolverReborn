@@ -252,6 +252,9 @@ internal partial class Configs : IPluginConfiguration
 	[ConditionBool, UI("Conserve burst in PvP unless the target is valuable, vulnerable, or killable.", Filter = DutySpecifcPvP)]
 	private static readonly bool _pvpBurstConservation = true;
 
+	[ConditionBool, UI("Only use Machinist Marksman's Spite in PvP when it is a strict execute.", Filter = DutySpecifcPvP)]
+	private static readonly bool _machinistMarksmansSpiteStrictExecuteOnly = false;
+
 	[ConditionBool, UI("Prioritize A tier tomeliths in Shatter.", Filter = DutySpecifcPvP)]
 	private static readonly bool _prioAtomelith = false;
 
