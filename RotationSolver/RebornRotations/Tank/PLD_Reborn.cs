@@ -207,7 +207,7 @@ public sealed class PLD_Reborn : PaladinRotation
 		return base.DefenseAreaAbility(nextGCD, out act);
 	}
 
-	[RotationDesc(ActionID.SentinelPvE, ActionID.RampartPvE, ActionID.BulwarkPvE, ActionID.SheltronPvE, ActionID.ReprisalPvE)]
+	[RotationDesc(ActionID.SentinelPvE, ActionID.GuardianPvE, ActionID.RampartPvE, ActionID.BulwarkPvE, ActionID.SheltronPvE, ActionID.ReprisalPvE)]
 	protected override bool DefenseSingleAbility(IAction nextGCD, out IAction? act)
 	{
 		if (InterventionTank && InterventionPvE.CanUse(out act))
@@ -230,24 +230,43 @@ public sealed class PLD_Reborn : PaladinRotation
 				return true;
 			}
 
-			// If Rampart is not cooling down or has been cooling down for more than 60 seconds, and Sentinel can be used, use Sentinel and return true.
-			if ((!RampartPvE.Cooldown.IsCoolingDown || RampartPvE.Cooldown.ElapsedAfter(60)) && GuardianPvE.CanUse(out act) && GuardianPvE.EnoughLevel)
+			const int strongMitigationSpacingSeconds = 60;
+			const int rampartFallbackDelaySeconds = 30;
+
+			if ((!RampartPvE.Cooldown.IsCoolingDown || RampartPvE.Cooldown.ElapsedAfter(strongMitigationSpacingSeconds)) && GuardianPvE.EnoughLevel && GuardianPvE.CanUse(out act))
 			{
 				return true;
 			}
 
-			if ((!RampartPvE.Cooldown.IsCoolingDown || RampartPvE.Cooldown.ElapsedAfter(60)) && SentinelPvE.CanUse(out act) && !GuardianPvE.EnoughLevel)
+			if ((!RampartPvE.Cooldown.IsCoolingDown || RampartPvE.Cooldown.ElapsedAfter(strongMitigationSpacingSeconds)) && !GuardianPvE.EnoughLevel && SentinelPvE.CanUse(out act))
 			{
 				return true;
 			}
 
-			// If Sentinel is at an enough level and is cooling down for more than 60 seconds, or if Sentinel is not at an enough level, and Rampart can be used, use Rampart and return true.
-			if (((GuardianPvE.EnoughLevel && GuardianPvE.Cooldown.IsCoolingDown && GuardianPvE.Cooldown.ElapsedAfter(60)) || (!GuardianPvE.EnoughLevel && SentinelPvE.EnoughLevel && SentinelPvE.Cooldown.IsCoolingDown && SentinelPvE.Cooldown.ElapsedAfter(60)) || !SentinelPvE.EnoughLevel) && RampartPvE.CanUse(out act))
+			if (!SentinelPvE.EnoughLevel)
 			{
-				return true;
+				if (RampartPvE.CanUse(out act))
+				{
+					return true;
+				}
 			}
 
-			// If Reprisal can be used, use it and return true.
+			if (SentinelPvE.EnoughLevel && !GuardianPvE.EnoughLevel)
+			{
+				if (SentinelPvE.Cooldown.IsCoolingDown && SentinelPvE.Cooldown.ElapsedAfter(rampartFallbackDelaySeconds) && RampartPvE.CanUse(out act))
+				{
+					return true;
+				}
+			}
+
+			if (GuardianPvE.EnoughLevel)
+			{
+				if (GuardianPvE.Cooldown.IsCoolingDown && GuardianPvE.Cooldown.ElapsedAfter(rampartFallbackDelaySeconds) && RampartPvE.CanUse(out act))
+				{
+					return true;
+				}
+			}
+
 			if (ReprisalPvE.CanUse(out act, skipAoeCheck: true))
 			{
 				return true;

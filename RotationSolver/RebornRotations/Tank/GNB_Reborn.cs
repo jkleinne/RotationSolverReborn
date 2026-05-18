@@ -82,7 +82,7 @@ public sealed class GNB_Reborn : GunbreakerRotation
 		return base.DefenseAreaAbility(nextGCD, out act);
 	}
 
-	[RotationDesc(ActionID.HeartOfStonePvE, ActionID.NebulaPvE, ActionID.RampartPvE, ActionID.CamouflagePvE, ActionID.ReprisalPvE)]
+	[RotationDesc(ActionID.HeartOfStonePvE, ActionID.NebulaPvE, ActionID.GreatNebulaPvE, ActionID.RampartPvE, ActionID.CamouflagePvE, ActionID.ReprisalPvE)]
 	protected override bool DefenseSingleAbility(IAction nextGCD, out IAction? act)
 	{
 		if (nextGCD.IsTheSameTo(false, (ActionID)GnashingFangPvE.ID) && !NoMercyPvE.Cooldown.IsCoolingDown)
@@ -120,18 +120,46 @@ public sealed class GNB_Reborn : GunbreakerRotation
 			}
 		}
 
+		const int strongMitigationSpacingSeconds = 60;
+		const int rampartFallbackDelaySeconds = 30;
+
 		//30
-		if ((!RampartPvE.Cooldown.IsCoolingDown || RampartPvE.Cooldown.ElapsedAfter(60)) && NebulaPvE.CanUse(out act))
-		{
-			return true;
-		}
-		//20
-		if (NebulaPvE.Cooldown.IsCoolingDown && NebulaPvE.Cooldown.ElapsedAfter(60) && RampartPvE.CanUse(out act))
+		if ((!RampartPvE.Cooldown.IsCoolingDown || RampartPvE.Cooldown.ElapsedAfter(strongMitigationSpacingSeconds)) && GreatNebulaPvE.EnoughLevel && GreatNebulaPvE.CanUse(out act))
 		{
 			return true;
 		}
 
-		if (ReprisalPvE.CanUse(out act))
+		if ((!RampartPvE.Cooldown.IsCoolingDown || RampartPvE.Cooldown.ElapsedAfter(strongMitigationSpacingSeconds)) && !GreatNebulaPvE.EnoughLevel && NebulaPvE.CanUse(out act))
+		{
+			return true;
+		}
+
+		//20
+		if (!NebulaPvE.EnoughLevel)
+		{
+			if (RampartPvE.CanUse(out act))
+			{
+				return true;
+			}
+		}
+
+		if (NebulaPvE.EnoughLevel && !GreatNebulaPvE.EnoughLevel)
+		{
+			if (NebulaPvE.Cooldown.IsCoolingDown && NebulaPvE.Cooldown.ElapsedAfter(rampartFallbackDelaySeconds) && RampartPvE.CanUse(out act))
+			{
+				return true;
+			}
+		}
+
+		if (GreatNebulaPvE.EnoughLevel)
+		{
+			if (GreatNebulaPvE.Cooldown.IsCoolingDown && GreatNebulaPvE.Cooldown.ElapsedAfter(rampartFallbackDelaySeconds) && RampartPvE.CanUse(out act))
+			{
+				return true;
+			}
+		}
+
+		if (ReprisalPvE.CanUse(out act, skipAoeCheck: true))
 		{
 			return true;
 		}
