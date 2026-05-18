@@ -136,29 +136,46 @@ public sealed class DRK_Reborn : DarkKnightRotation
 			return true;
 		}
 
+		const int strongMitigationSpacingSeconds = 60;
+		const int rampartFallbackDelaySeconds = 30;
+
 		//30
-		if ((!RampartPvE.Cooldown.IsCoolingDown || RampartPvE.Cooldown.ElapsedAfter(60)) && ShadowWallPvE.CanUse(out act))
+		if ((!RampartPvE.Cooldown.IsCoolingDown || RampartPvE.Cooldown.ElapsedAfter(strongMitigationSpacingSeconds)) && ShadowedVigilPvE.EnoughLevel && ShadowedVigilPvE.CanUse(out act))
 		{
 			return true;
 		}
 
-		if ((!RampartPvE.Cooldown.IsCoolingDown || RampartPvE.Cooldown.ElapsedAfter(60)) && ShadowedVigilPvE.CanUse(out act))
+		if ((!RampartPvE.Cooldown.IsCoolingDown || RampartPvE.Cooldown.ElapsedAfter(strongMitigationSpacingSeconds)) && !ShadowedVigilPvE.EnoughLevel && ShadowWallPvE.CanUse(out act))
 		{
 			return true;
 		}
 
 		//20
-		if (ShadowWallPvE.Cooldown.IsCoolingDown && ShadowWallPvE.Cooldown.ElapsedAfter(60) && RampartPvE.CanUse(out act))
+		if (!ShadowWallPvE.EnoughLevel)
 		{
-			return true;
+			if (RampartPvE.CanUse(out act))
+			{
+				return true;
+			}
 		}
 
-		if (ShadowedVigilPvE.Cooldown.IsCoolingDown && ShadowedVigilPvE.Cooldown.ElapsedAfter(60) && RampartPvE.CanUse(out act))
+		if (ShadowWallPvE.EnoughLevel && !ShadowedVigilPvE.EnoughLevel)
 		{
-			return true;
+			if (ShadowWallPvE.Cooldown.IsCoolingDown && ShadowWallPvE.Cooldown.ElapsedAfter(rampartFallbackDelaySeconds) && RampartPvE.CanUse(out act))
+			{
+				return true;
+			}
 		}
 
-		if (ReprisalPvE.CanUse(out act))
+		if (ShadowedVigilPvE.EnoughLevel)
+		{
+			if (ShadowedVigilPvE.Cooldown.IsCoolingDown && ShadowedVigilPvE.Cooldown.ElapsedAfter(rampartFallbackDelaySeconds) && RampartPvE.CanUse(out act))
+			{
+				return true;
+			}
+		}
+
+		if (ReprisalPvE.CanUse(out act, skipAoeCheck: true))
 		{
 			return true;
 		}

@@ -202,7 +202,7 @@ public sealed class WAR_Reborn : WarriorRotation
 		return base.HealSingleAbility(nextGCD, out act);
 	}
 
-	[RotationDesc(ActionID.RawIntuitionPvE, ActionID.VengeancePvE, ActionID.RampartPvE, ActionID.RawIntuitionPvE, ActionID.ReprisalPvE)]
+	[RotationDesc(ActionID.RawIntuitionPvE, ActionID.VengeancePvE, ActionID.DamnationPvE, ActionID.RampartPvE, ActionID.RawIntuitionPvE, ActionID.ReprisalPvE)]
 	protected override bool DefenseSingleAbility(IAction nextGCD, out IAction? act)
 	{
 		var RawSingleTargets = SoloIntuition;
@@ -223,25 +223,44 @@ public sealed class WAR_Reborn : WarriorRotation
 			return false;
 		}
 
-		if (ReprisalPvE.CanUse(out act, skipAoeCheck: true))
+		const int strongMitigationSpacingSeconds = 60;
+		const int rampartFallbackDelaySeconds = 30;
+
+		if ((!RampartPvE.Cooldown.IsCoolingDown || RampartPvE.Cooldown.ElapsedAfter(strongMitigationSpacingSeconds)) && DamnationPvE.EnoughLevel && DamnationPvE.CanUse(out act))
 		{
 			return true;
 		}
 
-		if ((!RampartPvE.Cooldown.IsCoolingDown || RampartPvE.Cooldown.ElapsedAfter(60)) && !StatusHelper.PlayerHasStatus(true, StatusID.ArmsLength))
+		if ((!RampartPvE.Cooldown.IsCoolingDown || RampartPvE.Cooldown.ElapsedAfter(strongMitigationSpacingSeconds)) && !DamnationPvE.EnoughLevel && VengeancePvE.CanUse(out act))
 		{
-			if (DamnationPvE.EnoughLevel && DamnationPvE.CanUse(out act))
-			{
-				return true;
-			}
+			return true;
+		}
 
-			if (!DamnationPvE.EnoughLevel && VengeancePvE.CanUse(out act))
+		if (!VengeancePvE.EnoughLevel)
+		{
+			if (RampartPvE.CanUse(out act))
 			{
 				return true;
 			}
 		}
 
-		if (((VengeancePvE.Cooldown.IsCoolingDown && VengeancePvE.Cooldown.ElapsedAfter(60)) || !VengeancePvE.EnoughLevel) && RampartPvE.CanUse(out act))
+		if (VengeancePvE.EnoughLevel && !DamnationPvE.EnoughLevel)
+		{
+			if (VengeancePvE.Cooldown.IsCoolingDown && VengeancePvE.Cooldown.ElapsedAfter(rampartFallbackDelaySeconds) && RampartPvE.CanUse(out act))
+			{
+				return true;
+			}
+		}
+
+		if (DamnationPvE.EnoughLevel)
+		{
+			if (DamnationPvE.Cooldown.IsCoolingDown && DamnationPvE.Cooldown.ElapsedAfter(rampartFallbackDelaySeconds) && RampartPvE.CanUse(out act))
+			{
+				return true;
+			}
+		}
+
+		if (ReprisalPvE.CanUse(out act, skipAoeCheck: true))
 		{
 			return true;
 		}

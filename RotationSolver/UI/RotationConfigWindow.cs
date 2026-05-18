@@ -4583,6 +4583,9 @@ public partial class RotationConfigWindow : Window
 			ImGui.Text($"Fate ID: {DataCenter.PlayerFateId}");
 		}
 		ImGui.Spacing();
+		ImGui.Text($"In Field Operations: {DataCenter.IsInFieldOperations}");
+		ImGui.Text($"In Field Raid: {DataCenter.IsInFieldRaid}");
+		ImGui.Spacing();
 		ImGui.Text($"IsInBozjanFieldOp: {DataCenter.IsInBozjanFieldOp}");
 		ImGui.Text($"IsInBozjanFieldOpCE: {DataCenter.IsInBozjanFieldOpCE}");
 		ImGui.Text($"IsInDelubrumNormal: {DataCenter.IsInDelubrumNormal}");
