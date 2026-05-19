@@ -304,20 +304,6 @@ public sealed class BRD_DefaultPvP : BardRotation
 		return count;
 	}
 
-	private static int CountAlliesTargeting(IBattleChara target)
-	{
-		var count = 0;
-		foreach (var member in PartyMembers)
-		{
-			if (member != null && member.TargetObjectId == target.GameObjectId)
-			{
-				count++;
-			}
-		}
-
-		return count;
-	}
-
 	private static bool IsPushingIntoEnemies(IBattleChara ally)
 	{
 		var smartTarget = HostileTarget;
@@ -477,31 +463,6 @@ public sealed class BRD_DefaultPvP : BardRotation
 			StatusID.MiracleOfNature);
 	}
 
-	private static bool HasNonGuardInvulnerability(IBattleChara target, IMitigationDatabase database)
-	{
-		var statusList = target.StatusList;
-		if (statusList == null)
-		{
-			return false;
-		}
-
-		foreach (var status in statusList)
-		{
-			var statusId = (StatusID)status.StatusId;
-			if (statusId == StatusID.Guard)
-			{
-				continue;
-			}
-
-			if (database.TryGet(statusId, out var entry) && entry.Kind == MitigationKind.Invuln)
-			{
-				return true;
-			}
-		}
-
-		return false;
-	}
-
 	private static BardPvPShutdownInput BuildShutdownInput(IBaseAction action, bool safeBackstepExists)
 	{
 		var target = action.Target.Target;
@@ -638,22 +599,27 @@ public sealed class BRD_DefaultPvP : BardRotation
 	{
 		action = null;
 
-		foreach (var targetSnapshot in RankTargets(intent, baseAction.TargetInfo.Range))
+		var rankedTargets = RankTargets(intent, baseAction.TargetInfo.Range, out var context);
+		foreach (var targetSnapshot in rankedTargets)
 		{
-			var target = FindHostileById(targetSnapshot.TargetId);
+			var target = PvPLiveTargetFactsBuilder.FindLiveTargetById(AllHostileTargets, targetSnapshot.TargetId);
 			if (target == null)
 			{
 				continue;
 			}
 
-			var input = CreateDecisionInput(targetSnapshot, target, intent, baseAction);
+			var input = CreateDecisionInput(targetSnapshot, target, intent, baseAction, context.Allies);
 			if (!shouldUse(input))
 			{
 				continue;
 			}
 
-			var refreshedSnapshot = RefreshTargetSnapshot(targetSnapshot, target, baseAction.TargetInfo.Range);
-			var refreshedInput = CreateDecisionInput(refreshedSnapshot, target, intent, baseAction);
+			var refreshedSnapshot = RefreshTargetSnapshot(
+				targetSnapshot,
+				target,
+				baseAction.TargetInfo.Range,
+				out var refreshedContext);
+			var refreshedInput = CreateDecisionInput(refreshedSnapshot, target, intent, baseAction, refreshedContext.Allies);
 			if (!shouldUse(refreshedInput))
 			{
 				continue;
@@ -668,22 +634,16 @@ public sealed class BRD_DefaultPvP : BardRotation
 		return false;
 	}
 
-	private static IBattleChara? FindHostileById(ulong targetId)
-	{
-		foreach (var hostile in AllHostileTargets)
-		{
-			if (hostile != null && hostile.GameObjectId == targetId)
-			{
-				return hostile;
-			}
-		}
-
-		return null;
-	}
-
-	private static List<BardPvPTargetSnapshot> RankTargets(BardPvPActionIntent intent, float range)
+	private static List<BardPvPTargetSnapshot> RankTargets(
+		BardPvPActionIntent intent,
+		float range,
+		out PvPLiveTargetFactsContext context)
 	{
 		List<BardPvPTargetSnapshot> snapshots = [];
+		var hostiles = BuildCombatantSnapshots(AllHostileTargets);
+		var allies = BuildCombatantSnapshots(PartyMembers);
+		var objectiveTargets = PvPObjectiveState.BuildObjectiveRelevantTargetIds();
+		context = CreateFactsContext(range, allies, hostiles, objectiveTargets);
 
 		foreach (var hostile in AllHostileTargets)
 		{
@@ -693,84 +653,135 @@ public sealed class BRD_DefaultPvP : BardRotation
 				continue;
 			}
 
-			snapshots.Add(CreateTargetSnapshot(hostile, intent, range));
+			snapshots.Add(CreateTargetSnapshot(hostile, intent, context));
 		}
 
 		return BardPvPTargetPolicy.Rank(snapshots, intent);
 	}
 
-	private static BardPvPTargetSnapshot CreateTargetSnapshot(IBattleChara target, BardPvPActionIntent intent, float range)
+	private static PvPLiveTargetFactsContext CreateFactsContext(
+		float range,
+		IReadOnlyList<PvPCombatantSnapshot> allies,
+		IReadOnlyList<PvPCombatantSnapshot> hostiles,
+		IReadOnlySet<ulong> objectiveTargets)
 	{
-		var database = PvPMitigationDatabaseProvider.Current;
-		var healthRatio = target.GetHealthRatio();
-		var hasGuard = target.HasStatus(false, StatusID.Guard);
-		var distance = target.DistanceToPlayer();
-
-		return new BardPvPTargetSnapshot(
-			TargetId: target.GameObjectId,
-			HealthRatio: healthRatio,
-			CurrentMp: target.CurrentMp,
-			HasGuard: hasGuard,
-			HasResilience: target.HasStatus(false, StatusID.Resilience),
-			IsObjectiveRelevant: IsObjectiveRelevantTarget(target),
-			HasAllyFocus: CountAlliesTargeting(target) > 0,
-			IsVulnerable: IsBurstWorthy(target),
-			IsControlled: IsControlledForEagleEyeShot(target),
-			HasInvulnerability: HasNonGuardInvulnerability(target, database),
-			ExpectedDamageRatio: ExpectedDamageRatio(intent, target),
-			EffectiveHealthRatio: ComputeEffectiveHealthRatio(target, database, ignoreGuard: false),
-			GuardPiercingEffectiveHealthRatio: ComputeEffectiveHealthRatio(target, database, ignoreGuard: true),
-			ActiveDamageReduction: MitigationPenalty.Compute(target, database),
-			IsExposed: !hasGuard && distance <= range,
-			IsInNormalRange: distance <= range,
-			LineTargetCount: CountHostilesInLine(target, range),
-			SplashTargetCount: CountHostilesNear(target.Position, OffensiveSplashRadiusYalms),
-			GuardAvailability: GetGuardAvailability(target));
+		return new PvPLiveTargetFactsContext(
+			MitigationDatabase: PvPMitigationDatabaseProvider.Current,
+			ObjectiveRelevantTargetIds: objectiveTargets,
+			Allies: allies,
+			Hostiles: hostiles,
+			CurrentTime: TimeSpan.FromMilliseconds(Environment.TickCount64),
+			GuardCooldownTracker: DataCenter.PvPGuardCooldownTracker,
+			GuardReactionWindow: TimeSpan.FromSeconds(GuardReactionWindowSeconds),
+			ActionRange: range,
+			DistanceToPlayerProvider: target => target.DistanceToPlayer(),
+			HealthRatioProvider: target => target.GetHealthRatio(),
+			HasStatus: (target, statusId) => target.HasStatus(false, statusId));
 	}
 
-	private static BardPvPTargetSnapshot RefreshTargetSnapshot(BardPvPTargetSnapshot snapshot, IBattleChara target, float range)
+	private static List<PvPCombatantSnapshot> BuildCombatantSnapshots(IEnumerable<IBattleChara?> combatants)
 	{
-		var database = PvPMitigationDatabaseProvider.Current;
-		var hasGuard = target.HasStatus(false, StatusID.Guard);
-		var distance = target.DistanceToPlayer();
-		var isInNormalRange = distance <= range;
+		List<PvPCombatantSnapshot> snapshots = [];
+		foreach (var combatant in combatants)
+		{
+			if (combatant == null)
+			{
+				continue;
+			}
+
+			snapshots.Add(PvPLiveTargetFactsBuilder.ToCombatantSnapshot(
+				combatant,
+				target => target.GetHealthRatio()));
+		}
+
+		return snapshots;
+	}
+
+	private static BardPvPTargetSnapshot CreateTargetSnapshot(
+		IBattleChara target,
+		BardPvPActionIntent intent,
+		PvPLiveTargetFactsContext context)
+	{
+		var facts = PvPLiveTargetFactsBuilder.Create(target, context);
+
+		return new BardPvPTargetSnapshot(
+			TargetId: facts.TargetId,
+			HealthRatio: facts.HealthRatio,
+			CurrentMp: facts.CurrentMp,
+			HasGuard: facts.HasGuard,
+			HasResilience: facts.HasResilience,
+			IsObjectiveRelevant: facts.IsObjectiveRelevant,
+			HasAllyFocus: facts.HasAllyFocus,
+			IsVulnerable: IsBurstWorthy(target),
+			IsControlled: IsControlledForEagleEyeShot(target),
+			HasInvulnerability: facts.HasNonGuardInvulnerability,
+			ExpectedDamageRatio: ExpectedDamageRatio(intent, target),
+			EffectiveHealthRatio: facts.EffectiveHealthRatio,
+			GuardPiercingEffectiveHealthRatio: facts.GuardPiercingEffectiveHealthRatio,
+			ActiveDamageReduction: facts.ActiveDamageReduction,
+			IsExposed: facts.IsExposed,
+			IsInNormalRange: facts.IsInNormalRange,
+			LineTargetCount: CountHostilesInLine(context.Hostiles, target, context.ActionRange),
+			SplashTargetCount: PvPCombatantQueries.CountHostilesNear(
+				context.Hostiles,
+				target.Position,
+				OffensiveSplashRadiusYalms),
+			GuardAvailability: facts.GuardAvailability);
+	}
+
+	private static BardPvPTargetSnapshot RefreshTargetSnapshot(
+		BardPvPTargetSnapshot snapshot,
+		IBattleChara target,
+		float range,
+		out PvPLiveTargetFactsContext context)
+	{
+		var hostiles = BuildCombatantSnapshots(AllHostileTargets);
+		var allies = BuildCombatantSnapshots(PartyMembers);
+		var objectiveTargets = PvPObjectiveState.BuildObjectiveRelevantTargetIds();
+		context = CreateFactsContext(range, allies, hostiles, objectiveTargets);
+		var facts = PvPLiveTargetFactsBuilder.Create(target, context);
 
 		var refreshedSnapshot = snapshot with
 		{
-			HealthRatio = target.GetHealthRatio(),
-			CurrentMp = target.CurrentMp,
-			HasGuard = hasGuard,
-			HasResilience = target.HasStatus(false, StatusID.Resilience),
-			IsObjectiveRelevant = IsObjectiveRelevantTarget(target),
-			HasAllyFocus = CountAlliesTargeting(target) > 0,
+			HealthRatio = facts.HealthRatio,
+			CurrentMp = facts.CurrentMp,
+			HasGuard = facts.HasGuard,
+			HasResilience = facts.HasResilience,
+			IsObjectiveRelevant = facts.IsObjectiveRelevant,
+			HasAllyFocus = facts.HasAllyFocus,
 			IsVulnerable = IsBurstWorthy(target),
 			IsControlled = IsControlledForEagleEyeShot(target),
-			HasInvulnerability = HasNonGuardInvulnerability(target, database),
-			EffectiveHealthRatio = ComputeEffectiveHealthRatio(target, database, ignoreGuard: false),
-			GuardPiercingEffectiveHealthRatio = ComputeEffectiveHealthRatio(target, database, ignoreGuard: true),
-			ActiveDamageReduction = MitigationPenalty.Compute(target, database),
-			GuardAvailability = GetGuardAvailability(target),
+			HasInvulnerability = facts.HasNonGuardInvulnerability,
+			EffectiveHealthRatio = facts.EffectiveHealthRatio,
+			GuardPiercingEffectiveHealthRatio = facts.GuardPiercingEffectiveHealthRatio,
+			ActiveDamageReduction = facts.ActiveDamageReduction,
+			GuardAvailability = facts.GuardAvailability,
 		};
 
 		return BardPvPTargetSnapshotRefresher.RefreshSpatialState(
 			refreshedSnapshot,
 			new BardPvPTargetSpatialState(
-				IsInNormalRange: isInNormalRange,
-				LineTargetCount: CountHostilesInLine(target, range),
-				SplashTargetCount: CountHostilesNear(target.Position, OffensiveSplashRadiusYalms)));
+				IsInNormalRange: facts.IsInNormalRange,
+				LineTargetCount: CountHostilesInLine(context.Hostiles, target, context.ActionRange),
+				SplashTargetCount: PvPCombatantQueries.CountHostilesNear(
+					context.Hostiles,
+					target.Position,
+					OffensiveSplashRadiusYalms)));
 	}
 
 	private BardPvPOffensiveDecisionInput CreateDecisionInput(
 		BardPvPTargetSnapshot snapshot,
 		IBattleChara target,
 		BardPvPActionIntent intent,
-		IBaseAction action)
+		IBaseAction action,
+		IReadOnlyList<PvPCombatantSnapshot> allies)
 	{
 		var objectiveControlNeeded = snapshot.IsObjectiveRelevant;
 		return new BardPvPOffensiveDecisionInput(
 			Target: snapshot,
 			FollowUpAvailable: HasImmediateFollowUp(intent),
-			AlliesCanBurst: snapshot.HasAllyFocus || CountAlliesNear(target, OffensiveAllyBurstRadiusYalms) > 0,
+			AlliesCanBurst: snapshot.HasAllyFocus
+				|| PvPCombatantQueries.CountAlliesNear(allies, target.Position, OffensiveAllyBurstRadiusYalms) > 0,
 			ObjectiveControlNeeded: objectiveControlNeeded,
 			TargetCommitted: objectiveControlNeeded
 				|| snapshot.HasAllyFocus
@@ -828,14 +839,6 @@ public sealed class BRD_DefaultPvP : BardRotation
 		};
 	}
 
-	private static PvPGuardAvailability GetGuardAvailability(IBattleChara target)
-	{
-		return DataCenter.PvPGuardCooldownTracker.GetAvailability(
-			target.GameObjectId,
-			TimeSpan.FromMilliseconds(Environment.TickCount64),
-			TimeSpan.FromSeconds(GuardReactionWindowSeconds));
-	}
-
 	private bool HasImmediateFollowUp(BardPvPActionIntent intent)
 	{
 		if (intent != BardPvPActionIntent.HarmonicArrow && HarmonicArrowPvP.Cooldown.HasOneCharge)
@@ -869,124 +872,22 @@ public sealed class BRD_DefaultPvP : BardRotation
 			&& StatusHelper.PlayerHasStatus(true, StatusID.EncoreOfLightReady);
 	}
 
-	private static int CountAlliesNear(IBattleChara target, float radius)
-	{
-		var count = 0;
-		foreach (var member in PartyMembers)
-		{
-			if (member != null
-				&& member.CurrentHp > 0
-				&& Vector3.Distance(member.Position, target.Position) <= radius)
-			{
-				count++;
-			}
-		}
-
-		return count;
-	}
-
-	private static int CountHostilesNear(Vector3 position, float radius)
-	{
-		var count = 0;
-		foreach (var hostile in AllHostileTargets)
-		{
-			if (hostile != null
-				&& hostile.CurrentHp > 0
-				&& Vector3.Distance(hostile.Position, position) <= radius)
-			{
-				count++;
-			}
-		}
-
-		return count;
-	}
-
-	private static int CountHostilesInLine(IBattleChara target, float range)
+	private static int CountHostilesInLine(
+		IReadOnlyList<PvPCombatantSnapshot> hostiles,
+		IBattleChara target,
+		float range)
 	{
 		if (Player == null)
 		{
 			return 0;
 		}
 
-		var origin = new Vector3(Player.Position.X, 0f, Player.Position.Z);
-		var targetPosition = new Vector3(target.Position.X, 0f, target.Position.Z);
-		var direction = targetPosition - origin;
-		if (direction.LengthSquared() <= float.Epsilon)
-		{
-			return 0;
-		}
-
-		var lineDirection = Vector3.Normalize(direction);
-		var count = 0;
-		foreach (var hostile in AllHostileTargets)
-		{
-			if (hostile == null || hostile.CurrentHp == 0)
-			{
-				continue;
-			}
-
-			var hostilePosition = new Vector3(hostile.Position.X, 0f, hostile.Position.Z);
-			var toHostile = hostilePosition - origin;
-			var forwardDistance = Vector3.Dot(lineDirection, toHostile);
-			if (forwardDistance < 0f || forwardDistance > range)
-			{
-				continue;
-			}
-
-			var perpendicularDistance = Vector3.Cross(lineDirection, toHostile).Length();
-			if (perpendicularDistance <= OffensiveLineHalfWidthYalms + hostile.HitboxRadius)
-			{
-				count++;
-			}
-		}
-
-		return count;
-	}
-
-	private static double ComputeEffectiveHealthRatio(
-		IBattleChara target,
-		IMitigationDatabase database,
-		bool ignoreGuard)
-	{
-		if (target.MaxHp == 0)
-		{
-			return double.PositiveInfinity;
-		}
-
-		var effectiveHp = ignoreGuard
-			? ComputeEffectiveHpIgnoringGuard(target, database)
-			: EffectiveHpCalculator.Compute(target, database);
-		return double.IsPositiveInfinity(effectiveHp)
-			? double.PositiveInfinity
-			: effectiveHp / target.MaxHp;
-	}
-
-	private static double ComputeEffectiveHpIgnoringGuard(IBattleChara target, IMitigationDatabase database)
-	{
-		var statusList = target.StatusList;
-		if (statusList == null)
-		{
-			return target.CurrentHp;
-		}
-
-		var damageMultiplier = 1.0;
-		foreach (var status in statusList)
-		{
-			var statusId = (StatusID)status.StatusId;
-			if (statusId == StatusID.Guard || !database.TryGet(statusId, out var entry))
-			{
-				continue;
-			}
-
-			if (entry.Kind == MitigationKind.Invuln)
-			{
-				return double.PositiveInfinity;
-			}
-
-			damageMultiplier *= 1.0 - entry.DamageReductionPercent;
-		}
-
-		return damageMultiplier <= 0.0 ? double.PositiveInfinity : target.CurrentHp / damageMultiplier;
+		return PvPCombatantQueries.CountHostilesInLine(
+			hostiles,
+			Player.Position,
+			target.Position,
+			range,
+			OffensiveLineHalfWidthYalms);
 	}
 
 	private static bool TryUseActionOn(
