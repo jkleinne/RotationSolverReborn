@@ -1,3 +1,4 @@
+using System.Numerics;
 using RotationSolver.Basic.Actions.PvPTargetSelection;
 
 namespace RotationSolver.Tests;
@@ -58,6 +59,124 @@ internal static partial class PvPTestSuite
 
 		AssertEqual(ScoringPreset.Ranked, migrated.Preset, "legacy Casual preset should migrate to Ranked");
 		AssertEqual(ScoringWeights.DefaultWeights, migrated.Weights, "legacy Casual backing weights should migrate to Ranked defaults");
+	}
+
+	static void PvPCombatantQueriesFindHostileById()
+	{
+		var hostiles = new[]
+		{
+			Combatant(10, health: 1f),
+			Combatant(20, health: 1f),
+		};
+
+		var found = PvPCombatantQueries.FindById(hostiles, 20);
+
+		AssertEqual(20UL, found?.ObjectId ?? 0, "query should return the matching hostile");
+	}
+
+	static void PvPCombatantQueriesCountAllyFocus()
+	{
+		var allies = new[]
+		{
+			Combatant(1, health: 1f, targetId: 99),
+			Combatant(2, health: 1f, targetId: 99),
+			Combatant(3, health: 0f, targetId: 99),
+		};
+
+		var count = PvPCombatantQueries.CountAlliesTargeting(allies, 99);
+
+		AssertEqual(3, count, "focus counts should preserve current target id semantics");
+	}
+
+	static void PvPCombatantQueriesCountHostilesTargetingAlly()
+	{
+		var hostiles = new[]
+		{
+			Combatant(10, health: 1f, targetId: 5),
+			Combatant(11, health: 1f, targetId: 5),
+			Combatant(12, health: 0f, targetId: 5),
+		};
+
+		var count = PvPCombatantQueries.CountHostilesTargeting(hostiles, 5);
+
+		AssertEqual(3, count, "hostile focus counts should preserve current target id semantics");
+	}
+
+	static void PvPCombatantQueriesCountNearbyHostiles()
+	{
+		var hostiles = new[]
+		{
+			Combatant(10, health: 1f, position: new Vector3(0f, 0f, 3f)),
+			Combatant(11, health: 1f, position: new Vector3(0f, 0f, 8f)),
+			Combatant(12, health: 0f, position: new Vector3(0f, 0f, 2f)),
+		};
+
+		var count = PvPCombatantQueries.CountHostilesNear(hostiles, Vector3.Zero, radius: 5f);
+
+		AssertEqual(1, count, "only living hostiles inside radius should count");
+	}
+
+	static void PvPCombatantQueriesCountNearbyAllies()
+	{
+		var allies = new[]
+		{
+			Combatant(1, health: 1f, position: new Vector3(0f, 0f, 4f)),
+			Combatant(2, health: 1f, position: new Vector3(0f, 0f, 7f)),
+			Combatant(3, health: 0f, position: new Vector3(0f, 0f, 3f)),
+		};
+
+		var count = PvPCombatantQueries.CountAlliesNear(allies, Vector3.Zero, radius: 5f);
+
+		AssertEqual(1, count, "only living allies inside radius should count");
+	}
+
+	static void PvPCombatantQueriesMeasureNearestHostileDistance()
+	{
+		var hostiles = new[]
+		{
+			Combatant(10, health: 1f, position: new Vector3(0f, 0f, 8f), hitboxRadius: 1f),
+			Combatant(11, health: 1f, position: new Vector3(0f, 0f, 4f), hitboxRadius: 0.5f),
+			Combatant(12, health: 0f, position: new Vector3(0f, 0f, 1f), hitboxRadius: 0f),
+		};
+
+		var distance = PvPCombatantQueries.DistanceToNearestHostile(hostiles, Vector3.Zero);
+
+		AssertEqual(3.5f, distance, "nearest hostile distance should ignore dead combatants and subtract hostile hitbox radius");
+	}
+
+	static void PvPCombatantQueriesCountHostilesInLine()
+	{
+		var hostiles = new[]
+		{
+			Combatant(10, health: 1f, position: new Vector3(0f, 0f, 5f), hitboxRadius: 0.5f),
+			Combatant(11, health: 1f, position: new Vector3(4f, 0f, 5f), hitboxRadius: 0.5f),
+			Combatant(12, health: 0f, position: new Vector3(0f, 0f, 4f), hitboxRadius: 0.5f),
+		};
+
+		var count = PvPCombatantQueries.CountHostilesInLine(
+			hostiles,
+			origin: Vector3.Zero,
+			targetPosition: new Vector3(0f, 2f, 10f),
+			range: 25f,
+			halfWidth: 1f);
+
+		AssertEqual(1, count, "line query should use XZ projection and ignore dead combatants");
+	}
+
+	static PvPCombatantSnapshot Combatant(
+		ulong objectId,
+		float health,
+		ulong targetId = 0,
+		Vector3 position = default,
+		float hitboxRadius = 0f)
+	{
+		return new PvPCombatantSnapshot(
+			ObjectId: objectId,
+			HealthRatio: health,
+			CurrentHp: health > 0f ? 1u : 0u,
+			TargetObjectId: targetId,
+			Position: position,
+			HitboxRadius: hitboxRadius);
 	}
 
 	static ScoringWeights LegacyCasualWeights()

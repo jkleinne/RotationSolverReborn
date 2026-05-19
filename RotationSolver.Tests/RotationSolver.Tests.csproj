@@ -9,6 +9,8 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPCombatantSnapshot.cs" Link="PvPCombatantSnapshot.cs" />
+		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPCombatantQueries.cs" Link="PvPCombatantQueries.cs" />
 		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPScoringFactors.cs" Link="PvPScoringFactors.cs" />
 		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPBurstIntent.cs" Link="PvPBurstIntent.cs" />
 		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPBurstRecommendation.cs" Link="PvPBurstRecommendation.cs" />
