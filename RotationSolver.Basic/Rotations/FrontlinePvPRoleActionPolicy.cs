@@ -32,11 +32,6 @@ internal readonly record struct FrontlineEagleEyeShotTargetState(
 
 internal static class FrontlinePvPRoleActionPolicy
 {
-	private const string BorderlandRuinsFrontlineName = "The Borderland Ruins (Secure)";
-	private const string SealRockFrontlineName = "Seal Rock (Seize)";
-	private const string FieldsOfGloryFrontlineName = "The Fields of Glory (Shatter)";
-	private const string OnsalHakairFrontlineName = "Onsal Hakair (Danshig Naadam)";
-	private const string WorqorChirtehFrontlineName = "Worqor Chirteh (Triumph)";
 	private const float EagleEyeShotSecureHealthRatio = 0.30f;
 	private const float BardControlledPressureHealthRatio = 0.55f;
 	private const float BardBurstPressureHealthRatio = 0.55f;
@@ -44,33 +39,6 @@ internal static class FrontlinePvPRoleActionPolicy
 	private const float MachinistInjuredPressureHealthRatio = 0.65f;
 	private const float MachinistBurstSetupHealthRatio = 0.80f;
 	private const float MachinistGuardPressureHealthRatio = 0.65f;
-
-	internal static readonly string[] FrontlineContentFinderNames =
-	[
-		BorderlandRuinsFrontlineName,
-		SealRockFrontlineName,
-		FieldsOfGloryFrontlineName,
-		OnsalHakairFrontlineName,
-		WorqorChirtehFrontlineName,
-	];
-
-	internal static bool IsFrontlineContentFinderName(string? contentFinderName)
-	{
-		if (string.IsNullOrEmpty(contentFinderName))
-		{
-			return false;
-		}
-
-		for (var i = 0; i < FrontlineContentFinderNames.Length; i++)
-		{
-			if (string.Equals(contentFinderName, FrontlineContentFinderNames[i], StringComparison.Ordinal))
-			{
-				return true;
-			}
-		}
-
-		return false;
-	}
 
 	internal static bool ShouldTryFrontlineRoleAction(bool isInFrontline, bool isInCrystallineConflict)
 	{

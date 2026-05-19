@@ -13,6 +13,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using Lumina.Excel.Sheets;
 using RotationSolver.Basic.Actions.PvPTargetSelection;
 using RotationSolver.Basic.Configuration;
+using RotationSolver.Basic.Data;
 using RotationSolver.Basic.Rotations.Duties;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
@@ -482,14 +483,14 @@ internal static class DataCenter
 	/// </summary>
 	/// <remarks>
 	/// Locale caveat: <see cref="Data.TerritoryInfo.ContentFinderName"/> is the localized
-	/// PlaceName text. The literal "Crystalline Conflict" matches the English client; on
+	/// PlaceName text. The classifier matches the English client name; on
 	/// JP/DE/FR clients the string differs and detection silently returns <c>false</c>,
 	/// degrading the Phase 2 carrier scoring term to zero contribution (no incorrect
 	/// behavior, just inert). Replace with a locale-invariant signal (ContentFinderIcon
 	/// or a TerritoryID set) if non-English-client support becomes required.
 	/// </remarks>
 	public static bool IsInCrystallineConflict =>
-		string.Equals(Territory?.ContentFinderName, "Crystalline Conflict", StringComparison.Ordinal);
+		PvPModeClassifier.IsCrystallineConflict(Territory?.ContentFinderName);
 
 	/// <summary>
 	/// True iff the current territory is one of the large-scale Frontline campaigns.
@@ -498,7 +499,8 @@ internal static class DataCenter
 	/// This intentionally excludes Crystalline Conflict and Rival Wings so mode-specific
 	/// PvP automation can stay scoped to Frontline.
 	/// </remarks>
-	public static bool IsInFrontline => FrontlinePvPRoleActionPolicy.IsFrontlineContentFinderName(Territory?.ContentFinderName);
+	public static bool IsInFrontline =>
+		PvPModeClassifier.IsFrontline(Territory?.ContentFinderName);
 
 	/// <summary>
 	/// When set to <c>true</c> by an external plugin via IPC, the TargetFreely behaviour is

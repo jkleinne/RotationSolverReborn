@@ -1,3 +1,4 @@
+using RotationSolver.Basic.Data;
 using RotationSolver.Basic.Rotations;
 
 namespace RotationSolver.Tests;
@@ -22,17 +23,41 @@ internal static partial class PvPTestSuite
 		AssertTrue(shouldTry, "Frontline should opt into PvP role action automation");
 	}
 
-	static void FrontlineRoleActionPolicyDetectsFrontlineDuties()
+	static void PvPModeClassifierDetectsCrystallineConflict()
 	{
-		foreach (var contentFinderName in FrontlinePvPRoleActionPolicy.FrontlineContentFinderNames)
+		AssertTrue(
+			PvPModeClassifier.IsCrystallineConflict("Crystalline Conflict"),
+			"English Crystalline Conflict content finder name should be detected");
+	}
+
+	static void PvPModeClassifierDetectsFrontlineDuties()
+	{
+		foreach (var contentFinderName in PvPModeClassifier.FrontlineContentFinderNames)
 		{
 			AssertTrue(
-				FrontlinePvPRoleActionPolicy.IsFrontlineContentFinderName(contentFinderName),
+				PvPModeClassifier.IsFrontline(contentFinderName),
+				$"{contentFinderName} should be detected as Frontline");
+		}
+	}
+
+	static void PvPModeClassifierRejectsCrystallineConflictAsFrontline()
+	{
+		AssertFalse(
+			PvPModeClassifier.IsFrontline("Crystalline Conflict"),
+			"Crystalline Conflict must not be detected as Frontline");
+	}
+
+	static void FrontlineRoleActionPolicyDetectsFrontlineDuties()
+	{
+		foreach (var contentFinderName in PvPModeClassifier.FrontlineContentFinderNames)
+		{
+			AssertTrue(
+				PvPModeClassifier.IsFrontline(contentFinderName),
 				$"{contentFinderName} should be detected as Frontline");
 		}
 
 		AssertFalse(
-			FrontlinePvPRoleActionPolicy.IsFrontlineContentFinderName("Crystalline Conflict"),
+			PvPModeClassifier.IsFrontline("Crystalline Conflict"),
 			"Crystalline Conflict must not be detected as Frontline");
 	}
 
