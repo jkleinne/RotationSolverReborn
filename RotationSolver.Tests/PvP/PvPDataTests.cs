@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Dalamud.Game.ClientState.Statuses;
+using RotationSolver.Basic.Actions.PvPTargetSelection;
 
 namespace RotationSolver.Tests;
 
@@ -113,6 +115,89 @@ internal static partial class PvPTestSuite
 		}
 	}
 
+	static void EffectiveHpIgnoringGuardKeepsDamageReduction()
+	{
+		var database = new TestMitigationDatabase(
+			new MitigationEntry(StatusID.Guard, MitigationKind.Invuln, 0.0, "Guard"),
+			new MitigationEntry(StatusID.Forte, MitigationKind.HeavyDR, 0.50, "Forte"));
+		var target = new MitigatedBattleChara(
+			currentHp: 1_000,
+			maxHp: 10_000,
+			StatusID.Guard,
+			StatusID.Forte);
+
+		var effectiveHp = EffectiveHpCalculator.ComputeIgnoringGuard(target, database);
+
+		AssertEqual(2_000.0, effectiveHp, "guard should be ignored while damage reduction still applies");
+	}
+
+	static void EffectiveHpIgnoringGuardKeepsNonGuardInvulnerability()
+	{
+		var database = new TestMitigationDatabase(
+			new MitigationEntry(StatusID.Guard, MitigationKind.Invuln, 0.0, "Guard"),
+			new MitigationEntry(StatusID.HallowedGround_1302, MitigationKind.Invuln, 0.0, "Hallowed Ground"));
+		var target = new MitigatedBattleChara(
+			currentHp: 1_000,
+			maxHp: 10_000,
+			StatusID.Guard,
+			StatusID.HallowedGround_1302);
+
+		var effectiveHp = EffectiveHpCalculator.ComputeIgnoringGuard(target, database);
+
+		AssertTrue(double.IsPositiveInfinity(effectiveHp), "non guard invulnerability should still block damage");
+	}
+
+	static void LiveTargetFactsUseCallerHealthProvider()
+	{
+		var target = new MitigatedBattleChara(currentHp: 1_000, maxHp: 10_000);
+		var context = CreateLiveFactsContext(
+			healthRatioProvider: combatant => combatant.GameObjectId == target.GameObjectId ? 0.73f : 0.0f);
+
+		var facts = PvPLiveTargetFactsBuilder.Create(target, context);
+
+		AssertEqual(0.73f, facts.HealthRatio, "live target facts should preserve caller health ratio semantics");
+	}
+
+	static void LiveTargetFactsUseCallerStatusDelegate()
+	{
+		var target = new MitigatedBattleChara(currentHp: 1_000, maxHp: 10_000);
+		var context = CreateLiveFactsContext(
+			hasStatus: (combatant, statusId) =>
+				combatant.GameObjectId == target.GameObjectId
+				&& (statusId == StatusID.Guard || statusId == StatusID.Resilience));
+
+		var facts = PvPLiveTargetFactsBuilder.Create(target, context);
+
+		AssertTrue(facts.HasGuard, "live target facts should preserve caller Guard status semantics");
+		AssertTrue(facts.HasResilience, "live target facts should preserve caller Resilience status semantics");
+		AssertFalse(facts.IsExposed, "caller Guard status should drive exposure");
+	}
+
+	static void LiveTargetFactsUseCallerDistanceProvider()
+	{
+		var target = new MitigatedBattleChara(currentHp: 1_000, maxHp: 10_000);
+		var context = CreateLiveFactsContext(
+			distanceToPlayerProvider: combatant => combatant.GameObjectId == target.GameObjectId ? 10f : 999f);
+
+		var facts = PvPLiveTargetFactsBuilder.Create(target, context);
+
+		AssertTrue(facts.IsInNormalRange, "live target facts should preserve caller range semantics");
+		AssertTrue(facts.IsExposed, "caller range semantics should drive exposure");
+	}
+
+	static void LiveCombatantSnapshotUsesCallerHealthProvider()
+	{
+		var combatant = new MitigatedBattleChara(currentHp: 1_000, maxHp: 10_000);
+		float HealthRatioProvider(IBattleChara candidate)
+		{
+			return candidate.GameObjectId == combatant.GameObjectId ? 0.42f : 0.0f;
+		}
+
+		var snapshot = PvPLiveTargetFactsBuilder.ToCombatantSnapshot(combatant, HealthRatioProvider);
+
+		AssertEqual(0.42f, snapshot.HealthRatio, "combatant snapshot should preserve caller health ratio semantics");
+	}
+
 	static string RepositoryPath(params string[] parts)
 	{
 		var root = FindRepositoryRoot();
@@ -167,5 +252,57 @@ internal static partial class PvPTestSuite
 		}
 
 		return value;
+	}
+
+	private sealed class TestMitigationDatabase(params MitigationEntry[] entries) : IMitigationDatabase
+	{
+		private readonly Dictionary<StatusID, MitigationEntry> entriesById = entries.ToDictionary(entry => entry.Id);
+
+		public bool TryGet(StatusID id, out MitigationEntry entry)
+		{
+			return entriesById.TryGetValue(id, out entry);
+		}
+	}
+
+	private static PvPLiveTargetFactsContext CreateLiveFactsContext(
+		Func<IBattleChara, float>? healthRatioProvider = null,
+		Func<IBattleChara, float>? distanceToPlayerProvider = null,
+		Func<IBattleChara, StatusID, bool>? hasStatus = null)
+	{
+		return new PvPLiveTargetFactsContext(
+			MitigationDatabase: new TestMitigationDatabase(),
+			ObjectiveRelevantTargetIds: new HashSet<ulong>(),
+			Allies: [],
+			Hostiles: [],
+			CurrentTime: TimeSpan.Zero,
+			GuardCooldownTracker: new PvPGuardCooldownTracker(),
+			GuardReactionWindow: TimeSpan.Zero,
+			ActionRange: 25f,
+			DistanceToPlayerProvider: distanceToPlayerProvider ?? (_ => 0.0f),
+			HealthRatioProvider: healthRatioProvider ?? (_ => 0.0f),
+			HasStatus: hasStatus ?? ((_, _) => false));
+	}
+
+	private sealed class MitigatedBattleChara : IBattleChara
+	{
+		public MitigatedBattleChara(uint currentHp, uint maxHp, params StatusID[] statuses)
+		{
+			CurrentHp = currentHp;
+			MaxHp = maxHp;
+			StatusList = statuses.Select(status => new TestStatus((uint)status)).ToArray();
+		}
+
+		public ulong GameObjectId => 1;
+
+		public uint CurrentHp { get; }
+
+		public uint MaxHp { get; }
+
+		public IReadOnlyList<IStatus> StatusList { get; }
+	}
+
+	private sealed class TestStatus(uint statusId) : IStatus
+	{
+		public uint StatusId { get; } = statusId;
 	}
 }
