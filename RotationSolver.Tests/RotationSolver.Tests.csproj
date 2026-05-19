@@ -9,6 +9,17 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPCombatantSnapshot.cs" Link="PvPCombatantSnapshot.cs" />
+		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPCombatantQueries.cs" Link="PvPCombatantQueries.cs" />
+		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\EffectiveHpCalculator.cs" Link="EffectiveHpCalculator.cs" />
+		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\IMitigationDatabase.cs" Link="IMitigationDatabase.cs" />
+		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\MitigationEntry.cs" Link="MitigationEntry.cs" />
+		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\MitigationKind.cs" Link="MitigationKind.cs" />
+		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPLiveTargetFacts.cs" Link="PvPLiveTargetFacts.cs" />
+		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPLiveTargetFactsBuilder.cs" Link="PvPLiveTargetFactsBuilder.cs" />
+		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPLiveTargetFactsContext.cs" Link="PvPLiveTargetFactsContext.cs" />
+		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPSingleTargetActionOptions.cs" Link="PvPSingleTargetActionOptions.cs" />
+		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPSingleTargetActionUse.cs" Link="PvPSingleTargetActionUse.cs" />
 		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPScoringFactors.cs" Link="PvPScoringFactors.cs" />
 		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPBurstIntent.cs" Link="PvPBurstIntent.cs" />
 		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPBurstRecommendation.cs" Link="PvPBurstRecommendation.cs" />
@@ -17,6 +28,8 @@
 		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPGuardCooldownTracker.cs" Link="PvPGuardCooldownTracker.cs" />
 		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\ScoringPreset.cs" Link="ScoringPreset.cs" />
 		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\ScoringWeights.cs" Link="ScoringWeights.cs" />
+		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\Factors\MitigationPenalty.cs" Link="MitigationPenalty.cs" />
+		<Compile Include="..\RotationSolver.Basic\Data\PvPModeClassifier.cs" Link="PvPModeClassifier.cs" />
 		<Compile Include="..\RotationSolver.Basic\Rotations\FrontlinePvPRoleActionPolicy.cs" Link="FrontlinePvPRoleActionPolicy.cs" />
 		<Compile Include="..\RotationSolver\Commands\AutoOffPolicy.cs" Link="AutoOffPolicy.cs" />
 		<Compile Include="..\RotationSolver\RebornRotations\PVPRotations\Ranged\BardPvPDecisionPolicy.cs" Link="BardPvPDecisionPolicy.cs" />
@@ -24,5 +37,10 @@
 		<Compile Include="..\RotationSolver\RebornRotations\PVPRotations\Ranged\BardPvPTargetPolicy.cs" Link="BardPvPTargetPolicy.cs" />
 		<Compile Include="..\RotationSolver\RebornRotations\PVPRotations\Ranged\MachinistPvPDecisionPolicy.cs" Link="MachinistPvPDecisionPolicy.cs" />
 		<Compile Include="..\RotationSolver\RebornRotations\PVPRotations\Ranged\MachinistPvPTargetPolicy.cs" Link="MachinistPvPTargetPolicy.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Using Include="Dalamud.Game.ClientState.Objects.Types" />
+		<Using Include="RotationSolver.Basic.Data" />
 	</ItemGroup>
 </Project>

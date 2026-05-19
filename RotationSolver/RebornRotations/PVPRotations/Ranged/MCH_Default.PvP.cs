@@ -1,6 +1,4 @@
-using System.Numerics;
 using RotationSolver.Basic.Actions.PvPTargetSelection;
-using RotationSolver.Basic.Actions.PvPTargetSelection.Factors;
 
 namespace RotationSolver.RebornRotations.PVPRotations.Ranged;
 
@@ -193,8 +191,13 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 			return false;
 		}
 
-		var snapshot = CreateTargetSnapshot(target, intent, analysisWillBuffAction: true);
-		var input = CreateDecisionInput(snapshot, target, intent);
+		var liveFrame = CreateLiveTargetFrame(intent);
+		var snapshot = CreateTargetSnapshot(
+			target,
+			intent,
+			analysisWillBuffAction: true,
+			context: liveFrame.FactsContext);
+		var input = CreateDecisionInput(snapshot, target, intent, liveFrame.Allies, liveFrame.Hostiles);
 		if (!ShouldUseAnalysis(intent, input))
 		{
 			return false;
@@ -341,15 +344,21 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 		bool skipAoeCheck = false)
 	{
 		action = null;
-		foreach (var targetSnapshot in RankTargets(intent))
+		var rankedFrame = RankTargets(intent);
+		foreach (var targetSnapshot in rankedFrame.RankedTargets)
 		{
-			var target = FindHostileById(targetSnapshot.TargetId);
+			var target = PvPLiveTargetFactsBuilder.FindLiveTargetById(AllHostileTargets, targetSnapshot.TargetId);
 			if (target == null)
 			{
 				continue;
 			}
 
-			var input = CreateDecisionInput(targetSnapshot, target, intent);
+			var input = CreateDecisionInput(
+				targetSnapshot,
+				target,
+				intent,
+				rankedFrame.LiveFrame.Allies,
+				rankedFrame.LiveFrame.Hostiles);
 			if (!shouldUse(input))
 			{
 				TraceMarksmanSpiteDecision("policy_reject", baseAction, target, targetSnapshot, input);
@@ -416,10 +425,20 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 			message);
 	}
 
-	private static List<MachinistPvPTargetSnapshot> RankTargets(MachinistPvPActionIntent intent)
+	private readonly record struct MachinistPvPLiveTargetFrame(
+		PvPLiveTargetFactsContext FactsContext,
+		IReadOnlyList<PvPCombatantSnapshot> Allies,
+		IReadOnlyList<PvPCombatantSnapshot> Hostiles);
+
+	private readonly record struct MachinistPvPRankedTargetFrame(
+		IReadOnlyList<MachinistPvPTargetSnapshot> RankedTargets,
+		MachinistPvPLiveTargetFrame LiveFrame);
+
+	private static MachinistPvPRankedTargetFrame RankTargets(MachinistPvPActionIntent intent)
 	{
 		List<MachinistPvPTargetSnapshot> snapshots = [];
 		var analysisWillBuffAction = StatusHelper.PlayerHasStatus(true, StatusID.Analysis);
+		var liveFrame = CreateLiveTargetFrame(intent);
 		foreach (var hostile in AllHostileTargets)
 		{
 			if (hostile == null || hostile.CurrentHp == 0)
@@ -427,97 +446,100 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 				continue;
 			}
 
-			snapshots.Add(CreateTargetSnapshot(hostile, intent, analysisWillBuffAction));
+			snapshots.Add(CreateTargetSnapshot(hostile, intent, analysisWillBuffAction, liveFrame.FactsContext));
 		}
 
-		return MachinistPvPTargetPolicy.Rank(snapshots, intent);
+		return new MachinistPvPRankedTargetFrame(
+			MachinistPvPTargetPolicy.Rank(snapshots, intent),
+			liveFrame);
 	}
 
-	private static MachinistPvPTargetSnapshot CreateTargetSnapshot(
-		IBattleChara target,
-		MachinistPvPActionIntent intent,
-		bool analysisWillBuffAction)
+	private static MachinistPvPLiveTargetFrame CreateLiveTargetFrame(MachinistPvPActionIntent intent)
 	{
+		var hostiles = PvPLiveTargetFactsBuilder.ToCombatantSnapshots(
+			AllHostileTargets,
+			target => target.GetHealthRatio());
+		var allies = PvPLiveTargetFactsBuilder.ToCombatantSnapshots(
+			PartyMembers,
+			target => target.GetHealthRatio());
 		var objectiveTargets = PvPObjectiveState.BuildObjectiveRelevantTargetIds();
-		var distance = target.DistanceToPlayer();
-		var hasGuard = target.HasStatus(false, StatusID.Guard);
-		var hasResilience = target.HasStatus(false, StatusID.Resilience);
-		var mitigationDatabase = PvPMitigationDatabaseProvider.Current;
-		var effectiveHp = EffectiveHpCalculator.Compute(target, mitigationDatabase);
-		var effectiveHpRatio = target.MaxHp == 0 || double.IsPositiveInfinity(effectiveHp)
-			? double.PositiveInfinity
-			: effectiveHp / target.MaxHp;
-		var range = intent switch
+
+		return new MachinistPvPLiveTargetFrame(
+			CreateFactsContext(intent, allies, objectiveTargets),
+			allies,
+			hostiles);
+	}
+
+	private static PvPLiveTargetFactsContext CreateFactsContext(
+		MachinistPvPActionIntent intent,
+		IReadOnlyList<PvPCombatantSnapshot> allies,
+		IReadOnlySet<ulong> objectiveTargets)
+	{
+		return new PvPLiveTargetFactsContext(
+			MitigationDatabase: PvPMitigationDatabaseProvider.Current,
+			ObjectiveRelevantTargetIds: objectiveTargets,
+			Allies: allies,
+			CurrentTime: TimeSpan.FromMilliseconds(Environment.TickCount64),
+			GuardCooldownTracker: DataCenter.PvPGuardCooldownTracker,
+			GuardReactionWindow: TimeSpan.FromSeconds(MarksmanGuardReactionWindowSeconds),
+			ActionRange: ResolveActionRange(intent),
+			DistanceToPlayerProvider: target => target.DistanceToPlayer(),
+			HealthRatioProvider: target => target.GetHealthRatio(),
+			HasStatus: (target, statusId) => target.HasStatus(false, statusId));
+	}
+
+	private static float ResolveActionRange(MachinistPvPActionIntent intent)
+	{
+		return intent switch
 		{
 			MachinistPvPActionIntent.MarksmanSpite => LimitBreakRangeYalms,
 			MachinistPvPActionIntent.EagleEyeShot => EagleEyeShotRangeYalms,
 			_ => NormalToolRangeYalms,
 		};
+	}
+
+	private static MachinistPvPTargetSnapshot CreateTargetSnapshot(
+		IBattleChara target,
+		MachinistPvPActionIntent intent,
+		bool analysisWillBuffAction,
+		PvPLiveTargetFactsContext context)
+	{
+		var facts = PvPLiveTargetFactsBuilder.Create(target, context);
 
 		return new MachinistPvPTargetSnapshot(
-			TargetId: target.GameObjectId,
-			HealthRatio: target.GetHealthRatio(),
-			CurrentMp: target.CurrentMp,
-			HasGuard: hasGuard,
-			HasResilience: hasResilience,
-			IsObjectiveRelevant: objectiveTargets.Contains(target.GameObjectId),
-			HasAllyFocus: CountAlliesTargeting(target) > 0,
+			TargetId: facts.TargetId,
+			HealthRatio: facts.HealthRatio,
+			CurrentMp: facts.CurrentMp,
+			HasGuard: facts.HasGuard,
+			HasResilience: facts.HasResilience,
+			IsObjectiveRelevant: facts.IsObjectiveRelevant,
+			HasAllyFocus: facts.HasAllyFocus,
 			IsVulnerable: false,
-			HasInvulnerability: HasNonGuardInvulnerability(target, mitigationDatabase),
+			HasInvulnerability: facts.HasNonGuardInvulnerability,
 			HasWildfire: target.HasStatus(true, StatusID.Wildfire, StatusID.Wildfire_1323),
 			ExpectedDamageRatio: ExpectedDamageRatio(intent, target, analysisWillBuffAction),
-			EffectiveHealthRatio: effectiveHpRatio,
-			ActiveDamageReduction: MitigationPenalty.Compute(target, mitigationDatabase),
-			IsExposed: !hasGuard && distance <= range,
-			IsInNormalRange: distance <= range,
-			IsInCloseRange: distance <= CloseToolRangeYalms,
-			GuardAvailability: GetGuardAvailability(target));
-	}
-
-	private static PvPGuardAvailability GetGuardAvailability(IBattleChara target)
-	{
-		return DataCenter.PvPGuardCooldownTracker.GetAvailability(
-			target.GameObjectId,
-			TimeSpan.FromMilliseconds(Environment.TickCount64),
-			TimeSpan.FromSeconds(MarksmanGuardReactionWindowSeconds));
-	}
-
-	private static bool HasNonGuardInvulnerability(IBattleChara target, IMitigationDatabase database)
-	{
-		var statusList = target.StatusList;
-		if (statusList == null)
-		{
-			return false;
-		}
-
-		foreach (var status in statusList)
-		{
-			var statusId = (StatusID)status.StatusId;
-			if (statusId == StatusID.Guard)
-			{
-				continue;
-			}
-
-			if (database.TryGet(statusId, out var entry) && entry.Kind == MitigationKind.Invuln)
-			{
-				return true;
-			}
-		}
-
-		return false;
+			EffectiveHealthRatio: facts.EffectiveHealthRatio,
+			ActiveDamageReduction: facts.ActiveDamageReduction,
+			IsExposed: facts.IsExposed,
+			IsInNormalRange: facts.IsInNormalRange,
+			IsInCloseRange: context.DistanceToPlayerProvider(target) <= CloseToolRangeYalms,
+			GuardAvailability: facts.GuardAvailability);
 	}
 
 	private MachinistPvPDecisionInput CreateDecisionInput(
 		MachinistPvPTargetSnapshot snapshot,
 		IBattleChara target,
-		MachinistPvPActionIntent intent)
+		MachinistPvPActionIntent intent,
+		IReadOnlyList<PvPCombatantSnapshot> allies,
+		IReadOnlyList<PvPCombatantSnapshot> hostiles)
 	{
-		var objectiveControlNeeded = snapshot.IsObjectiveRelevant || IsForcedTeamfight(target);
+		var objectiveControlNeeded = snapshot.IsObjectiveRelevant || IsForcedTeamfight(target, hostiles);
 		return new MachinistPvPDecisionInput(
 			Target: snapshot,
-			SafeCloseRange: IsSafeCloseRange(target, objectiveControlNeeded),
+			SafeCloseRange: IsSafeCloseRange(snapshot, objectiveControlNeeded, hostiles),
 			FollowUpAvailable: HasImmediateFollowUp(intent),
-			AlliesCanBurst: snapshot.HasAllyFocus || CountAlliesNear(target, TeamfightRadiusYalms) > 0,
+			AlliesCanBurst: snapshot.HasAllyFocus
+				|| PvPCombatantQueries.CountAlliesNear(allies, target.Position, TeamfightRadiusYalms) > 0,
 			ObjectiveControlNeeded: objectiveControlNeeded,
 			TargetCommitted: IsTargetCommitted(snapshot, target, objectiveControlNeeded),
 			ExpectedDamageRatio: snapshot.ExpectedDamageRatio,
@@ -558,35 +580,14 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 		bool skipAoeCheck)
 	{
 		action = null;
-		var originalCanTarget = baseAction.Setting.CanTarget;
-		baseAction.Setting.CanTarget = candidate =>
-			originalCanTarget(candidate) && candidate.GameObjectId == targetId;
-
-		try
-		{
-			return baseAction.CanUse(
-				out action,
-				usedUp: usedUp,
-				skipAoeCheck: skipAoeCheck,
-				targetOverride: TargetType.Nearest);
-		}
-		finally
-		{
-			baseAction.Setting.CanTarget = originalCanTarget;
-		}
-	}
-
-	private static IBattleChara? FindHostileById(ulong targetId)
-	{
-		foreach (var hostile in AllHostileTargets)
-		{
-			if (hostile != null && hostile.GameObjectId == targetId)
-			{
-				return hostile;
-			}
-		}
-
-		return null;
+		return PvPSingleTargetActionUse.TryUseOn(
+			baseAction,
+			targetId,
+			new PvPSingleTargetActionOptions(
+				UsedUp: usedUp,
+				SkipAoeCheck: skipAoeCheck,
+				TargetOverride: TargetType.Nearest),
+			out action);
 	}
 
 	private bool HasImmediateFollowUp(MachinistPvPActionIntent intent)
@@ -613,24 +614,27 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 		return action.Cooldown.HasOneCharge && StatusHelper.PlayerHasStatus(true, primedStatus);
 	}
 
-	private static bool IsSafeCloseRange(IBattleChara target, bool objectiveControlNeeded)
+	private static bool IsSafeCloseRange(
+		MachinistPvPTargetSnapshot snapshot,
+		bool objectiveControlNeeded,
+		IReadOnlyList<PvPCombatantSnapshot> hostiles)
 	{
-		if (Player == null || target.DistanceToPlayer() > CloseToolRangeYalms)
+		if (Player == null || !snapshot.IsInCloseRange)
 		{
 			return false;
 		}
 
-		if (objectiveControlNeeded || target.GetHealthRatio() <= CloseRangeCommitHealthRatio)
+		if (objectiveControlNeeded || snapshot.HealthRatio <= CloseRangeCommitHealthRatio)
 		{
 			return true;
 		}
 
-		return CountHostilesNear(Player.Position, CloseToolRangeYalms) <= SafeCloseRangeHostileLimit;
+		return PvPCombatantQueries.CountHostilesNear(hostiles, Player.Position, CloseToolRangeYalms) <= SafeCloseRangeHostileLimit;
 	}
 
-	private static bool IsForcedTeamfight(IBattleChara target)
+	private static bool IsForcedTeamfight(IBattleChara target, IReadOnlyList<PvPCombatantSnapshot> hostiles)
 	{
-		return CountHostilesNear(target.Position, TeamfightRadiusYalms) >= ForcedTeamfightHostileCount;
+		return PvPCombatantQueries.CountHostilesNear(hostiles, target.Position, TeamfightRadiusYalms) >= ForcedTeamfightHostileCount;
 	}
 
 	private static bool IsTargetCommitted(
@@ -644,50 +648,5 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 			|| target.TargetObjectId != 0;
 	}
 
-	private static int CountAlliesTargeting(IBattleChara target)
-	{
-		var count = 0;
-		foreach (var member in PartyMembers)
-		{
-			if (member != null && member.TargetObjectId == target.GameObjectId)
-			{
-				count++;
-			}
-		}
-
-		return count;
-	}
-
-	private static int CountAlliesNear(IBattleChara target, float radius)
-	{
-		var count = 0;
-		foreach (var member in PartyMembers)
-		{
-			if (member != null
-				&& member.CurrentHp > 0
-				&& Vector3.Distance(member.Position, target.Position) <= radius)
-			{
-				count++;
-			}
-		}
-
-		return count;
-	}
-
-	private static int CountHostilesNear(Vector3 position, float radius)
-	{
-		var count = 0;
-		foreach (var hostile in AllHostileTargets)
-		{
-			if (hostile != null
-				&& hostile.CurrentHp > 0
-				&& Vector3.Distance(hostile.Position, position) <= radius)
-			{
-				count++;
-			}
-		}
-
-		return count;
-	}
 	#endregion
 }

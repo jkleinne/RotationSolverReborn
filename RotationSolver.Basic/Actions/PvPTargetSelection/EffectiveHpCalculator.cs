@@ -7,7 +7,32 @@ namespace RotationSolver.Basic.Actions.PvPTargetSelection;
 /// </summary>
 public static class EffectiveHpCalculator
 {
+    /// <summary>
+    /// Computes target eHP with all modeled active mitigation, including Guard.
+    /// </summary>
     public static double Compute(IBattleChara target, IMitigationDatabase database)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(database);
+
+        return Compute(target, database, ignoredStatus: null);
+    }
+
+    /// <summary>
+    /// Computes target eHP for Guard-piercing actions while preserving every other modeled mitigation.
+    /// </summary>
+    public static double ComputeIgnoringGuard(IBattleChara target, IMitigationDatabase database)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(database);
+
+        return Compute(target, database, static statusId => statusId == StatusID.Guard);
+    }
+
+    private static double Compute(
+        IBattleChara target,
+        IMitigationDatabase database,
+        Func<StatusID, bool>? ignoredStatus)
     {
         var statusList = target.StatusList;
         if (statusList == null)
@@ -18,7 +43,8 @@ public static class EffectiveHpCalculator
         var damageMultiplier = 1.0;
         foreach (var status in statusList)
         {
-            if (!database.TryGet((StatusID)status.StatusId, out var entry))
+            var statusId = (StatusID)status.StatusId;
+            if (ignoredStatus?.Invoke(statusId) == true || !database.TryGet(statusId, out var entry))
             {
                 continue;
             }
