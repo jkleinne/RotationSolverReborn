@@ -58,6 +58,24 @@ internal static partial class PvPTestSuite
         AssertTrue(ReferenceEquals(originalCanTarget, testAction.Setting.CanTarget), "exact target helper should restore the predicate when CanUse throws");
     }
 
+    static void PvPSingleTargetActionUseComposesOriginalPredicate()
+    {
+        var testAction = new TestAction(
+        [
+            new TestBattleChara(20),
+            new TestBattleChara(30),
+        ]);
+        Func<IBattleChara, bool> originalCanTarget = candidate => candidate.GameObjectId != 30;
+        testAction.Setting.CanTarget = originalCanTarget;
+
+        var canUse = PvPSingleTargetActionUse.TryUseOn(testAction, 30, new PvPSingleTargetActionOptions(), out _);
+
+        AssertFalse(canUse, "exact target helper should keep the original target predicate");
+        AssertEqual(1, testAction.CanUseCallCount, "exact target helper should still evaluate CanUse for nonzero target ids");
+        AssertEqual(0, testAction.AcceptedTargetIds.Count, "exact target helper should not accept a target rejected by the original predicate");
+        AssertTrue(ReferenceEquals(originalCanTarget, testAction.Setting.CanTarget), "exact target helper should restore the original predicate after rejected target checks");
+    }
+
     static void PvPSingleTargetActionUseRejectsZeroTargetWithoutPredicateChange()
     {
         var testAction = new TestAction([new TestBattleChara(20)]);

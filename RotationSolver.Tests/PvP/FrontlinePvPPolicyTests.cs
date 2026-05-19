@@ -5,6 +5,15 @@ namespace RotationSolver.Tests;
 
 internal static partial class PvPTestSuite
 {
+	private static readonly string[] ExpectedFrontlineContentFinderNames =
+	[
+		"The Borderland Ruins (Secure)",
+		"Seal Rock (Seize)",
+		"The Fields of Glory (Shatter)",
+		"Onsal Hakair (Danshig Naadam)",
+		"Worqor Chirteh (Triumph)",
+	];
+
 	static void FrontlineRoleActionPolicyRejectsCrystallineConflict()
 	{
 		var shouldTry = FrontlinePvPRoleActionPolicy.ShouldTryFrontlineRoleAction(
@@ -32,8 +41,16 @@ internal static partial class PvPTestSuite
 
 	static void PvPModeClassifierDetectsFrontlineDuties()
 	{
-		foreach (var contentFinderName in PvPModeClassifier.FrontlineContentFinderNames)
+		AssertEqual(
+			ExpectedFrontlineContentFinderNames.Length,
+			PvPModeClassifier.FrontlineContentFinderNames.Count,
+			"Frontline classifier should expose each verified Frontline duty name");
+
+		foreach (var contentFinderName in ExpectedFrontlineContentFinderNames)
 		{
+			AssertTrue(
+				PvPModeClassifier.FrontlineContentFinderNames.Contains(contentFinderName),
+				$"{contentFinderName} should be present in the classifier set");
 			AssertTrue(
 				PvPModeClassifier.IsFrontline(contentFinderName),
 				$"{contentFinderName} should be detected as Frontline");
@@ -42,20 +59,6 @@ internal static partial class PvPTestSuite
 
 	static void PvPModeClassifierRejectsCrystallineConflictAsFrontline()
 	{
-		AssertFalse(
-			PvPModeClassifier.IsFrontline("Crystalline Conflict"),
-			"Crystalline Conflict must not be detected as Frontline");
-	}
-
-	static void FrontlineRoleActionPolicyDetectsFrontlineDuties()
-	{
-		foreach (var contentFinderName in PvPModeClassifier.FrontlineContentFinderNames)
-		{
-			AssertTrue(
-				PvPModeClassifier.IsFrontline(contentFinderName),
-				$"{contentFinderName} should be detected as Frontline");
-		}
-
 		AssertFalse(
 			PvPModeClassifier.IsFrontline("Crystalline Conflict"),
 			"Crystalline Conflict must not be detected as Frontline");

@@ -16,7 +16,6 @@ public static class PvPLiveTargetFactsBuilder
         ArgumentNullException.ThrowIfNull(context.MitigationDatabase);
         ArgumentNullException.ThrowIfNull(context.ObjectiveRelevantTargetIds);
         ArgumentNullException.ThrowIfNull(context.Allies);
-        ArgumentNullException.ThrowIfNull(context.Hostiles);
         ArgumentNullException.ThrowIfNull(context.GuardCooldownTracker);
         ArgumentNullException.ThrowIfNull(context.DistanceToPlayerProvider);
         ArgumentNullException.ThrowIfNull(context.HealthRatioProvider);
@@ -66,6 +65,30 @@ public static class PvPLiveTargetFactsBuilder
             TargetObjectId: combatant.TargetObjectId,
             Position: combatant.Position,
             HitboxRadius: combatant.HitboxRadius);
+    }
+
+    /// <summary>
+    /// Captures value-only combatant facts for live collections while skipping null object entries.
+    /// </summary>
+    public static List<PvPCombatantSnapshot> ToCombatantSnapshots(
+        IEnumerable<IBattleChara?> combatants,
+        Func<IBattleChara, float> healthRatioProvider)
+    {
+        ArgumentNullException.ThrowIfNull(combatants);
+        ArgumentNullException.ThrowIfNull(healthRatioProvider);
+
+        List<PvPCombatantSnapshot> snapshots = [];
+        foreach (var combatant in combatants)
+        {
+            if (combatant == null)
+            {
+                continue;
+            }
+
+            snapshots.Add(ToCombatantSnapshot(combatant, healthRatioProvider));
+        }
+
+        return snapshots;
     }
 
     /// <summary>

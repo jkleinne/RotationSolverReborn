@@ -198,6 +198,28 @@ internal static partial class PvPTestSuite
 		AssertEqual(0.42f, snapshot.HealthRatio, "combatant snapshot should preserve caller health ratio semantics");
 	}
 
+	static void LiveCombatantSnapshotsSkipNullsAndUseCallerHealthProvider()
+	{
+		var firstCombatant = new MitigatedBattleChara(currentHp: 1_000, maxHp: 10_000, objectId: 10);
+		var secondCombatant = new MitigatedBattleChara(currentHp: 1_000, maxHp: 10_000, objectId: 20);
+		var combatants = new IBattleChara?[]
+		{
+			firstCombatant,
+			null,
+			secondCombatant,
+		};
+
+		var snapshots = PvPLiveTargetFactsBuilder.ToCombatantSnapshots(
+			combatants,
+			combatant => combatant.GameObjectId == firstCombatant.GameObjectId ? 0.25f : 0.75f);
+
+		AssertEqual(2, snapshots.Count, "combatant snapshot list should ignore null live entries");
+		AssertEqual(10UL, snapshots[0].ObjectId, "combatant snapshot list should preserve the first live object id");
+		AssertEqual(0.25f, snapshots[0].HealthRatio, "combatant snapshot list should use caller health ratio for first live object");
+		AssertEqual(20UL, snapshots[1].ObjectId, "combatant snapshot list should preserve the second live object id");
+		AssertEqual(0.75f, snapshots[1].HealthRatio, "combatant snapshot list should use caller health ratio for second live object");
+	}
+
 	static string RepositoryPath(params string[] parts)
 	{
 		var root = FindRepositoryRoot();
@@ -273,7 +295,6 @@ internal static partial class PvPTestSuite
 			MitigationDatabase: new TestMitigationDatabase(),
 			ObjectiveRelevantTargetIds: new HashSet<ulong>(),
 			Allies: [],
-			Hostiles: [],
 			CurrentTime: TimeSpan.Zero,
 			GuardCooldownTracker: new PvPGuardCooldownTracker(),
 			GuardReactionWindow: TimeSpan.Zero,
@@ -285,14 +306,27 @@ internal static partial class PvPTestSuite
 
 	private sealed class MitigatedBattleChara : IBattleChara
 	{
-		public MitigatedBattleChara(uint currentHp, uint maxHp, params StatusID[] statuses)
+		public MitigatedBattleChara(
+			uint currentHp,
+			uint maxHp,
+			params StatusID[] statuses)
+			: this(currentHp, maxHp, objectId: 1, statuses)
 		{
+		}
+
+		public MitigatedBattleChara(
+			uint currentHp,
+			uint maxHp,
+			ulong objectId,
+			params StatusID[] statuses)
+		{
+			GameObjectId = objectId;
 			CurrentHp = currentHp;
 			MaxHp = maxHp;
 			StatusList = statuses.Select(status => new TestStatus((uint)status)).ToArray();
 		}
 
-		public ulong GameObjectId => 1;
+		public ulong GameObjectId { get; }
 
 		public uint CurrentHp { get; }
 

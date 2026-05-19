@@ -191,16 +191,13 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 			return false;
 		}
 
-		var hostiles = BuildCombatantSnapshots(AllHostileTargets);
-		var allies = BuildCombatantSnapshots(PartyMembers);
-		var objectiveTargets = PvPObjectiveState.BuildObjectiveRelevantTargetIds();
-		var context = CreateFactsContext(intent, allies, hostiles, objectiveTargets);
+		var liveFrame = CreateLiveTargetFrame(intent);
 		var snapshot = CreateTargetSnapshot(
 			target,
 			intent,
 			analysisWillBuffAction: true,
-			context: context);
-		var input = CreateDecisionInput(snapshot, target, intent, allies, hostiles);
+			context: liveFrame.FactsContext);
+		var input = CreateDecisionInput(snapshot, target, intent, liveFrame.Allies, liveFrame.Hostiles);
 		if (!ShouldUseAnalysis(intent, input))
 		{
 			return false;
@@ -347,7 +344,8 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 		bool skipAoeCheck = false)
 	{
 		action = null;
-		foreach (var targetSnapshot in RankTargets(intent, out var context))
+		var rankedFrame = RankTargets(intent);
+		foreach (var targetSnapshot in rankedFrame.RankedTargets)
 		{
 			var target = PvPLiveTargetFactsBuilder.FindLiveTargetById(AllHostileTargets, targetSnapshot.TargetId);
 			if (target == null)
@@ -355,7 +353,12 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 				continue;
 			}
 
-			var input = CreateDecisionInput(targetSnapshot, target, intent, context.Allies, context.Hostiles);
+			var input = CreateDecisionInput(
+				targetSnapshot,
+				target,
+				intent,
+				rankedFrame.LiveFrame.Allies,
+				rankedFrame.LiveFrame.Hostiles);
 			if (!shouldUse(input))
 			{
 				TraceMarksmanSpiteDecision("policy_reject", baseAction, target, targetSnapshot, input);
@@ -422,16 +425,20 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 			message);
 	}
 
-	private static List<MachinistPvPTargetSnapshot> RankTargets(
-		MachinistPvPActionIntent intent,
-		out PvPLiveTargetFactsContext context)
+	private readonly record struct MachinistPvPLiveTargetFrame(
+		PvPLiveTargetFactsContext FactsContext,
+		IReadOnlyList<PvPCombatantSnapshot> Allies,
+		IReadOnlyList<PvPCombatantSnapshot> Hostiles);
+
+	private readonly record struct MachinistPvPRankedTargetFrame(
+		IReadOnlyList<MachinistPvPTargetSnapshot> RankedTargets,
+		MachinistPvPLiveTargetFrame LiveFrame);
+
+	private static MachinistPvPRankedTargetFrame RankTargets(MachinistPvPActionIntent intent)
 	{
 		List<MachinistPvPTargetSnapshot> snapshots = [];
 		var analysisWillBuffAction = StatusHelper.PlayerHasStatus(true, StatusID.Analysis);
-		var hostiles = BuildCombatantSnapshots(AllHostileTargets);
-		var allies = BuildCombatantSnapshots(PartyMembers);
-		var objectiveTargets = PvPObjectiveState.BuildObjectiveRelevantTargetIds();
-		context = CreateFactsContext(intent, allies, hostiles, objectiveTargets);
+		var liveFrame = CreateLiveTargetFrame(intent);
 		foreach (var hostile in AllHostileTargets)
 		{
 			if (hostile == null || hostile.CurrentHp == 0)
@@ -439,23 +446,39 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 				continue;
 			}
 
-			snapshots.Add(CreateTargetSnapshot(hostile, intent, analysisWillBuffAction, context));
+			snapshots.Add(CreateTargetSnapshot(hostile, intent, analysisWillBuffAction, liveFrame.FactsContext));
 		}
 
-		return MachinistPvPTargetPolicy.Rank(snapshots, intent);
+		return new MachinistPvPRankedTargetFrame(
+			MachinistPvPTargetPolicy.Rank(snapshots, intent),
+			liveFrame);
+	}
+
+	private static MachinistPvPLiveTargetFrame CreateLiveTargetFrame(MachinistPvPActionIntent intent)
+	{
+		var hostiles = PvPLiveTargetFactsBuilder.ToCombatantSnapshots(
+			AllHostileTargets,
+			target => target.GetHealthRatio());
+		var allies = PvPLiveTargetFactsBuilder.ToCombatantSnapshots(
+			PartyMembers,
+			target => target.GetHealthRatio());
+		var objectiveTargets = PvPObjectiveState.BuildObjectiveRelevantTargetIds();
+
+		return new MachinistPvPLiveTargetFrame(
+			CreateFactsContext(intent, allies, objectiveTargets),
+			allies,
+			hostiles);
 	}
 
 	private static PvPLiveTargetFactsContext CreateFactsContext(
 		MachinistPvPActionIntent intent,
 		IReadOnlyList<PvPCombatantSnapshot> allies,
-		IReadOnlyList<PvPCombatantSnapshot> hostiles,
 		IReadOnlySet<ulong> objectiveTargets)
 	{
 		return new PvPLiveTargetFactsContext(
 			MitigationDatabase: PvPMitigationDatabaseProvider.Current,
 			ObjectiveRelevantTargetIds: objectiveTargets,
 			Allies: allies,
-			Hostiles: hostiles,
 			CurrentTime: TimeSpan.FromMilliseconds(Environment.TickCount64),
 			GuardCooldownTracker: DataCenter.PvPGuardCooldownTracker,
 			GuardReactionWindow: TimeSpan.FromSeconds(MarksmanGuardReactionWindowSeconds),
@@ -473,24 +496,6 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 			MachinistPvPActionIntent.EagleEyeShot => EagleEyeShotRangeYalms,
 			_ => NormalToolRangeYalms,
 		};
-	}
-
-	private static List<PvPCombatantSnapshot> BuildCombatantSnapshots(IEnumerable<IBattleChara?> combatants)
-	{
-		List<PvPCombatantSnapshot> snapshots = [];
-		foreach (var combatant in combatants)
-		{
-			if (combatant == null)
-			{
-				continue;
-			}
-
-			snapshots.Add(PvPLiveTargetFactsBuilder.ToCombatantSnapshot(
-				combatant,
-				target => target.GetHealthRatio()));
-		}
-
-		return snapshots;
 	}
 
 	private static MachinistPvPTargetSnapshot CreateTargetSnapshot(

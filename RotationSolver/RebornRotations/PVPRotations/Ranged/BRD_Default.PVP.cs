@@ -599,8 +599,8 @@ public sealed class BRD_DefaultPvP : BardRotation
 	{
 		action = null;
 
-		var rankedTargets = RankTargets(intent, baseAction.TargetInfo.Range, out var context);
-		foreach (var targetSnapshot in rankedTargets)
+		var rankedFrame = RankTargets(intent, baseAction.TargetInfo.Range);
+		foreach (var targetSnapshot in rankedFrame.RankedTargets)
 		{
 			var target = PvPLiveTargetFactsBuilder.FindLiveTargetById(AllHostileTargets, targetSnapshot.TargetId);
 			if (target == null)
@@ -608,24 +608,28 @@ public sealed class BRD_DefaultPvP : BardRotation
 				continue;
 			}
 
-			var input = CreateDecisionInput(targetSnapshot, target, intent, baseAction, context.Allies);
+			var input = CreateDecisionInput(targetSnapshot, target, intent, baseAction, rankedFrame.LiveFrame.Allies);
 			if (!shouldUse(input))
 			{
 				continue;
 			}
 
-			var refreshedSnapshot = RefreshTargetSnapshot(
+			var refreshedFrame = RefreshTargetSnapshot(
 				targetSnapshot,
 				target,
-				baseAction.TargetInfo.Range,
-				out var refreshedContext);
-			var refreshedInput = CreateDecisionInput(refreshedSnapshot, target, intent, baseAction, refreshedContext.Allies);
+				baseAction.TargetInfo.Range);
+			var refreshedInput = CreateDecisionInput(
+				refreshedFrame.Snapshot,
+				target,
+				intent,
+				baseAction,
+				refreshedFrame.LiveFrame.Allies);
 			if (!shouldUse(refreshedInput))
 			{
 				continue;
 			}
 
-			if (TryUseActionOn(baseAction, refreshedSnapshot.TargetId, out action, skipAoeCheck, skipStatusProvideCheck))
+			if (TryUseActionOn(baseAction, refreshedFrame.Snapshot.TargetId, out action, skipAoeCheck, skipStatusProvideCheck))
 			{
 				return true;
 			}
@@ -634,16 +638,23 @@ public sealed class BRD_DefaultPvP : BardRotation
 		return false;
 	}
 
-	private static List<BardPvPTargetSnapshot> RankTargets(
-		BardPvPActionIntent intent,
-		float range,
-		out PvPLiveTargetFactsContext context)
+	private readonly record struct BardPvPLiveTargetFrame(
+		PvPLiveTargetFactsContext FactsContext,
+		IReadOnlyList<PvPCombatantSnapshot> Allies,
+		IReadOnlyList<PvPCombatantSnapshot> Hostiles);
+
+	private readonly record struct BardPvPRankedTargetFrame(
+		IReadOnlyList<BardPvPTargetSnapshot> RankedTargets,
+		BardPvPLiveTargetFrame LiveFrame);
+
+	private readonly record struct BardPvPRefreshedTargetFrame(
+		BardPvPTargetSnapshot Snapshot,
+		BardPvPLiveTargetFrame LiveFrame);
+
+	private static BardPvPRankedTargetFrame RankTargets(BardPvPActionIntent intent, float range)
 	{
 		List<BardPvPTargetSnapshot> snapshots = [];
-		var hostiles = BuildCombatantSnapshots(AllHostileTargets);
-		var allies = BuildCombatantSnapshots(PartyMembers);
-		var objectiveTargets = PvPObjectiveState.BuildObjectiveRelevantTargetIds();
-		context = CreateFactsContext(range, allies, hostiles, objectiveTargets);
+		var liveFrame = CreateLiveTargetFrame(range);
 
 		foreach (var hostile in AllHostileTargets)
 		{
@@ -653,23 +664,39 @@ public sealed class BRD_DefaultPvP : BardRotation
 				continue;
 			}
 
-			snapshots.Add(CreateTargetSnapshot(hostile, intent, context));
+			snapshots.Add(CreateTargetSnapshot(hostile, intent, liveFrame));
 		}
 
-		return BardPvPTargetPolicy.Rank(snapshots, intent);
+		return new BardPvPRankedTargetFrame(
+			BardPvPTargetPolicy.Rank(snapshots, intent),
+			liveFrame);
+	}
+
+	private static BardPvPLiveTargetFrame CreateLiveTargetFrame(float range)
+	{
+		var hostiles = PvPLiveTargetFactsBuilder.ToCombatantSnapshots(
+			AllHostileTargets,
+			target => target.GetHealthRatio());
+		var allies = PvPLiveTargetFactsBuilder.ToCombatantSnapshots(
+			PartyMembers,
+			target => target.GetHealthRatio());
+		var objectiveTargets = PvPObjectiveState.BuildObjectiveRelevantTargetIds();
+
+		return new BardPvPLiveTargetFrame(
+			CreateFactsContext(range, allies, objectiveTargets),
+			allies,
+			hostiles);
 	}
 
 	private static PvPLiveTargetFactsContext CreateFactsContext(
 		float range,
 		IReadOnlyList<PvPCombatantSnapshot> allies,
-		IReadOnlyList<PvPCombatantSnapshot> hostiles,
 		IReadOnlySet<ulong> objectiveTargets)
 	{
 		return new PvPLiveTargetFactsContext(
 			MitigationDatabase: PvPMitigationDatabaseProvider.Current,
 			ObjectiveRelevantTargetIds: objectiveTargets,
 			Allies: allies,
-			Hostiles: hostiles,
 			CurrentTime: TimeSpan.FromMilliseconds(Environment.TickCount64),
 			GuardCooldownTracker: DataCenter.PvPGuardCooldownTracker,
 			GuardReactionWindow: TimeSpan.FromSeconds(GuardReactionWindowSeconds),
@@ -679,30 +706,12 @@ public sealed class BRD_DefaultPvP : BardRotation
 			HasStatus: (target, statusId) => target.HasStatus(false, statusId));
 	}
 
-	private static List<PvPCombatantSnapshot> BuildCombatantSnapshots(IEnumerable<IBattleChara?> combatants)
-	{
-		List<PvPCombatantSnapshot> snapshots = [];
-		foreach (var combatant in combatants)
-		{
-			if (combatant == null)
-			{
-				continue;
-			}
-
-			snapshots.Add(PvPLiveTargetFactsBuilder.ToCombatantSnapshot(
-				combatant,
-				target => target.GetHealthRatio()));
-		}
-
-		return snapshots;
-	}
-
 	private static BardPvPTargetSnapshot CreateTargetSnapshot(
 		IBattleChara target,
 		BardPvPActionIntent intent,
-		PvPLiveTargetFactsContext context)
+		BardPvPLiveTargetFrame liveFrame)
 	{
-		var facts = PvPLiveTargetFactsBuilder.Create(target, context);
+		var facts = PvPLiveTargetFactsBuilder.Create(target, liveFrame.FactsContext);
 
 		return new BardPvPTargetSnapshot(
 			TargetId: facts.TargetId,
@@ -721,25 +730,24 @@ public sealed class BRD_DefaultPvP : BardRotation
 			ActiveDamageReduction: facts.ActiveDamageReduction,
 			IsExposed: facts.IsExposed,
 			IsInNormalRange: facts.IsInNormalRange,
-			LineTargetCount: CountHostilesInLine(context.Hostiles, target, context.ActionRange),
+			LineTargetCount: CountHostilesInLine(
+				liveFrame.Hostiles,
+				target,
+				liveFrame.FactsContext.ActionRange),
 			SplashTargetCount: PvPCombatantQueries.CountHostilesNear(
-				context.Hostiles,
+				liveFrame.Hostiles,
 				target.Position,
 				OffensiveSplashRadiusYalms),
 			GuardAvailability: facts.GuardAvailability);
 	}
 
-	private static BardPvPTargetSnapshot RefreshTargetSnapshot(
+	private static BardPvPRefreshedTargetFrame RefreshTargetSnapshot(
 		BardPvPTargetSnapshot snapshot,
 		IBattleChara target,
-		float range,
-		out PvPLiveTargetFactsContext context)
+		float range)
 	{
-		var hostiles = BuildCombatantSnapshots(AllHostileTargets);
-		var allies = BuildCombatantSnapshots(PartyMembers);
-		var objectiveTargets = PvPObjectiveState.BuildObjectiveRelevantTargetIds();
-		context = CreateFactsContext(range, allies, hostiles, objectiveTargets);
-		var facts = PvPLiveTargetFactsBuilder.Create(target, context);
+		var liveFrame = CreateLiveTargetFrame(range);
+		var facts = PvPLiveTargetFactsBuilder.Create(target, liveFrame.FactsContext);
 
 		var refreshedSnapshot = snapshot with
 		{
@@ -758,15 +766,20 @@ public sealed class BRD_DefaultPvP : BardRotation
 			GuardAvailability = facts.GuardAvailability,
 		};
 
-		return BardPvPTargetSnapshotRefresher.RefreshSpatialState(
-			refreshedSnapshot,
-			new BardPvPTargetSpatialState(
-				IsInNormalRange: facts.IsInNormalRange,
-				LineTargetCount: CountHostilesInLine(context.Hostiles, target, context.ActionRange),
-				SplashTargetCount: PvPCombatantQueries.CountHostilesNear(
-					context.Hostiles,
-					target.Position,
-					OffensiveSplashRadiusYalms)));
+		return new BardPvPRefreshedTargetFrame(
+			BardPvPTargetSnapshotRefresher.RefreshSpatialState(
+				refreshedSnapshot,
+				new BardPvPTargetSpatialState(
+					IsInNormalRange: facts.IsInNormalRange,
+					LineTargetCount: CountHostilesInLine(
+						liveFrame.Hostiles,
+						target,
+						liveFrame.FactsContext.ActionRange),
+					SplashTargetCount: PvPCombatantQueries.CountHostilesNear(
+						liveFrame.Hostiles,
+						target.Position,
+						OffensiveSplashRadiusYalms))),
+			liveFrame);
 	}
 
 	private BardPvPOffensiveDecisionInput CreateDecisionInput(

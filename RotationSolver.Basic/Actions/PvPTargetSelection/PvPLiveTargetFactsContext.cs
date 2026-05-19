@@ -6,7 +6,6 @@ namespace RotationSolver.Basic.Actions.PvPTargetSelection;
 /// <param name="MitigationDatabase">Mitigation lookup for the current plugin data version.</param>
 /// <param name="ObjectiveRelevantTargetIds">Objective-relevant target ids from the caller's PvP mode context.</param>
 /// <param name="Allies">Value snapshots for ally focus queries.</param>
-/// <param name="Hostiles">Value snapshots for hostile spatial queries and later shared reuse.</param>
 /// <param name="CurrentTime">Current frame time supplied by the rotation caller.</param>
 /// <param name="GuardCooldownTracker">Stateful Guard cooldown tracker owned outside the builder.</param>
 /// <param name="GuardReactionWindow">Minimum Guard unavailable window required by the caller.</param>
@@ -18,7 +17,6 @@ public readonly record struct PvPLiveTargetFactsContext(
     IMitigationDatabase MitigationDatabase,
     IReadOnlySet<ulong> ObjectiveRelevantTargetIds,
     IReadOnlyList<PvPCombatantSnapshot> Allies,
-    IReadOnlyList<PvPCombatantSnapshot> Hostiles,
     TimeSpan CurrentTime,
     PvPGuardCooldownTracker GuardCooldownTracker,
     TimeSpan GuardReactionWindow,

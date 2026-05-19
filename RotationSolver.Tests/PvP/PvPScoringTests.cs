@@ -163,6 +163,58 @@ internal static partial class PvPTestSuite
 		AssertEqual(1, count, "line query should use XZ projection and ignore dead combatants");
 	}
 
+	static void PvPCombatantQueriesLineCountRejectsZeroLengthDirection()
+	{
+		var hostiles = new[]
+		{
+			Combatant(10, health: 1f, position: new Vector3(0f, 0f, 1f), hitboxRadius: 0.5f),
+		};
+
+		var count = PvPCombatantQueries.CountHostilesInLine(
+			hostiles,
+			origin: Vector3.Zero,
+			targetPosition: Vector3.Zero,
+			range: 25f,
+			halfWidth: 1f);
+
+		AssertEqual(0, count, "line query should reject a zero-length direction");
+	}
+
+	static void PvPCombatantQueriesLineCountRejectsHostilesBeyondRange()
+	{
+		var hostiles = new[]
+		{
+			Combatant(10, health: 1f, position: new Vector3(0f, 0f, 26f), hitboxRadius: 1f),
+		};
+
+		var count = PvPCombatantQueries.CountHostilesInLine(
+			hostiles,
+			origin: Vector3.Zero,
+			targetPosition: new Vector3(0f, 0f, 10f),
+			range: 25f,
+			halfWidth: 1f);
+
+		AssertEqual(0, count, "line query should reject hostiles beyond the action range");
+	}
+
+	static void PvPCombatantQueriesLineCountIncludesHitboxBoundary()
+	{
+		var hostiles = new[]
+		{
+			Combatant(10, health: 1f, position: new Vector3(1.5f, 0f, 5f), hitboxRadius: 0.5f),
+			Combatant(11, health: 1f, position: new Vector3(1.6f, 0f, 5f), hitboxRadius: 0.5f),
+		};
+
+		var count = PvPCombatantQueries.CountHostilesInLine(
+			hostiles,
+			origin: Vector3.Zero,
+			targetPosition: new Vector3(0f, 0f, 10f),
+			range: 25f,
+			halfWidth: 1f);
+
+		AssertEqual(1, count, "line query should include hostiles on the half width plus hitbox boundary");
+	}
+
 	static PvPCombatantSnapshot Combatant(
 		ulong objectId,
 		float health,
