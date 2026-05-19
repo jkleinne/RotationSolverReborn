@@ -378,23 +378,13 @@ public sealed class BRD_DefaultPvP : BardRotation
 			return false;
 		}
 
-		var targetObjectId = target.GameObjectId;
-		var originalCanTarget = wardensPaean.Setting.CanTarget;
-
-		wardensPaean.Setting.CanTarget = candidate =>
-			originalCanTarget(candidate) && candidate.GameObjectId == targetObjectId;
-
-		try
-		{
-			return wardensPaean.CanUse(
-				out action,
-				skipTargetStatusNeedCheck: intent == PaeanCastIntent.Protect,
-				targetOverride: TargetType.Nearest);
-		}
-		finally
-		{
-			wardensPaean.Setting.CanTarget = originalCanTarget;
-		}
+		return PvPSingleTargetActionUse.TryUseOn(
+			wardensPaean,
+			target.GameObjectId,
+			new PvPSingleTargetActionOptions(
+				SkipTargetStatusNeedCheck: intent == PaeanCastIntent.Protect,
+				TargetOverride: TargetType.Nearest),
+			out action);
 	}
 
 	protected override bool AttackAbility(IAction nextGCD, out IAction? action)
@@ -1007,22 +997,14 @@ public sealed class BRD_DefaultPvP : BardRotation
 		bool skipStatusProvideCheck)
 	{
 		action = null;
-		var originalCanTarget = baseAction.Setting.CanTarget;
-		baseAction.Setting.CanTarget = candidate =>
-			originalCanTarget(candidate) && candidate.GameObjectId == targetId;
-
-		try
-		{
-			return baseAction.CanUse(
-				out action,
-				skipAoeCheck: skipAoeCheck,
-				skipStatusProvideCheck: skipStatusProvideCheck,
-				targetOverride: TargetType.Nearest);
-		}
-		finally
-		{
-			baseAction.Setting.CanTarget = originalCanTarget;
-		}
+		return PvPSingleTargetActionUse.TryUseOn(
+			baseAction,
+			targetId,
+			new PvPSingleTargetActionOptions(
+				SkipStatusProvideCheck: skipStatusProvideCheck,
+				SkipAoeCheck: skipAoeCheck,
+				TargetOverride: TargetType.Nearest),
+			out action);
 	}
 	#endregion
 }

@@ -558,22 +558,14 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 		bool skipAoeCheck)
 	{
 		action = null;
-		var originalCanTarget = baseAction.Setting.CanTarget;
-		baseAction.Setting.CanTarget = candidate =>
-			originalCanTarget(candidate) && candidate.GameObjectId == targetId;
-
-		try
-		{
-			return baseAction.CanUse(
-				out action,
-				usedUp: usedUp,
-				skipAoeCheck: skipAoeCheck,
-				targetOverride: TargetType.Nearest);
-		}
-		finally
-		{
-			baseAction.Setting.CanTarget = originalCanTarget;
-		}
+		return PvPSingleTargetActionUse.TryUseOn(
+			baseAction,
+			targetId,
+			new PvPSingleTargetActionOptions(
+				UsedUp: usedUp,
+				SkipAoeCheck: skipAoeCheck,
+				TargetOverride: TargetType.Nearest),
+			out action);
 	}
 
 	private static IBattleChara? FindHostileById(ulong targetId)
