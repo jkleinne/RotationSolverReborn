@@ -52,6 +52,7 @@ internal static partial class PvPTestSuite
 		new("machinist target policy prefers team focused non lb target", MachinistTargetPolicyPrefersTeamFocusedNonLbTarget),
 		new("machinist target policy keeps direct secure above team focus", MachinistTargetPolicyKeepsDirectSecureAboveTeamFocus),
 		new("machinist target policy does not boost marksman team focus", MachinistTargetPolicyDoesNotBoostMarksmanTeamFocus),
+		new("machinist target policy does not boost eagle eye team focus", MachinistTargetPolicyDoesNotBoostEagleEyeTeamFocus),
 		new("machinist target policy allows guarded drill punish", MachinistTargetPolicyAllowsGuardedDrillPunish),
 		new("machinist analysis drill rejects full resource target", MachinistAnalysisDrillRejectsFullResourceTarget),
 		new("machinist analysis drill accepts direct secure kill", MachinistAnalysisDrillAcceptsDirectSecureKill),

@@ -118,6 +118,35 @@ internal static partial class PvPTestSuite
 		AssertEqual(oneFocusScore, teamFocusScore, "Marksman's Spite should not gain extra value from multiple ally focus");
 	}
 
+	static void MachinistTargetPolicyDoesNotBoostEagleEyeTeamFocus()
+	{
+		var noFocusTarget = MachinistTarget(
+			1,
+			healthRatio: 0.40f,
+			currentMp: 10_000,
+			hasAllyFocus: false,
+			allyFocusCount: 0);
+		var oneFocusTarget = MachinistTarget(
+			2,
+			healthRatio: 0.40f,
+			currentMp: 10_000,
+			hasAllyFocus: true,
+			allyFocusCount: 1);
+		var teamFocusTarget = MachinistTarget(
+			3,
+			healthRatio: 0.40f,
+			currentMp: 10_000,
+			hasAllyFocus: true,
+			allyFocusCount: 2);
+
+		var noFocusScore = MachinistPvPTargetPolicy.Score(noFocusTarget, MachinistPvPActionIntent.EagleEyeShot);
+		var oneFocusScore = MachinistPvPTargetPolicy.Score(oneFocusTarget, MachinistPvPActionIntent.EagleEyeShot);
+		var teamFocusScore = MachinistPvPTargetPolicy.Score(teamFocusTarget, MachinistPvPActionIntent.EagleEyeShot);
+
+		AssertTrue(oneFocusScore > noFocusScore, "Eagle Eye Shot should keep existing single ally focus value");
+		AssertEqual(oneFocusScore, teamFocusScore, "Eagle Eye Shot should not gain extra value from multiple ally focus");
+	}
+
 	static void MachinistTargetPolicyAllowsGuardedDrillPunish()
 	{
 		var guardedLowTarget = MachinistTarget(
