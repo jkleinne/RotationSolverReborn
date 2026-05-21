@@ -155,6 +155,7 @@ internal static partial class PvPTestSuite
 		new("live target facts use caller health provider", LiveTargetFactsUseCallerHealthProvider),
 		new("live target facts use caller status delegate", LiveTargetFactsUseCallerStatusDelegate),
 		new("live target facts use caller distance provider", LiveTargetFactsUseCallerDistanceProvider),
+		new("live target facts expose ally focus count", LiveTargetFactsExposeAllyFocusCount),
 		new("live combatant snapshot uses caller health provider", LiveCombatantSnapshotUsesCallerHealthProvider),
 		new("live combatant snapshots skip nulls and use caller health provider", LiveCombatantSnapshotsSkipNullsAndUseCallerHealthProvider),
 		new("frontline role action policy rejects crystalline conflict", FrontlineRoleActionPolicyRejectsCrystallineConflict),

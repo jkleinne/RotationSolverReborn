@@ -27,6 +27,7 @@ public static class PvPLiveTargetFactsBuilder
         var guardPiercingEffectiveHealth = EffectiveHpCalculator.ComputeIgnoringGuard(target, mitigationDatabase);
         var isInNormalRange = context.DistanceToPlayerProvider(target) <= context.ActionRange;
         var hasGuard = context.HasStatus(target, StatusID.Guard);
+        var allyFocusCount = PvPCombatantQueries.CountAlliesTargeting(context.Allies, targetId);
 
         return new PvPLiveTargetFacts(
             TargetId: targetId,
@@ -35,7 +36,8 @@ public static class PvPLiveTargetFactsBuilder
             HasGuard: hasGuard,
             HasResilience: context.HasStatus(target, StatusID.Resilience),
             IsObjectiveRelevant: context.ObjectiveRelevantTargetIds.Contains(targetId),
-            HasAllyFocus: PvPCombatantQueries.CountAlliesTargeting(context.Allies, targetId) > 0,
+            HasAllyFocus: allyFocusCount > 0,
+            AllyFocusCount: allyFocusCount,
             HasNonGuardInvulnerability: HasNonGuardInvulnerability(target, mitigationDatabase),
             EffectiveHealthRatio: ToEffectiveHealthRatio(target, effectiveHealth),
             GuardPiercingEffectiveHealthRatio: ToEffectiveHealthRatio(target, guardPiercingEffectiveHealth),

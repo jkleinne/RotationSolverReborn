@@ -185,6 +185,23 @@ internal static partial class PvPTestSuite
 		AssertTrue(facts.IsExposed, "caller range semantics should drive exposure");
 	}
 
+	static void LiveTargetFactsExposeAllyFocusCount()
+	{
+		var target = new MitigatedBattleChara(currentHp: 1_000, maxHp: 10_000, objectId: 99);
+		var allies = new[]
+		{
+			new PvPCombatantSnapshot(1, 1.0f, 1, target.GameObjectId, default, 0f),
+			new PvPCombatantSnapshot(2, 1.0f, 1, target.GameObjectId, default, 0f),
+			new PvPCombatantSnapshot(3, 1.0f, 1, 42UL, default, 0f),
+		};
+		var context = CreateLiveFactsContext(allies: allies);
+
+		var facts = PvPLiveTargetFactsBuilder.Create(target, context);
+
+		AssertEqual(2, facts.AllyFocusCount, "live target facts should preserve the exact ally focus count");
+		AssertTrue(facts.HasAllyFocus, "live target facts should derive ally focus from the count");
+	}
+
 	static void LiveCombatantSnapshotUsesCallerHealthProvider()
 	{
 		var combatant = new MitigatedBattleChara(currentHp: 1_000, maxHp: 10_000);
@@ -289,12 +306,13 @@ internal static partial class PvPTestSuite
 	private static PvPLiveTargetFactsContext CreateLiveFactsContext(
 		Func<IBattleChara, float>? healthRatioProvider = null,
 		Func<IBattleChara, float>? distanceToPlayerProvider = null,
-		Func<IBattleChara, StatusID, bool>? hasStatus = null)
+		Func<IBattleChara, StatusID, bool>? hasStatus = null,
+		IReadOnlyList<PvPCombatantSnapshot>? allies = null)
 	{
 		return new PvPLiveTargetFactsContext(
 			MitigationDatabase: new TestMitigationDatabase(),
 			ObjectiveRelevantTargetIds: new HashSet<ulong>(),
-			Allies: [],
+			Allies: allies ?? [],
 			CurrentTime: TimeSpan.Zero,
 			GuardCooldownTracker: new PvPGuardCooldownTracker(),
 			GuardReactionWindow: TimeSpan.Zero,
