@@ -250,6 +250,90 @@ internal static partial class PvPTestSuite
 		AssertEqual(2UL, selected?.TargetId, "Bard should prefer pressure on enemies with limited Recuperate resources");
 	}
 
+	static void BardOffensiveTargetPolicyPrefersTeamFocusedNonLbTarget()
+	{
+		var oneFocusTarget = BardOffensiveTarget(
+			1,
+			healthRatio: 0.40f,
+			currentMp: 10_000,
+			hasAllyFocus: true,
+			allyFocusCount: 1);
+		var teamFocusTarget = BardOffensiveTarget(
+			2,
+			healthRatio: 0.40f,
+			currentMp: 10_000,
+			hasAllyFocus: true,
+			allyFocusCount: 2);
+		var noFocusTarget = BardOffensiveTarget(
+			3,
+			healthRatio: 0.40f,
+			currentMp: 10_000,
+			hasAllyFocus: false,
+			allyFocusCount: 0);
+
+		var oneFocusScore = BardPvPTargetPolicy.Score(oneFocusTarget, BardPvPActionIntent.PowerfulShot);
+		var teamFocusScore = BardPvPTargetPolicy.Score(teamFocusTarget, BardPvPActionIntent.PowerfulShot);
+		var noFocusScore = BardPvPTargetPolicy.Score(noFocusTarget, BardPvPActionIntent.PowerfulShot);
+		var selected = BardPvPTargetPolicy.SelectBest(
+			[oneFocusTarget, teamFocusTarget, noFocusTarget],
+			BardPvPActionIntent.PowerfulShot);
+
+		AssertTrue(oneFocusScore > noFocusScore, "Bard non-LB focus scoring should value a single ally focus over no focus");
+		AssertTrue(teamFocusScore > oneFocusScore, "Bard non-LB focus scoring should value team focus over single ally focus");
+		AssertEqual(2UL, selected?.TargetId, "Bard should prefer the enemy already focused by multiple allies for non-LB pressure");
+	}
+
+	static void BardOffensiveTargetPolicyKeepsDirectSecureAboveTeamFocus()
+	{
+		var directSecureTarget = BardOffensiveTarget(
+			1,
+			healthRatio: 0.15f,
+			currentMp: 10_000,
+			effectiveHealthRatio: 0.15,
+			expectedDamageRatio: 0.20);
+		var teamFocusTarget = BardOffensiveTarget(
+			2,
+			healthRatio: 0.40f,
+			currentMp: 10_000,
+			hasAllyFocus: true,
+			allyFocusCount: 3);
+
+		var selected = BardPvPTargetPolicy.SelectBest(
+			[directSecureTarget, teamFocusTarget],
+			BardPvPActionIntent.HarmonicArrow);
+
+		AssertEqual(1UL, selected?.TargetId, "Bard should keep direct secure pressure ahead of focus-only team pressure");
+	}
+
+	static void BardOffensiveTargetPolicyDoesNotBoostEagleEyeTeamFocus()
+	{
+		var noFocusTarget = BardOffensiveTarget(
+			1,
+			healthRatio: 0.40f,
+			currentMp: 10_000,
+			hasAllyFocus: false,
+			allyFocusCount: 0);
+		var oneFocusTarget = BardOffensiveTarget(
+			2,
+			healthRatio: 0.40f,
+			currentMp: 10_000,
+			hasAllyFocus: true,
+			allyFocusCount: 1);
+		var teamFocusTarget = BardOffensiveTarget(
+			3,
+			healthRatio: 0.40f,
+			currentMp: 10_000,
+			hasAllyFocus: true,
+			allyFocusCount: 2);
+
+		var noFocusScore = BardPvPTargetPolicy.Score(noFocusTarget, BardPvPActionIntent.EagleEyeShot);
+		var oneFocusScore = BardPvPTargetPolicy.Score(oneFocusTarget, BardPvPActionIntent.EagleEyeShot);
+		var teamFocusScore = BardPvPTargetPolicy.Score(teamFocusTarget, BardPvPActionIntent.EagleEyeShot);
+
+		AssertTrue(oneFocusScore > noFocusScore, "Eagle Eye Shot should keep existing single ally focus value");
+		AssertEqual(oneFocusScore, teamFocusScore, "Eagle Eye Shot should not gain extra value from multiple ally focus");
+	}
+
 	static void BardOffensiveTargetPolicyUsesPitchPerfectSplashValue()
 	{
 		var isolatedTarget = BardOffensiveTarget(1, healthRatio: 0.40f, currentMp: 10_000, splashTargetCount: 1);
