@@ -16,6 +16,7 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 	private const int ForcedTeamfightHostileCount = 2;
 	private const int SafeCloseRangeHostileLimit = 2;
 	private const double MarksmanGuardReactionWindowSeconds = 1.25;
+	private const double RecuperatePotency = 16_000.0;
 	private const double MarksmansSpitePotency = 40_000.0;
 	private const double EagleEyeShotPotency = 12_000.0;
 	private const double DrillPotency = 10_000.0;
@@ -544,8 +545,14 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 			ObjectiveControlNeeded: objectiveControlNeeded,
 			TargetCommitted: IsTargetCommitted(snapshot, target, objectiveControlNeeded),
 			ExpectedDamageRatio: snapshot.ExpectedDamageRatio,
+			ExpectedRecuperateRatio: ExpectedRecuperateRatio(target),
 			HasGuardCooldownKnowledge: DataCenter.IsInCrystallineConflict,
 			StrictMarksmanExecuteOnly: Service.Config.MachinistMarksmansSpiteStrictExecuteOnly);
+	}
+
+	private static double ExpectedRecuperateRatio(IBattleChara target)
+	{
+		return PotencyRatio(RecuperatePotency, target);
 	}
 
 	private static double ExpectedDamageRatio(
@@ -553,24 +560,26 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 		IBattleChara target,
 		bool analysisWillBuffAction)
 	{
-		if (target.MaxHp == 0)
+		var potency = intent switch
 		{
-			return 0.0;
-		}
-
-		return intent switch
-		{
-			MachinistPvPActionIntent.MarksmanSpite => MarksmansSpitePotency / target.MaxHp,
-			MachinistPvPActionIntent.EagleEyeShot => EagleEyeShotPotency / target.MaxHp,
-			MachinistPvPActionIntent.AnalysisDrill => (analysisWillBuffAction ? AnalysisDrillPotency : DrillPotency) / target.MaxHp,
-			MachinistPvPActionIntent.AnalysisBioblaster => (analysisWillBuffAction ? AnalysisBioblasterPotency : BioblasterPotency) / target.MaxHp,
-			MachinistPvPActionIntent.AnalysisAirAnchor => (analysisWillBuffAction ? AnalysisAirAnchorPotency : AirAnchorPotency) / target.MaxHp,
-			MachinistPvPActionIntent.AnalysisChainSaw => ChainSawPotency / target.MaxHp,
-			MachinistPvPActionIntent.Scattergun => ScattergunPotency / target.MaxHp,
-			MachinistPvPActionIntent.FullMetalField => FullMetalFieldPrimaryPotency / target.MaxHp,
-			MachinistPvPActionIntent.BlazingShot => BlazingShotPotency / target.MaxHp,
+			MachinistPvPActionIntent.MarksmanSpite => MarksmansSpitePotency,
+			MachinistPvPActionIntent.EagleEyeShot => EagleEyeShotPotency,
+			MachinistPvPActionIntent.AnalysisDrill => analysisWillBuffAction ? AnalysisDrillPotency : DrillPotency,
+			MachinistPvPActionIntent.AnalysisBioblaster => analysisWillBuffAction ? AnalysisBioblasterPotency : BioblasterPotency,
+			MachinistPvPActionIntent.AnalysisAirAnchor => analysisWillBuffAction ? AnalysisAirAnchorPotency : AirAnchorPotency,
+			MachinistPvPActionIntent.AnalysisChainSaw => ChainSawPotency,
+			MachinistPvPActionIntent.Scattergun => ScattergunPotency,
+			MachinistPvPActionIntent.FullMetalField => FullMetalFieldPrimaryPotency,
+			MachinistPvPActionIntent.BlazingShot => BlazingShotPotency,
 			_ => 0.0,
 		};
+
+		return PotencyRatio(potency, target);
+	}
+
+	private static double PotencyRatio(double potency, IBattleChara target)
+	{
+		return target.MaxHp == 0 ? 0.0 : potency / target.MaxHp;
 	}
 
 	private static bool TryUseActionOn(

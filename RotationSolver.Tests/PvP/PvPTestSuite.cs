@@ -93,6 +93,7 @@ internal static partial class PvPTestSuite
 		new("machinist marksmans spite accepts strict execute on guard cooldown", MachinistMarksmanSpiteAcceptsStrictExecuteOnGuardCooldown),
 		new("machinist marksmans spite rejects strict cc unknown guard", MachinistMarksmanSpiteRejectsStrictCcUnknownGuard),
 		new("machinist marksmans spite rejects strict unknown guard recuperate survivor", MachinistMarksmanSpiteRejectsStrictUnknownGuardRecuperateSurvivor),
+		new("machinist marksmans spite uses caller recuperate ratio", MachinistMarksmanSpiteUsesCallerRecuperateRatio),
 		new("machinist marksmans spite accepts strict unknown guard very low health", MachinistMarksmanSpiteAcceptsStrictUnknownGuardVeryLowHealth),
 		new("machinist marksmans spite accepts strict unknown guard very low mp", MachinistMarksmanSpiteAcceptsStrictUnknownGuardVeryLowMp),
 		new("machinist marksmans spite rejects strict unknown guard without low signal", MachinistMarksmanSpiteRejectsStrictUnknownGuardWithoutLowSignal),

@@ -5,6 +5,9 @@ namespace RotationSolver.Tests;
 
 internal static partial class PvPTestSuite
 {
+	private const double MarksmanDefaultRecuperateRatio = 0.268;
+	private const double MarksmanLowRecuperateRatio = 0.08;
+
 	static void MachinistTargetPolicyPrefersKillableLowResourceTarget()
 	{
 		var highResourceTarget = MachinistTarget(1, healthRatio: 0.40f, currentMp: 10_000);
@@ -401,6 +404,7 @@ internal static partial class PvPTestSuite
 				expectedDamageRatio: 0.67,
 				guardAvailability: PvPGuardAvailability.Unknown),
 			ExpectedDamageRatio: 0.67,
+			ExpectedRecuperateRatio: MarksmanDefaultRecuperateRatio,
 			SafeCloseRange: true,
 			FollowUpAvailable: false,
 			AlliesCanBurst: false,
@@ -838,6 +842,7 @@ internal static partial class PvPTestSuite
 				expectedDamageRatio: 0.67,
 				guardAvailability: PvPGuardAvailability.Unknown),
 			ExpectedDamageRatio: 0.67,
+			ExpectedRecuperateRatio: MarksmanDefaultRecuperateRatio,
 			SafeCloseRange: true,
 			FollowUpAvailable: false,
 			AlliesCanBurst: false,
@@ -860,6 +865,7 @@ internal static partial class PvPTestSuite
 				expectedDamageRatio: 0.67,
 				guardAvailability: PvPGuardAvailability.Unknown),
 			ExpectedDamageRatio: 0.67,
+			ExpectedRecuperateRatio: MarksmanDefaultRecuperateRatio,
 			SafeCloseRange: true,
 			FollowUpAvailable: false,
 			AlliesCanBurst: false,
@@ -869,6 +875,29 @@ internal static partial class PvPTestSuite
 			StrictMarksmanExecuteOnly: true);
 
 		AssertFalse(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Strict Marksman's Spite should not fire when one Recuperate lets an unknown Guard target survive");
+	}
+
+	static void MachinistMarksmanSpiteUsesCallerRecuperateRatio()
+	{
+		var input = new MachinistPvPDecisionInput(
+			Target: MachinistTarget(
+				1,
+				healthRatio: 0.55f,
+				currentMp: PvPScoringFactors.LowMp,
+				effectiveHealthRatio: 0.55,
+				expectedDamageRatio: 0.67,
+				guardAvailability: PvPGuardAvailability.Unknown),
+			ExpectedDamageRatio: 0.67,
+			ExpectedRecuperateRatio: MarksmanLowRecuperateRatio,
+			SafeCloseRange: true,
+			FollowUpAvailable: false,
+			AlliesCanBurst: false,
+			ObjectiveControlNeeded: false,
+			TargetCommitted: true,
+			HasGuardCooldownKnowledge: false,
+			StrictMarksmanExecuteOnly: true);
+
+		AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Strict Marksman's Spite should trust the caller-supplied Recuperate health ratio");
 	}
 
 	static void MachinistMarksmanSpiteAcceptsStrictUnknownGuardVeryLowHealth()
@@ -882,6 +911,7 @@ internal static partial class PvPTestSuite
 				expectedDamageRatio: 0.67,
 				guardAvailability: PvPGuardAvailability.Unknown),
 			ExpectedDamageRatio: 0.67,
+			ExpectedRecuperateRatio: MarksmanDefaultRecuperateRatio,
 			SafeCloseRange: true,
 			FollowUpAvailable: false,
 			AlliesCanBurst: false,
@@ -904,6 +934,7 @@ internal static partial class PvPTestSuite
 				expectedDamageRatio: 0.67,
 				guardAvailability: PvPGuardAvailability.Unknown),
 			ExpectedDamageRatio: 0.67,
+			ExpectedRecuperateRatio: MarksmanDefaultRecuperateRatio,
 			SafeCloseRange: true,
 			FollowUpAvailable: false,
 			AlliesCanBurst: false,
@@ -926,6 +957,7 @@ internal static partial class PvPTestSuite
 				expectedDamageRatio: 0.67,
 				guardAvailability: PvPGuardAvailability.Unknown),
 			ExpectedDamageRatio: 0.67,
+			ExpectedRecuperateRatio: MarksmanDefaultRecuperateRatio,
 			SafeCloseRange: true,
 			FollowUpAvailable: false,
 			AlliesCanBurst: false,
@@ -949,6 +981,7 @@ internal static partial class PvPTestSuite
 				expectedDamageRatio: 0.67,
 				guardAvailability: PvPGuardAvailability.Unknown),
 			ExpectedDamageRatio: 0.67,
+			ExpectedRecuperateRatio: MarksmanDefaultRecuperateRatio,
 			SafeCloseRange: true,
 			FollowUpAvailable: false,
 			AlliesCanBurst: false,
@@ -972,6 +1005,7 @@ internal static partial class PvPTestSuite
 				expectedDamageRatio: 0.67,
 				guardAvailability: PvPGuardAvailability.Unknown),
 			ExpectedDamageRatio: 0.67,
+			ExpectedRecuperateRatio: MarksmanDefaultRecuperateRatio,
 			SafeCloseRange: true,
 			FollowUpAvailable: false,
 			AlliesCanBurst: false,
