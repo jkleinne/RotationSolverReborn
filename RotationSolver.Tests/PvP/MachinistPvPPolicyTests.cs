@@ -827,6 +827,184 @@ internal static partial class PvPTestSuite
 		AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Strict Marksman's Spite mode should still accept a clear execute when Guard is cooling down");
 	}
 
+	static void MachinistMarksmanSpiteRejectsStrictCcUnknownGuard()
+	{
+		var input = new MachinistPvPDecisionInput(
+			Target: MachinistTarget(
+				1,
+				healthRatio: 0.30f,
+				currentMp: PvPScoringFactors.LowMp,
+				effectiveHealthRatio: 0.30,
+				expectedDamageRatio: 0.67,
+				guardAvailability: PvPGuardAvailability.Unknown),
+			ExpectedDamageRatio: 0.67,
+			SafeCloseRange: true,
+			FollowUpAvailable: false,
+			AlliesCanBurst: false,
+			ObjectiveControlNeeded: false,
+			TargetCommitted: true,
+			HasGuardCooldownKnowledge: true,
+			StrictMarksmanExecuteOnly: true);
+
+		AssertFalse(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Strict Marksman's Spite should require confirmed Guard cooldown when cooldown knowledge is reliable");
+	}
+
+	static void MachinistMarksmanSpiteRejectsStrictUnknownGuardRecuperateSurvivor()
+	{
+		var input = new MachinistPvPDecisionInput(
+			Target: MachinistTarget(
+				1,
+				healthRatio: 0.55f,
+				currentMp: PvPScoringFactors.LowMp,
+				effectiveHealthRatio: 0.55,
+				expectedDamageRatio: 0.67,
+				guardAvailability: PvPGuardAvailability.Unknown),
+			ExpectedDamageRatio: 0.67,
+			SafeCloseRange: true,
+			FollowUpAvailable: false,
+			AlliesCanBurst: false,
+			ObjectiveControlNeeded: false,
+			TargetCommitted: true,
+			HasGuardCooldownKnowledge: false,
+			StrictMarksmanExecuteOnly: true);
+
+		AssertFalse(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Strict Marksman's Spite should not fire when one Recuperate lets an unknown Guard target survive");
+	}
+
+	static void MachinistMarksmanSpiteAcceptsStrictUnknownGuardVeryLowHealth()
+	{
+		var input = new MachinistPvPDecisionInput(
+			Target: MachinistTarget(
+				1,
+				healthRatio: 0.35f,
+				currentMp: 10_000,
+				effectiveHealthRatio: 0.35,
+				expectedDamageRatio: 0.67,
+				guardAvailability: PvPGuardAvailability.Unknown),
+			ExpectedDamageRatio: 0.67,
+			SafeCloseRange: true,
+			FollowUpAvailable: false,
+			AlliesCanBurst: false,
+			ObjectiveControlNeeded: false,
+			TargetCommitted: true,
+			HasGuardCooldownKnowledge: false,
+			StrictMarksmanExecuteOnly: true);
+
+		AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Strict Marksman's Spite should accept unknown Guard only when very low HP still dies through one Recuperate");
+	}
+
+	static void MachinistMarksmanSpiteAcceptsStrictUnknownGuardVeryLowMp()
+	{
+		var input = new MachinistPvPDecisionInput(
+			Target: MachinistTarget(
+				1,
+				healthRatio: 0.37f,
+				currentMp: PvPScoringFactors.LowMp,
+				effectiveHealthRatio: 0.37,
+				expectedDamageRatio: 0.67,
+				guardAvailability: PvPGuardAvailability.Unknown),
+			ExpectedDamageRatio: 0.67,
+			SafeCloseRange: true,
+			FollowUpAvailable: false,
+			AlliesCanBurst: false,
+			ObjectiveControlNeeded: false,
+			TargetCommitted: true,
+			HasGuardCooldownKnowledge: false,
+			StrictMarksmanExecuteOnly: true);
+
+		AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Strict Marksman's Spite should accept unknown Guard when low MP still dies through one Recuperate");
+	}
+
+	static void MachinistMarksmanSpiteRejectsStrictUnknownGuardWithoutLowSignal()
+	{
+		var input = new MachinistPvPDecisionInput(
+			Target: MachinistTarget(
+				1,
+				healthRatio: 0.37f,
+				currentMp: 10_000,
+				effectiveHealthRatio: 0.37,
+				expectedDamageRatio: 0.67,
+				guardAvailability: PvPGuardAvailability.Unknown),
+			ExpectedDamageRatio: 0.67,
+			SafeCloseRange: true,
+			FollowUpAvailable: false,
+			AlliesCanBurst: false,
+			ObjectiveControlNeeded: false,
+			TargetCommitted: true,
+			HasGuardCooldownKnowledge: false,
+			StrictMarksmanExecuteOnly: true);
+
+		AssertFalse(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Strict Marksman's Spite should require very low HP or low MP before accepting unknown Guard");
+	}
+
+	static void MachinistMarksmanSpiteRejectsStrictUnknownGuardMitigatedRecuperateSurvivor()
+	{
+		var input = new MachinistPvPDecisionInput(
+			Target: MachinistTarget(
+				1,
+				healthRatio: 0.30f,
+				currentMp: PvPScoringFactors.LowMp,
+				effectiveHealthRatio: 0.40,
+				activeDamageReduction: 0.25,
+				expectedDamageRatio: 0.67,
+				guardAvailability: PvPGuardAvailability.Unknown),
+			ExpectedDamageRatio: 0.67,
+			SafeCloseRange: true,
+			FollowUpAvailable: false,
+			AlliesCanBurst: false,
+			ObjectiveControlNeeded: false,
+			TargetCommitted: true,
+			HasGuardCooldownKnowledge: false,
+			StrictMarksmanExecuteOnly: true);
+
+		AssertFalse(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Strict Marksman's Spite should reject unknown Guard when mitigation makes one Recuperate survivable");
+	}
+
+	static void MachinistMarksmanSpiteRejectsStrictUnknownGuardMitigatedLowHealthSurvivor()
+	{
+		var input = new MachinistPvPDecisionInput(
+			Target: MachinistTarget(
+				1,
+				healthRatio: 0.25f,
+				currentMp: PvPScoringFactors.LowMp,
+				effectiveHealthRatio: 0.3333333333333333,
+				activeDamageReduction: 0.25,
+				expectedDamageRatio: 0.67,
+				guardAvailability: PvPGuardAvailability.Unknown),
+			ExpectedDamageRatio: 0.67,
+			SafeCloseRange: true,
+			FollowUpAvailable: false,
+			AlliesCanBurst: false,
+			ObjectiveControlNeeded: false,
+			TargetCommitted: true,
+			HasGuardCooldownKnowledge: false,
+			StrictMarksmanExecuteOnly: true);
+
+		AssertFalse(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Strict Marksman's Spite should scale Recuperate through mitigation before accepting low HP unknown Guard");
+	}
+
+	static void MachinistMarksmanSpitePreservesNonStrictUnknownGuardExecute()
+	{
+		var input = new MachinistPvPDecisionInput(
+			Target: MachinistTarget(
+				1,
+				healthRatio: 0.40f,
+				currentMp: 10_000,
+				effectiveHealthRatio: 0.40,
+				expectedDamageRatio: 0.67,
+				guardAvailability: PvPGuardAvailability.Unknown),
+			ExpectedDamageRatio: 0.67,
+			SafeCloseRange: true,
+			FollowUpAvailable: false,
+			AlliesCanBurst: false,
+			ObjectiveControlNeeded: false,
+			TargetCommitted: true,
+			HasGuardCooldownKnowledge: false,
+			StrictMarksmanExecuteOnly: false);
+
+		AssertTrue(MachinistPvPDecisionPolicy.ShouldUseMarksmanSpite(input), "Non strict Marksman's Spite should preserve existing unknown Guard true execute behavior");
+	}
+
 	static void MachinistMarksmanSpiteRejectsUnknownGuardLethalEmergency()
 	{
 		var input = new MachinistPvPDecisionInput(

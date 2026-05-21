@@ -27,6 +27,10 @@ internal static class MachinistPvPDecisionPolicy
 	private const float MarksmanFocusedCleanupHealthRatio = 0.25f;
 	private const double MarksmanSecureSafetyMarginRatio = 0.01;
 	private const double MarksmanConversionMaxLeftoverRatio = 0.04;
+	private const double MarksmanRecuperatePotency = 16_000.0;
+	private const double MarksmansSpitePotency = 40_000.0;
+	private const double MarksmanUnknownGuardSafetyMarginRatio = 0.03;
+	private const float MarksmanUnknownGuardVeryLowHealthRatio = 0.35f;
 
 	internal static bool ShouldUseAnalysisDrill(MachinistPvPDecisionInput input)
 	{
@@ -167,14 +171,14 @@ internal static class MachinistPvPDecisionPolicy
 			return false;
 		}
 
+		if (input.StrictMarksmanExecuteOnly)
+		{
+			return HasStrictMarksmanTrueExecute(input);
+		}
+
 		if (HasMarksmanTrueExecute(input))
 		{
 			return true;
-		}
-
-		if (input.StrictMarksmanExecuteOnly)
-		{
-			return false;
 		}
 
 		return HasMarksmanFocusedTeamFinisher(input);
@@ -275,6 +279,71 @@ internal static class MachinistPvPDecisionPolicy
 	{
 		return HasMarksmanSecureDamage(input)
 			&& CanSpendMarksmanBeforeGuard(input);
+	}
+
+	private static bool HasStrictMarksmanTrueExecute(MachinistPvPDecisionInput input)
+	{
+		if (!HasMarksmanSecureDamage(input))
+		{
+			return false;
+		}
+
+		if (input.Target.GuardAvailability == PvPGuardAvailability.CoolingDown)
+		{
+			return true;
+		}
+
+		if (input.Target.GuardAvailability == PvPGuardAvailability.Ready || input.HasGuardCooldownKnowledge)
+		{
+			return false;
+		}
+
+		return HasMarksmanUnknownGuardFallback(input);
+	}
+
+	private static bool HasMarksmanUnknownGuardFallback(MachinistPvPDecisionInput input)
+	{
+		return HasMarksmanSecureDamageThroughRecuperate(input)
+			&& HasMarksmanUnknownGuardVulnerabilitySignal(input);
+	}
+
+	private static bool HasMarksmanSecureDamageThroughRecuperate(MachinistPvPDecisionInput input)
+	{
+		return input.Target.EffectiveHealthRatio
+			+ MarksmanEffectiveRecuperateRatio(input)
+			+ MarksmanUnknownGuardSafetyMarginRatio <= input.ExpectedDamageRatio;
+	}
+
+	private static double MarksmanEffectiveRecuperateRatio(MachinistPvPDecisionInput input)
+	{
+		var damageMultiplier = MarksmanCurrentDamageMultiplier(input);
+		if (damageMultiplier <= 0.0 || !double.IsFinite(damageMultiplier))
+		{
+			return double.PositiveInfinity;
+		}
+
+		return MarksmanRecuperateRatio(input) / damageMultiplier;
+	}
+
+	private static double MarksmanCurrentDamageMultiplier(MachinistPvPDecisionInput input)
+	{
+		if (input.Target.HealthRatio <= 0.0f || input.Target.EffectiveHealthRatio <= 0.0)
+		{
+			return double.NaN;
+		}
+
+		return input.Target.HealthRatio / input.Target.EffectiveHealthRatio;
+	}
+
+	private static double MarksmanRecuperateRatio(MachinistPvPDecisionInput input)
+	{
+		return input.ExpectedDamageRatio * (MarksmanRecuperatePotency / MarksmansSpitePotency);
+	}
+
+	private static bool HasMarksmanUnknownGuardVulnerabilitySignal(MachinistPvPDecisionInput input)
+	{
+		return input.Target.HealthRatio <= MarksmanUnknownGuardVeryLowHealthRatio
+			|| input.Target.CurrentMp <= PvPScoringFactors.LowMp;
 	}
 
 	private static bool CanSpendMarksmanBeforeGuard(MachinistPvPDecisionInput input)
