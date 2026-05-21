@@ -185,6 +185,23 @@ internal static partial class PvPTestSuite
 		AssertTrue(facts.IsExposed, "caller range semantics should drive exposure");
 	}
 
+	static void LiveTargetFactsExposeAllyFocusCount()
+	{
+		var target = new MitigatedBattleChara(currentHp: 1_000, maxHp: 10_000, objectId: 99);
+		var allies = new[]
+		{
+			new PvPCombatantSnapshot(1, 1.0f, 1, target.GameObjectId, default, 0f),
+			new PvPCombatantSnapshot(2, 1.0f, 1, target.GameObjectId, default, 0f),
+			new PvPCombatantSnapshot(3, 1.0f, 1, 42UL, default, 0f),
+		};
+		var context = CreateLiveFactsContext(allies: allies);
+
+		var facts = PvPLiveTargetFactsBuilder.Create(target, context);
+
+		AssertEqual(2, facts.AllyFocusCount, "live target facts should preserve the exact ally focus count");
+		AssertTrue(facts.HasAllyFocus, "live target facts should derive ally focus from the count");
+	}
+
 	static void LiveCombatantSnapshotUsesCallerHealthProvider()
 	{
 		var combatant = new MitigatedBattleChara(currentHp: 1_000, maxHp: 10_000);
@@ -218,6 +235,22 @@ internal static partial class PvPTestSuite
 		AssertEqual(0.25f, snapshots[0].HealthRatio, "combatant snapshot list should use caller health ratio for first live object");
 		AssertEqual(20UL, snapshots[1].ObjectId, "combatant snapshot list should preserve the second live object id");
 		AssertEqual(0.75f, snapshots[1].HealthRatio, "combatant snapshot list should use caller health ratio for second live object");
+	}
+
+	static void LiveCombatantSnapshotsExcludeLocalPlayer()
+	{
+		const ulong localPlayerId = 10;
+		var localPlayer = new MitigatedBattleChara(currentHp: 1_000, maxHp: 10_000, objectId: localPlayerId);
+		var ally = new MitigatedBattleChara(currentHp: 1_000, maxHp: 10_000, objectId: 20);
+
+		var snapshots = PvPLiveTargetFactsBuilder.ToCombatantSnapshots(
+			[localPlayer, ally],
+			combatant => combatant.GameObjectId == localPlayer.GameObjectId ? 0.25f : 0.75f,
+			excludedObjectId: localPlayerId);
+
+		AssertEqual(1, snapshots.Count, "combatant snapshot list should exclude the local player snapshot");
+		AssertEqual(20UL, snapshots[0].ObjectId, "combatant snapshot list should preserve non-local allies");
+		AssertEqual(0.75f, snapshots[0].HealthRatio, "combatant snapshot list should still use caller health ratio");
 	}
 
 	static string RepositoryPath(params string[] parts)
@@ -289,12 +322,13 @@ internal static partial class PvPTestSuite
 	private static PvPLiveTargetFactsContext CreateLiveFactsContext(
 		Func<IBattleChara, float>? healthRatioProvider = null,
 		Func<IBattleChara, float>? distanceToPlayerProvider = null,
-		Func<IBattleChara, StatusID, bool>? hasStatus = null)
+		Func<IBattleChara, StatusID, bool>? hasStatus = null,
+		IReadOnlyList<PvPCombatantSnapshot>? allies = null)
 	{
 		return new PvPLiveTargetFactsContext(
 			MitigationDatabase: new TestMitigationDatabase(),
 			ObjectiveRelevantTargetIds: new HashSet<ulong>(),
-			Allies: [],
+			Allies: allies ?? [],
 			CurrentTime: TimeSpan.Zero,
 			GuardCooldownTracker: new PvPGuardCooldownTracker(),
 			GuardReactionWindow: TimeSpan.Zero,

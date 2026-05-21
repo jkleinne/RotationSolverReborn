@@ -461,7 +461,8 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 			target => target.GetHealthRatio());
 		var allies = PvPLiveTargetFactsBuilder.ToCombatantSnapshots(
 			PartyMembers,
-			target => target.GetHealthRatio());
+			target => target.GetHealthRatio(),
+			excludedObjectId: Player?.GameObjectId ?? 0);
 		var objectiveTargets = PvPObjectiveState.BuildObjectiveRelevantTargetIds();
 
 		return new MachinistPvPLiveTargetFrame(
@@ -513,7 +514,7 @@ public sealed class MCH_DefaultPvP : MachinistRotation
 			HasGuard: facts.HasGuard,
 			HasResilience: facts.HasResilience,
 			IsObjectiveRelevant: facts.IsObjectiveRelevant,
-			HasAllyFocus: facts.HasAllyFocus,
+			AllyFocusCount: facts.AllyFocusCount,
 			IsVulnerable: false,
 			HasInvulnerability: facts.HasNonGuardInvulnerability,
 			HasWildfire: target.HasStatus(true, StatusID.Wildfire, StatusID.Wildfire_1323),

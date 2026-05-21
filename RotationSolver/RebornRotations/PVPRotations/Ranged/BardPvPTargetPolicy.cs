@@ -20,7 +20,7 @@ internal readonly record struct BardPvPTargetSnapshot(
 	bool HasGuard,
 	bool HasResilience,
 	bool IsObjectiveRelevant,
-	bool HasAllyFocus,
+	int AllyFocusCount,
 	bool IsVulnerable,
 	bool IsControlled,
 	bool HasInvulnerability,
@@ -32,7 +32,10 @@ internal readonly record struct BardPvPTargetSnapshot(
 	bool IsInNormalRange,
 	int LineTargetCount,
 	int SplashTargetCount,
-	PvPGuardAvailability GuardAvailability = PvPGuardAvailability.Unknown);
+	PvPGuardAvailability GuardAvailability = PvPGuardAvailability.Unknown)
+{
+	internal bool HasAllyFocus => AllyFocusCount > 0;
+}
 
 internal readonly record struct BardPvPTargetSpatialState(
 	bool IsInNormalRange,
@@ -60,7 +63,9 @@ internal static class BardPvPTargetPolicy
 	private const double HealthPressureWeight = 4.0;
 	private const double MpPressureWeight = 3.0;
 	private const double ObjectiveScore = 1.5;
+	private const int TeamFocusThreshold = 2;
 	private const double AllyFocusScore = 1.25;
+	private const double TeamFocusScore = 2.25;
 	private const double VulnerableScore = 1.5;
 	private const double ControlledScore = 1.25;
 	private const double ExposedScore = 1.0;
@@ -129,10 +134,7 @@ internal static class BardPvPTargetPolicy
 			score += ObjectiveScore;
 		}
 
-		if (target.HasAllyFocus)
-		{
-			score += AllyFocusScore;
-		}
+		score += AllyFocusValue(target, intent);
 
 		if (target.IsVulnerable)
 		{
@@ -202,6 +204,31 @@ internal static class BardPvPTargetPolicy
 	private static bool IgnoresGuard(BardPvPActionIntent intent)
 	{
 		return intent == BardPvPActionIntent.EagleEyeShot;
+	}
+
+	private static double AllyFocusValue(BardPvPTargetSnapshot target, BardPvPActionIntent intent)
+	{
+		if (!target.HasAllyFocus)
+		{
+			return 0.0;
+		}
+
+		if (ReceivesNonLbFocusBonus(intent) && target.AllyFocusCount >= TeamFocusThreshold)
+		{
+			return TeamFocusScore;
+		}
+
+		return AllyFocusScore;
+	}
+
+	private static bool ReceivesNonLbFocusBonus(BardPvPActionIntent intent)
+	{
+		return intent is BardPvPActionIntent.PowerfulShot
+			or BardPvPActionIntent.HarmonicArrow
+			or BardPvPActionIntent.PitchPerfect
+			or BardPvPActionIntent.ApexArrow
+			or BardPvPActionIntent.BlastArrow
+			or BardPvPActionIntent.EncoreOfLight;
 	}
 
 	private static bool HasExposureValue(BardPvPTargetSnapshot target, BardPvPActionIntent intent)

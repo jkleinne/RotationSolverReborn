@@ -679,7 +679,8 @@ public sealed class BRD_DefaultPvP : BardRotation
 			target => target.GetHealthRatio());
 		var allies = PvPLiveTargetFactsBuilder.ToCombatantSnapshots(
 			PartyMembers,
-			target => target.GetHealthRatio());
+			target => target.GetHealthRatio(),
+			excludedObjectId: Player?.GameObjectId ?? 0);
 		var objectiveTargets = PvPObjectiveState.BuildObjectiveRelevantTargetIds();
 
 		return new BardPvPLiveTargetFrame(
@@ -720,7 +721,7 @@ public sealed class BRD_DefaultPvP : BardRotation
 			HasGuard: facts.HasGuard,
 			HasResilience: facts.HasResilience,
 			IsObjectiveRelevant: facts.IsObjectiveRelevant,
-			HasAllyFocus: facts.HasAllyFocus,
+			AllyFocusCount: facts.AllyFocusCount,
 			IsVulnerable: IsBurstWorthy(target),
 			IsControlled: IsControlledForEagleEyeShot(target),
 			HasInvulnerability: facts.HasNonGuardInvulnerability,
@@ -756,7 +757,7 @@ public sealed class BRD_DefaultPvP : BardRotation
 			HasGuard = facts.HasGuard,
 			HasResilience = facts.HasResilience,
 			IsObjectiveRelevant = facts.IsObjectiveRelevant,
-			HasAllyFocus = facts.HasAllyFocus,
+			AllyFocusCount = facts.AllyFocusCount,
 			IsVulnerable = IsBurstWorthy(target),
 			IsControlled = IsControlledForEagleEyeShot(target),
 			HasInvulnerability = facts.HasNonGuardInvulnerability,
