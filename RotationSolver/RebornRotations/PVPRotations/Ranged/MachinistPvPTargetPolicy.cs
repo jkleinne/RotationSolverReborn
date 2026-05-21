@@ -24,7 +24,6 @@ internal readonly record struct MachinistPvPTargetSnapshot(
 	bool HasGuard,
 	bool HasResilience,
 	bool IsObjectiveRelevant,
-	bool HasAllyFocus,
 	int AllyFocusCount,
 	bool IsVulnerable,
 	bool IsExposed,
@@ -35,7 +34,10 @@ internal readonly record struct MachinistPvPTargetSnapshot(
 	double ExpectedDamageRatio = 0.0,
 	double EffectiveHealthRatio = 1.0,
 	double ActiveDamageReduction = 0.0,
-	PvPGuardAvailability GuardAvailability = PvPGuardAvailability.Unknown);
+	PvPGuardAvailability GuardAvailability = PvPGuardAvailability.Unknown)
+{
+	internal bool HasAllyFocus => AllyFocusCount > 0;
+}
 
 internal static class MachinistPvPTargetPolicy
 {

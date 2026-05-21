@@ -9,7 +9,6 @@ namespace RotationSolver.Basic.Actions.PvPTargetSelection;
 /// <param name="HasGuard">Whether caller status policy reports active Guard for this target.</param>
 /// <param name="HasResilience">Whether caller status policy reports active Resilience for this target.</param>
 /// <param name="IsObjectiveRelevant">Whether caller-supplied objective ids include this target.</param>
-/// <param name="HasAllyFocus">Whether any caller-supplied ally snapshot targets this target.</param>
 /// <param name="AllyFocusCount">How many caller-supplied ally snapshots target this target.</param>
 /// <param name="HasNonGuardInvulnerability">Whether a non-Guard mitigation entry blocks normal damage.</param>
 /// <param name="EffectiveHealthRatio">Effective health ratio with all modeled mitigation.</param>
@@ -25,7 +24,6 @@ public readonly record struct PvPLiveTargetFacts(
     bool HasGuard,
     bool HasResilience,
     bool IsObjectiveRelevant,
-    bool HasAllyFocus,
     int AllyFocusCount,
     bool HasNonGuardInvulnerability,
     double EffectiveHealthRatio,
@@ -33,4 +31,10 @@ public readonly record struct PvPLiveTargetFacts(
     double ActiveDamageReduction,
     bool IsExposed,
     bool IsInNormalRange,
-    PvPGuardAvailability GuardAvailability);
+    PvPGuardAvailability GuardAvailability)
+{
+    /// <summary>
+    /// Whether any caller-supplied ally snapshot targets this target.
+    /// </summary>
+    public bool HasAllyFocus => AllyFocusCount > 0;
+}

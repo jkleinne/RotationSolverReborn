@@ -40,19 +40,16 @@ internal static partial class PvPTestSuite
 			1,
 			healthRatio: 0.40f,
 			currentMp: 10_000,
-			hasAllyFocus: true,
 			allyFocusCount: 1);
 		var teamFocusTarget = MachinistTarget(
 			2,
 			healthRatio: 0.40f,
 			currentMp: 10_000,
-			hasAllyFocus: true,
 			allyFocusCount: 2);
 		var noFocusTarget = MachinistTarget(
 			3,
 			healthRatio: 0.40f,
 			currentMp: 10_000,
-			hasAllyFocus: false,
 			allyFocusCount: 0);
 
 		var oneFocusScore = MachinistPvPTargetPolicy.Score(oneFocusTarget, MachinistPvPActionIntent.BlazingShot);
@@ -79,7 +76,6 @@ internal static partial class PvPTestSuite
 			2,
 			healthRatio: 0.40f,
 			currentMp: 10_000,
-			hasAllyFocus: true,
 			allyFocusCount: 3);
 
 		var selected = MachinistPvPTargetPolicy.SelectBest(
@@ -89,25 +85,40 @@ internal static partial class PvPTestSuite
 		AssertEqual(1UL, selected?.TargetId, "MCH should keep direct secure pressure ahead of focus-only team pressure");
 	}
 
+	static void MachinistTargetPolicyDerivesAllyFocusFromCount()
+	{
+		var noFocusTarget = MachinistTarget(
+			1,
+			healthRatio: 0.40f,
+			currentMp: 10_000);
+		var teamFocusTarget = MachinistTarget(
+			2,
+			healthRatio: 0.40f,
+			currentMp: 10_000,
+			allyFocusCount: 2);
+
+		var noFocusScore = MachinistPvPTargetPolicy.Score(noFocusTarget, MachinistPvPActionIntent.BlazingShot);
+		var teamFocusScore = MachinistPvPTargetPolicy.Score(teamFocusTarget, MachinistPvPActionIntent.BlazingShot);
+
+		AssertTrue(teamFocusScore > noFocusScore, "MCH target focus should be derived from ally focus count");
+	}
+
 	static void MachinistTargetPolicyDoesNotBoostMarksmanTeamFocus()
 	{
 		var noFocusTarget = MachinistTarget(
 			1,
 			healthRatio: 0.40f,
 			currentMp: 10_000,
-			hasAllyFocus: false,
 			allyFocusCount: 0);
 		var oneFocusTarget = MachinistTarget(
 			2,
 			healthRatio: 0.40f,
 			currentMp: 10_000,
-			hasAllyFocus: true,
 			allyFocusCount: 1);
 		var teamFocusTarget = MachinistTarget(
 			3,
 			healthRatio: 0.40f,
 			currentMp: 10_000,
-			hasAllyFocus: true,
 			allyFocusCount: 2);
 
 		var noFocusScore = MachinistPvPTargetPolicy.Score(noFocusTarget, MachinistPvPActionIntent.MarksmanSpite);
@@ -124,19 +135,16 @@ internal static partial class PvPTestSuite
 			1,
 			healthRatio: 0.40f,
 			currentMp: 10_000,
-			hasAllyFocus: false,
 			allyFocusCount: 0);
 		var oneFocusTarget = MachinistTarget(
 			2,
 			healthRatio: 0.40f,
 			currentMp: 10_000,
-			hasAllyFocus: true,
 			allyFocusCount: 1);
 		var teamFocusTarget = MachinistTarget(
 			3,
 			healthRatio: 0.40f,
 			currentMp: 10_000,
-			hasAllyFocus: true,
 			allyFocusCount: 2);
 
 		var noFocusScore = MachinistPvPTargetPolicy.Score(noFocusTarget, MachinistPvPActionIntent.EagleEyeShot);
@@ -331,7 +339,7 @@ internal static partial class PvPTestSuite
 				1,
 				healthRatio: 0.14f,
 				currentMp: 2_000,
-				hasAllyFocus: true,
+				allyFocusCount: 1,
 				effectiveHealthRatio: 0.14),
 			ExpectedDamageRatio: 0.67,
 			SafeCloseRange: true,
@@ -429,7 +437,7 @@ internal static partial class PvPTestSuite
 				1,
 				healthRatio: 0.68f,
 				currentMp: 2_000,
-				hasAllyFocus: true,
+				allyFocusCount: 1,
 				effectiveHealthRatio: 0.68,
 				expectedDamageRatio: 0.67,
 				guardAvailability: PvPGuardAvailability.CoolingDown),
@@ -451,7 +459,7 @@ internal static partial class PvPTestSuite
 				1,
 				healthRatio: 0.68f,
 				currentMp: 2_000,
-				hasAllyFocus: true,
+				allyFocusCount: 1,
 				effectiveHealthRatio: 0.68,
 				expectedDamageRatio: 0.67,
 				guardAvailability: PvPGuardAvailability.CoolingDown),
@@ -473,7 +481,7 @@ internal static partial class PvPTestSuite
 				1,
 				healthRatio: 0.68f,
 				currentMp: 2_000,
-				hasAllyFocus: true,
+				allyFocusCount: 1,
 				effectiveHealthRatio: 0.68,
 				expectedDamageRatio: 0.67,
 				guardAvailability: PvPGuardAvailability.CoolingDown),
@@ -570,7 +578,7 @@ internal static partial class PvPTestSuite
 				1,
 				healthRatio: 0.76f,
 				currentMp: 2_000,
-				hasAllyFocus: true,
+				allyFocusCount: 1,
 				effectiveHealthRatio: 0.76,
 				expectedDamageRatio: 0.67),
 			ExpectedDamageRatio: 0.67,
@@ -590,7 +598,7 @@ internal static partial class PvPTestSuite
 				1,
 				healthRatio: 0.72f,
 				currentMp: 2_000,
-				hasAllyFocus: true,
+				allyFocusCount: 1,
 				effectiveHealthRatio: 0.72,
 				expectedDamageRatio: 0.67),
 			ExpectedDamageRatio: 0.67,
@@ -610,7 +618,7 @@ internal static partial class PvPTestSuite
 				1,
 				healthRatio: 0.68f,
 				currentMp: 10_000,
-				hasAllyFocus: true,
+				allyFocusCount: 1,
 				isVulnerable: true,
 				effectiveHealthRatio: 0.68,
 				expectedDamageRatio: 0.67,
@@ -694,7 +702,7 @@ internal static partial class PvPTestSuite
 				1,
 				healthRatio: 0.68f,
 				currentMp: 2_000,
-				hasAllyFocus: true,
+				allyFocusCount: 1,
 				effectiveHealthRatio: 0.68,
 				expectedDamageRatio: 0.67,
 				guardAvailability: PvPGuardAvailability.Ready),
@@ -715,7 +723,7 @@ internal static partial class PvPTestSuite
 				1,
 				healthRatio: 0.68f,
 				currentMp: 2_000,
-				hasAllyFocus: true,
+				allyFocusCount: 1,
 				effectiveHealthRatio: 0.68,
 				expectedDamageRatio: 0.67,
 				guardAvailability: PvPGuardAvailability.Ready),
@@ -737,7 +745,7 @@ internal static partial class PvPTestSuite
 				1,
 				healthRatio: 0.68f,
 				currentMp: 2_000,
-				hasAllyFocus: true,
+				allyFocusCount: 1,
 				effectiveHealthRatio: 0.68,
 				expectedDamageRatio: 0.67,
 				guardAvailability: PvPGuardAvailability.Unknown),
@@ -759,7 +767,7 @@ internal static partial class PvPTestSuite
 				1,
 				healthRatio: 0.68f,
 				currentMp: 2_000,
-				hasAllyFocus: true,
+				allyFocusCount: 1,
 				effectiveHealthRatio: 0.68,
 				expectedDamageRatio: 0.67,
 				guardAvailability: PvPGuardAvailability.CoolingDown),
@@ -781,7 +789,7 @@ internal static partial class PvPTestSuite
 				1,
 				healthRatio: 0.68f,
 				currentMp: 2_000,
-				hasAllyFocus: true,
+				allyFocusCount: 1,
 				effectiveHealthRatio: 0.68,
 				expectedDamageRatio: 0.67,
 				guardAvailability: PvPGuardAvailability.CoolingDown),

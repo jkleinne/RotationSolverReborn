@@ -20,7 +20,6 @@ internal readonly record struct BardPvPTargetSnapshot(
 	bool HasGuard,
 	bool HasResilience,
 	bool IsObjectiveRelevant,
-	bool HasAllyFocus,
 	int AllyFocusCount,
 	bool IsVulnerable,
 	bool IsControlled,
@@ -33,7 +32,10 @@ internal readonly record struct BardPvPTargetSnapshot(
 	bool IsInNormalRange,
 	int LineTargetCount,
 	int SplashTargetCount,
-	PvPGuardAvailability GuardAvailability = PvPGuardAvailability.Unknown);
+	PvPGuardAvailability GuardAvailability = PvPGuardAvailability.Unknown)
+{
+	internal bool HasAllyFocus => AllyFocusCount > 0;
+}
 
 internal readonly record struct BardPvPTargetSpatialState(
 	bool IsInNormalRange,

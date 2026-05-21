@@ -237,6 +237,22 @@ internal static partial class PvPTestSuite
 		AssertEqual(0.75f, snapshots[1].HealthRatio, "combatant snapshot list should use caller health ratio for second live object");
 	}
 
+	static void LiveCombatantSnapshotsExcludeLocalPlayer()
+	{
+		const ulong localPlayerId = 10;
+		var localPlayer = new MitigatedBattleChara(currentHp: 1_000, maxHp: 10_000, objectId: localPlayerId);
+		var ally = new MitigatedBattleChara(currentHp: 1_000, maxHp: 10_000, objectId: 20);
+
+		var snapshots = PvPLiveTargetFactsBuilder.ToCombatantSnapshots(
+			[localPlayer, ally],
+			combatant => combatant.GameObjectId == localPlayer.GameObjectId ? 0.25f : 0.75f,
+			excludedObjectId: localPlayerId);
+
+		AssertEqual(1, snapshots.Count, "combatant snapshot list should exclude the local player snapshot");
+		AssertEqual(20UL, snapshots[0].ObjectId, "combatant snapshot list should preserve non-local allies");
+		AssertEqual(0.75f, snapshots[0].HealthRatio, "combatant snapshot list should still use caller health ratio");
+	}
+
 	static string RepositoryPath(params string[] parts)
 	{
 		var root = FindRepositoryRoot();

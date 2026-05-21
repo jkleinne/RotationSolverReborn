@@ -256,19 +256,16 @@ internal static partial class PvPTestSuite
 			1,
 			healthRatio: 0.40f,
 			currentMp: 10_000,
-			hasAllyFocus: true,
 			allyFocusCount: 1);
 		var teamFocusTarget = BardOffensiveTarget(
 			2,
 			healthRatio: 0.40f,
 			currentMp: 10_000,
-			hasAllyFocus: true,
 			allyFocusCount: 2);
 		var noFocusTarget = BardOffensiveTarget(
 			3,
 			healthRatio: 0.40f,
 			currentMp: 10_000,
-			hasAllyFocus: false,
 			allyFocusCount: 0);
 
 		var oneFocusScore = BardPvPTargetPolicy.Score(oneFocusTarget, BardPvPActionIntent.PowerfulShot);
@@ -295,7 +292,6 @@ internal static partial class PvPTestSuite
 			2,
 			healthRatio: 0.40f,
 			currentMp: 10_000,
-			hasAllyFocus: true,
 			allyFocusCount: 3);
 
 		var selected = BardPvPTargetPolicy.SelectBest(
@@ -305,25 +301,40 @@ internal static partial class PvPTestSuite
 		AssertEqual(1UL, selected?.TargetId, "Bard should keep direct secure pressure ahead of focus-only team pressure");
 	}
 
+	static void BardOffensiveTargetPolicyDerivesAllyFocusFromCount()
+	{
+		var noFocusTarget = BardOffensiveTarget(
+			1,
+			healthRatio: 0.40f,
+			currentMp: 10_000);
+		var teamFocusTarget = BardOffensiveTarget(
+			2,
+			healthRatio: 0.40f,
+			currentMp: 10_000,
+			allyFocusCount: 2);
+
+		var noFocusScore = BardPvPTargetPolicy.Score(noFocusTarget, BardPvPActionIntent.PowerfulShot);
+		var teamFocusScore = BardPvPTargetPolicy.Score(teamFocusTarget, BardPvPActionIntent.PowerfulShot);
+
+		AssertTrue(teamFocusScore > noFocusScore, "Bard target focus should be derived from ally focus count");
+	}
+
 	static void BardOffensiveTargetPolicyDoesNotBoostEagleEyeTeamFocus()
 	{
 		var noFocusTarget = BardOffensiveTarget(
 			1,
 			healthRatio: 0.40f,
 			currentMp: 10_000,
-			hasAllyFocus: false,
 			allyFocusCount: 0);
 		var oneFocusTarget = BardOffensiveTarget(
 			2,
 			healthRatio: 0.40f,
 			currentMp: 10_000,
-			hasAllyFocus: true,
 			allyFocusCount: 1);
 		var teamFocusTarget = BardOffensiveTarget(
 			3,
 			healthRatio: 0.40f,
 			currentMp: 10_000,
-			hasAllyFocus: true,
 			allyFocusCount: 2);
 
 		var noFocusScore = BardPvPTargetPolicy.Score(noFocusTarget, BardPvPActionIntent.EagleEyeShot);
@@ -471,7 +482,7 @@ internal static partial class PvPTestSuite
 	static void BardPitchPerfectAcceptsRepertoireAllyFocusFollowUp()
 	{
 		var input = BardOffensiveInput(
-			BardOffensiveTarget(1, healthRatio: 0.75f, currentMp: 10_000, hasAllyFocus: true),
+			BardOffensiveTarget(1, healthRatio: 0.75f, currentMp: 10_000, allyFocusCount: 1),
 			followUpAvailable: true,
 			hasRepertoire: true);
 

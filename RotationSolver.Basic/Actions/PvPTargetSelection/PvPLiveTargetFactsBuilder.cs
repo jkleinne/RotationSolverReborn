@@ -7,6 +7,8 @@ namespace RotationSolver.Basic.Actions.PvPTargetSelection;
 /// </summary>
 public static class PvPLiveTargetFactsBuilder
 {
+    private const ulong NoExcludedObjectId = 0;
+
     /// <summary>
     /// Creates shared target facts for one live combatant without reading global PvP frame state.
     /// </summary>
@@ -36,7 +38,6 @@ public static class PvPLiveTargetFactsBuilder
             HasGuard: hasGuard,
             HasResilience: context.HasStatus(target, StatusID.Resilience),
             IsObjectiveRelevant: context.ObjectiveRelevantTargetIds.Contains(targetId),
-            HasAllyFocus: allyFocusCount > 0,
             AllyFocusCount: allyFocusCount,
             HasNonGuardInvulnerability: HasNonGuardInvulnerability(target, mitigationDatabase),
             EffectiveHealthRatio: ToEffectiveHealthRatio(target, effectiveHealth),
@@ -72,9 +73,13 @@ public static class PvPLiveTargetFactsBuilder
     /// <summary>
     /// Captures value-only combatant facts for live collections while skipping null object entries.
     /// </summary>
+    /// <param name="combatants">Live combatants supplied by the caller's frame boundary.</param>
+    /// <param name="healthRatioProvider">Caller health policy used for each captured combatant.</param>
+    /// <param name="excludedObjectId">Optional object id to skip, used when the local player should not count as ally focus.</param>
     public static List<PvPCombatantSnapshot> ToCombatantSnapshots(
         IEnumerable<IBattleChara?> combatants,
-        Func<IBattleChara, float> healthRatioProvider)
+        Func<IBattleChara, float> healthRatioProvider,
+        ulong excludedObjectId = NoExcludedObjectId)
     {
         ArgumentNullException.ThrowIfNull(combatants);
         ArgumentNullException.ThrowIfNull(healthRatioProvider);
@@ -83,6 +88,12 @@ public static class PvPLiveTargetFactsBuilder
         foreach (var combatant in combatants)
         {
             if (combatant == null)
+            {
+                continue;
+            }
+
+            if (excludedObjectId != NoExcludedObjectId
+                && combatant.GameObjectId == excludedObjectId)
             {
                 continue;
             }
