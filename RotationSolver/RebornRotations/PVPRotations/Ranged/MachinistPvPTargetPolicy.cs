@@ -25,6 +25,7 @@ internal readonly record struct MachinistPvPTargetSnapshot(
 	bool HasResilience,
 	bool IsObjectiveRelevant,
 	bool HasAllyFocus,
+	int AllyFocusCount,
 	bool IsVulnerable,
 	bool IsExposed,
 	bool IsInNormalRange,
@@ -41,7 +42,9 @@ internal static class MachinistPvPTargetPolicy
 	private const double LowMpScore = 3.0;
 	private const double MediumMpScore = 1.5;
 	private const double ObjectiveScore = 1.5;
+	private const int TeamFocusThreshold = 2;
 	private const double AllyFocusScore = 1.25;
+	private const double TeamFocusScore = 2.25;
 	private const double VulnerableScore = 1.5;
 	private const double ExposedScore = 1.0;
 	private const double NormalRangeScore = 0.5;
@@ -108,10 +111,7 @@ internal static class MachinistPvPTargetPolicy
 			score += ObjectiveScore;
 		}
 
-		if (target.HasAllyFocus)
-		{
-			score += AllyFocusScore;
-		}
+		score += AllyFocusValue(target, intent);
 
 		if (target.IsVulnerable)
 		{
@@ -161,6 +161,34 @@ internal static class MachinistPvPTargetPolicy
 	private static bool IgnoresGuard(MachinistPvPActionIntent intent)
 	{
 		return intent is MachinistPvPActionIntent.AnalysisDrill or MachinistPvPActionIntent.EagleEyeShot;
+	}
+
+	private static double AllyFocusValue(MachinistPvPTargetSnapshot target, MachinistPvPActionIntent intent)
+	{
+		if (!target.HasAllyFocus)
+		{
+			return 0.0;
+		}
+
+		if (ReceivesNonLbFocusBonus(intent) && target.AllyFocusCount >= TeamFocusThreshold)
+		{
+			return TeamFocusScore;
+		}
+
+		return AllyFocusScore;
+	}
+
+	private static bool ReceivesNonLbFocusBonus(MachinistPvPActionIntent intent)
+	{
+		return intent is MachinistPvPActionIntent.AnalysisDrill
+			or MachinistPvPActionIntent.AnalysisAirAnchor
+			or MachinistPvPActionIntent.AnalysisChainSaw
+			or MachinistPvPActionIntent.AnalysisBioblaster
+			or MachinistPvPActionIntent.Wildfire
+			or MachinistPvPActionIntent.Scattergun
+			or MachinistPvPActionIntent.Bishop
+			or MachinistPvPActionIntent.FullMetalField
+			or MachinistPvPActionIntent.BlazingShot;
 	}
 
 	private static double HealthPressure(float healthRatio)

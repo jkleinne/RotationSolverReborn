@@ -34,6 +34,90 @@ internal static partial class PvPTestSuite
 		AssertEqual(1UL, selected?.TargetId, "MCH should prefer a direct secure target over a low MP pressure target");
 	}
 
+	static void MachinistTargetPolicyPrefersTeamFocusedNonLbTarget()
+	{
+		var oneFocusTarget = MachinistTarget(
+			1,
+			healthRatio: 0.40f,
+			currentMp: 10_000,
+			hasAllyFocus: true,
+			allyFocusCount: 1);
+		var teamFocusTarget = MachinistTarget(
+			2,
+			healthRatio: 0.40f,
+			currentMp: 10_000,
+			hasAllyFocus: true,
+			allyFocusCount: 2);
+		var noFocusTarget = MachinistTarget(
+			3,
+			healthRatio: 0.40f,
+			currentMp: 10_000,
+			hasAllyFocus: false,
+			allyFocusCount: 0);
+
+		var oneFocusScore = MachinistPvPTargetPolicy.Score(oneFocusTarget, MachinistPvPActionIntent.BlazingShot);
+		var teamFocusScore = MachinistPvPTargetPolicy.Score(teamFocusTarget, MachinistPvPActionIntent.BlazingShot);
+		var noFocusScore = MachinistPvPTargetPolicy.Score(noFocusTarget, MachinistPvPActionIntent.BlazingShot);
+		var selected = MachinistPvPTargetPolicy.SelectBest(
+			[oneFocusTarget, teamFocusTarget, noFocusTarget],
+			MachinistPvPActionIntent.BlazingShot);
+
+		AssertTrue(oneFocusScore > noFocusScore, "MCH non-LB focus scoring should value a single ally focus over no focus");
+		AssertTrue(teamFocusScore > oneFocusScore, "MCH non-LB focus scoring should value team focus over single ally focus");
+		AssertEqual(2UL, selected?.TargetId, "MCH should prefer the enemy already focused by multiple allies for non-LB pressure");
+	}
+
+	static void MachinistTargetPolicyKeepsDirectSecureAboveTeamFocus()
+	{
+		var directSecureTarget = MachinistTarget(
+			1,
+			healthRatio: 0.15f,
+			currentMp: 10_000,
+			effectiveHealthRatio: 0.15,
+			expectedDamageRatio: 0.20);
+		var teamFocusTarget = MachinistTarget(
+			2,
+			healthRatio: 0.40f,
+			currentMp: 10_000,
+			hasAllyFocus: true,
+			allyFocusCount: 3);
+
+		var selected = MachinistPvPTargetPolicy.SelectBest(
+			[directSecureTarget, teamFocusTarget],
+			MachinistPvPActionIntent.AnalysisDrill);
+
+		AssertEqual(1UL, selected?.TargetId, "MCH should keep direct secure pressure ahead of focus-only team pressure");
+	}
+
+	static void MachinistTargetPolicyDoesNotBoostMarksmanTeamFocus()
+	{
+		var noFocusTarget = MachinistTarget(
+			1,
+			healthRatio: 0.40f,
+			currentMp: 10_000,
+			hasAllyFocus: false,
+			allyFocusCount: 0);
+		var oneFocusTarget = MachinistTarget(
+			2,
+			healthRatio: 0.40f,
+			currentMp: 10_000,
+			hasAllyFocus: true,
+			allyFocusCount: 1);
+		var teamFocusTarget = MachinistTarget(
+			3,
+			healthRatio: 0.40f,
+			currentMp: 10_000,
+			hasAllyFocus: true,
+			allyFocusCount: 2);
+
+		var noFocusScore = MachinistPvPTargetPolicy.Score(noFocusTarget, MachinistPvPActionIntent.MarksmanSpite);
+		var oneFocusScore = MachinistPvPTargetPolicy.Score(oneFocusTarget, MachinistPvPActionIntent.MarksmanSpite);
+		var teamFocusScore = MachinistPvPTargetPolicy.Score(teamFocusTarget, MachinistPvPActionIntent.MarksmanSpite);
+
+		AssertTrue(oneFocusScore > noFocusScore, "Marksman's Spite should keep existing single ally focus value");
+		AssertEqual(oneFocusScore, teamFocusScore, "Marksman's Spite should not gain extra value from multiple ally focus");
+	}
+
 	static void MachinistTargetPolicyAllowsGuardedDrillPunish()
 	{
 		var guardedLowTarget = MachinistTarget(
