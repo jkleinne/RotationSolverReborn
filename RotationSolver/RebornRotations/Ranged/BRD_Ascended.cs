@@ -14,12 +14,29 @@ public sealed class BRD_Ascended : BardRotation
     private const float DoTEndBuffer = 0.5f;
     private const float ArmyHeartbreakHoldThreshold = 30f;
     private const float SidewinderBuffLookahead = 10f;
+    private const float HeartbreakChargeLookahead = 5f;
+    private const float MagesHeartbreakHoldGcdMultiplier = 0.9f;
+    #endregion
+
+    #region Status Sets
+
+    private static readonly StatusID[] NoBurstStatuses = [];
+    private static readonly StatusID[] RagingStrikesStatuses = [StatusID.RagingStrikes];
+    private static readonly StatusID[] BattleVoiceStatuses = [StatusID.BattleVoice];
+    private static readonly StatusID[] RadiantFinaleStatuses = [StatusID.RadiantFinale];
+    private static readonly StatusID[] RagingBattleStatuses = [StatusID.RagingStrikes, StatusID.BattleVoice];
+    private static readonly StatusID[] RagingFinaleStatuses = [StatusID.RagingStrikes, StatusID.RadiantFinale];
+    private static readonly StatusID[] BattleFinaleStatuses = [StatusID.BattleVoice, StatusID.RadiantFinale];
+    private static readonly StatusID[] FullBurstStatuses =
+        [StatusID.RagingStrikes, StatusID.BattleVoice, StatusID.RadiantFinale];
+
     #endregion
 
     #region Song Timings
 
     private static bool Is369 => SongTimings == BardAscendedSongTiming.Cycle369;
     private static bool IsCustom => SongTimings == BardAscendedSongTiming.Custom;
+    private static bool UsesStandardBurstPath => BardAscendedDecisionPolicy.UsesStandardBurstPath(SongTimings);
     private static bool IsStandardTiming =>
         SongTimings is BardAscendedSongTiming.Standard
             or BardAscendedSongTiming.AdjustedStandard;
@@ -40,53 +57,38 @@ public sealed class BRD_Ascended : BardRotation
 
     #region Player Status
 
-    private StatusID[] BurstStatus
+    private static StatusID[] BurstStatus => (
+        RagingStrikesPvE.EnoughLevel,
+        BattleVoicePvE.EnoughLevel,
+        RadiantFinalePvE.EnoughLevel) switch
     {
-        get
-        {
-            if (field != null) return field;
-            if (BurstActions.Length == 0) return field = [];
-            var statuses = new List<StatusID>();
-            foreach (var action in BurstActions)
-            {
-                if (action == RagingStrikesPvE) statuses.Add(StatusID.RagingStrikes);
-                if (action == BattleVoicePvE) statuses.Add(StatusID.BattleVoice);
-                if (action == RadiantFinalePvE) statuses.Add(StatusID.RadiantFinale);
-            }
-            return field = [.. statuses];
-        }
-    }
+        (true, true, true) => FullBurstStatuses,
+        (true, true, false) => RagingBattleStatuses,
+        (true, false, true) => RagingFinaleStatuses,
+        (false, true, true) => BattleFinaleStatuses,
+        (true, false, false) => RagingStrikesStatuses,
+        (false, true, false) => BattleVoiceStatuses,
+        (false, false, true) => RadiantFinaleStatuses,
+        _ => NoBurstStatuses
+    };
 
-    private IBaseAction Stormbite => field ??= StormbitePvE.EnoughLevel ? StormbitePvE : WindbitePvE;
+    private IBaseAction Stormbite => StormbitePvE.EnoughLevel ? StormbitePvE : WindbitePvE;
 
-    private IBaseAction CausticBite => field ??= CausticBitePvE.EnoughLevel ? CausticBitePvE : VenomousBitePvE;
-    private IBaseAction[] DoTActions => field ??= [Stormbite, CausticBite];
+    private IBaseAction CausticBite => CausticBitePvE.EnoughLevel ? CausticBitePvE : VenomousBitePvE;
+    private static IBaseAction ActiveBloodletterVariant =>
+        HeartbreakShotPvE.EnoughLevel ? HeartbreakShotPvE : BloodletterPvE;
+    private static IBaseAction ActiveFiller =>
+        BurstShotPvE.EnoughLevel ? BurstShotPvE : HeavyShotPvE;
 
-    private IBaseAction[] BurstActions
-    {
-        get
-        {
-            if (field != null) return field;
-            var actions = new List<IBaseAction>();
-            if (RagingStrikesPvE.EnoughLevel) actions.Add(RagingStrikesPvE);
-            if (BattleVoicePvE.EnoughLevel) actions.Add(BattleVoicePvE);
-            if (RadiantFinalePvE.EnoughLevel) actions.Add(RadiantFinalePvE);
-            return field = [.. actions];
-        }
-    }
+    private static bool HasBurstActions =>
+        RagingStrikesPvE.EnoughLevel
+        || BattleVoicePvE.EnoughLevel
+        || RadiantFinalePvE.EnoughLevel;
 
-    private IBaseAction[] SongList
-    {
-        get
-        {
-            if (field != null) return field;
-            var songs = new List<IBaseAction>();
-            if (TheWanderersMinuetPvE.EnoughLevel) songs.Add(TheWanderersMinuetPvE);
-            if (MagesBalladPvE.EnoughLevel) songs.Add(MagesBalladPvE);
-            if (ArmysPaeonPvE.EnoughLevel) songs.Add(ArmysPaeonPvE);
-            return field = [.. songs];
-        }
-    }
+    private static bool HasSongActions =>
+        TheWanderersMinuetPvE.EnoughLevel
+        || MagesBalladPvE.EnoughLevel
+        || ArmysPaeonPvE.EnoughLevel;
 
     private bool BurstEndGCD(uint gcdCount) => StatusHelper.PlayerHasStatus(true, BurstStatus)
                                                && StatusHelper.PlayerWillStatusEndGCD(gcdCount, DataCenter.CalculatedActionAhead, true, BurstStatus);
@@ -115,27 +117,16 @@ public sealed class BRD_Ascended : BardRotation
         {
             if (!MergedStatus.HasFlag(AutoStatus.Burst)) return false;
 
-            if (BurstActions.Length == 0) return false;
-            foreach (var burstAction in BurstActions)
-            {
-                if (!burstAction.IsEnabled) return false;
-            }
-            return true;
-        }
-    }
-
-    private bool CanBurstChanged
-    {
-        get
-        {
-            var currentCanBurst = CanBurst;
-            if (currentCanBurst == field) return false;
-            field = currentCanBurst;
-            return true;
+            if (!HasBurstActions) return false;
+            if (RagingStrikesPvE.EnoughLevel && !RagingStrikesPvE.IsEnabled) return false;
+            if (BattleVoicePvE.EnoughLevel && !BattleVoicePvE.IsEnabled) return false;
+            return !RadiantFinalePvE.EnoughLevel || RadiantFinalePvE.IsEnabled;
         }
     }
 
     private static bool IsFirstCycle { get; set; }
+    private static bool HasCombatCycleState { get; set; }
+    private static float LastCombatTimeRaw { get; set; }
 
     #endregion
 
@@ -147,6 +138,8 @@ public sealed class BRD_Ascended : BardRotation
                && action.Setting.TargetStatusProvide != null
                && CurrentTarget.HasStatus(true, action.Setting.TargetStatusProvide);
     }
+
+    private static bool TargetHasBossIcon => CurrentTarget?.IsBossFromIcon() == true;
 
     private static bool TargetIsBoss
     {
@@ -283,6 +276,7 @@ public sealed class BRD_Ascended : BardRotation
     #region Countdown Logic
     protected override IAction? CountDownAction(float remainTime)
     {
+        RefreshCombatCycleState();
         IsFirstCycle = true;
         if (AscendedPotions.ShouldUsePotion(this, out var potionAct)) return potionAct;
 
@@ -290,10 +284,13 @@ public sealed class BRD_Ascended : BardRotation
         if (SongTimings == BardAscendedSongTiming.AdjustedStandard
             && remainTime <= 0f)
         {
-            if (HeartbreakShotPvE.CanUse(out act)) return act;
+            if (ActiveBloodletterVariant.CanUse(out act)) return act;
         }
 
-        if (Is369 && EnablePrepullHeartbreakShot && remainTime < 1.65f && HeartbreakShotPvE.CanUse(out act))
+        if (Is369
+            && EnablePrepullHeartbreakShot
+            && remainTime < 1.65f
+            && ActiveBloodletterVariant.CanUse(out act))
         {
             return act;
         }
@@ -307,6 +304,7 @@ public sealed class BRD_Ascended : BardRotation
 
     protected override bool EmergencyAbility(IAction nextGCD, out IAction? act)
     {
+        RefreshCombatCycleState();
         act = null;
         if (AscendedPotions.ShouldUsePotion(this, out act)) return true;
 
@@ -321,6 +319,7 @@ public sealed class BRD_Ascended : BardRotation
 
     protected override bool GeneralAbility(IAction nextGCD, out IAction? act)
     {
+        RefreshCombatCycleState();
         act = null;
         return TryUseSong(out act)
                || base.GeneralAbility(nextGCD, out act);
@@ -328,6 +327,7 @@ public sealed class BRD_Ascended : BardRotation
 
     protected override bool AttackAbility(IAction nextGcd, out IAction? act)
     {
+        RefreshCombatCycleState();
         act = null;
         if (!CanWeave) return false;
         return TryUseRadiantFinale(out act)
@@ -344,6 +344,7 @@ public sealed class BRD_Ascended : BardRotation
 
     protected override bool GeneralGCD(out IAction? act)
     {
+        RefreshCombatCycleState();
         if (TryUseIronJaws(out act)) return true;
         if (TryUseDoTs(out act)) return true;
         if (TryUseBurst(out act)) return true;
@@ -376,13 +377,40 @@ public sealed class BRD_Ascended : BardRotation
         }
     }
 
-    private bool CanDoTMobs => CurrentTarget != null && (!DoTsBoss || TargetIsBoss);
+    private bool CanDoTMobs => CurrentTarget != null && (!DoTsBoss || TargetHasBossIcon);
+
+    private bool TargetHasAllDots => TargetHasDoT(Stormbite) && TargetHasDoT(CausticBite);
+
+    private bool AnyDotEnding => DoTsEnding(Stormbite) || DoTsEnding(CausticBite);
+
+    private static void RefreshCombatCycleState()
+    {
+        if (!InCombat)
+        {
+            HasCombatCycleState = false;
+            LastCombatTimeRaw = 0f;
+            return;
+        }
+
+        if (BardAscendedDecisionPolicy.ShouldStartFirstCycle(
+                isInCombat: true,
+                hasCombatState: HasCombatCycleState,
+                currentCombatTime: DataCenter.CombatTimeRaw,
+                previousCombatTime: LastCombatTimeRaw))
+        {
+            IsFirstCycle = true;
+        }
+
+        HasCombatCycleState = true;
+        LastCombatTimeRaw = DataCenter.CombatTimeRaw;
+    }
 
     private bool WouldUseIronJaws
     {
         get
         {
             if (!IronJawsPvE.EnoughLevel || !CanDoTMobs) return false;
+            if (!TargetHasAllDots) return false;
             if (!BardAscendedDecisionPolicy.ShouldRefreshIronJaws(
                     EffectiveTargetTimeToKill,
                     TargetIsBoss,
@@ -391,13 +419,7 @@ public sealed class BRD_Ascended : BardRotation
                 return false;
             }
 
-            foreach (var doTAction in DoTActions)
-            {
-                if (CurrentTarget != null && !TargetHasDoT(doTAction)) return false;
-                if (!DoTsEnding(doTAction) || InBurst) continue;
-                return true;
-            }
-
+            if (!InBurst && AnyDotEnding) return true;
             return InBurst && BurstEndGCD(1) && !IsLastGCD(ActionID.IronJawsPvE);
         }
     }
@@ -444,6 +466,7 @@ public sealed class BRD_Ascended : BardRotation
     {
         act = null;
         if (!IronJawsPvE.EnoughLevel || !CanDoTMobs) return false;
+        if (!TargetHasAllDots) return false;
         if (!BardAscendedDecisionPolicy.ShouldRefreshIronJaws(
                 EffectiveTargetTimeToKill,
                 TargetIsBoss,
@@ -452,10 +475,8 @@ public sealed class BRD_Ascended : BardRotation
             return false;
         }
 
-        foreach (var doTAction in DoTActions)
+        if (!InBurst && AnyDotEnding)
         {
-            if (CurrentTarget != null && !TargetHasDoT(doTAction)) return false;
-            if (!DoTsEnding(doTAction) || InBurst) continue;
             return IronJawsPvE.CanUse(out act, true);
         }
 
@@ -538,17 +559,19 @@ public sealed class BRD_Ascended : BardRotation
             _ => BardAscendedSongPhase.None
         };
 
+    private BardAscendedApexDecisionInput ApexDecisionInput => new(
+        SongPhase: CurrentSongPhase,
+        SoulVoice: SoulVoice,
+        IsInBurst: InBurst,
+        WouldUseIronJaws: WouldUseIronJaws,
+        SongSecondsRemaining: SongTime,
+        TargetSecondsRemaining: EffectiveTargetTimeToKill,
+        WeaponTotalSeconds: WeaponTotal,
+        WouldUseEnhancedFiller: CanUseEnhancedFiller,
+        NoFutureBlastPossible: !float.IsNaN(EffectiveTargetTimeToKill) && EffectiveTargetTimeToKill <= WeaponTotal);
+
     private bool CanSpendSoulVoice =>
-        BardAscendedDecisionPolicy.ShouldSpendApex(
-            songPhase: CurrentSongPhase,
-            soulVoice: SoulVoice,
-            isInBurst: InBurst,
-            wouldUseIronJaws: WouldUseIronJaws,
-            songSecondsRemaining: SongTime,
-            targetSecondsRemaining: EffectiveTargetTimeToKill,
-            weaponTotalSeconds: WeaponTotal,
-            wouldUseEnhancedFiller: CanUseEnhancedFiller,
-            noFutureBlastPossible: !float.IsNaN(EffectiveTargetTimeToKill) && EffectiveTargetTimeToKill <= WeaponTotal);
+        BardAscendedDecisionPolicy.ShouldSpendApex(ApexDecisionInput);
 
     private bool TryUseApexArrow(out IAction? act)
     {
@@ -633,7 +656,7 @@ public sealed class BRD_Ascended : BardRotation
         if (IsInSandbagMode) return false;
         if (TryUseAoE(out act)) return true;
         if (TryUseEnhancedFiller(out act)) return true;
-        return BurstShotPvE.CanUse(out act, skipComboCheck: true)
+        return ActiveFiller.CanUse(out act, skipComboCheck: true)
                && !CanUseEnhancedFiller
                && !HasResonantArrow;
     }
@@ -662,18 +685,6 @@ public sealed class BRD_Ascended : BardRotation
         {
             if (WeaponRemain <= DataCenter.CalculatedActionAhead + Math.Max(AnimationLock, 0.6f)) return false;
 
-            if (!EmpyrealArrowPvE.Cooldown.IsCoolingDown
-                || EmpyrealArrowPvE.Cooldown.HasOneCharge)
-            {
-                return CanWeave;
-            }
-
-            var recast = EmpyrealArrowPvE.Cooldown.RecastTimeRemain;
-
-            if (recast >= WeaponTotal) return false;
-
-            if (recast >= WeaponRemain) return false;
-
             return CanWeave && EmpyrealArrowPvE.Cooldown.HasOneCharge;
         }
     }
@@ -682,7 +693,7 @@ public sealed class BRD_Ascended : BardRotation
     {
         get
         {
-            if (IsStandardTiming)
+            if (UsesStandardBurstPath)
             {
                 return true;
             }
@@ -740,20 +751,30 @@ public sealed class BRD_Ascended : BardRotation
     {
         act = null;
 
-        if (SongList.Length == 0)
+        if (!HasSongActions)
             return false;
+
+        if (NoSong
+            && IsFirstCycle
+            && !TheWanderersMinuetPvE.EnoughLevel
+            && TryUseFirstAvailableSong(out act))
+        {
+            return true;
+        }
 
         if (!NoSong && !ShouldSwapSong)
             return false;
 
-        foreach (var song in SongList)
-        {
-            if (song == TheWanderersMinuetPvE && TryUseWanderersMinuet(out act)) return true;
-            if (song == MagesBalladPvE && TryUseMagesBallad(out act)) return true;
-            if (song == ArmysPaeonPvE && TryUseArmys(out act)) return true;
-        }
+        return TheWanderersMinuetPvE.EnoughLevel && TryUseWanderersMinuet(out act)
+               || MagesBalladPvE.EnoughLevel && TryUseMagesBallad(out act)
+               || ArmysPaeonPvE.EnoughLevel && TryUseArmys(out act);
+    }
 
-        return false;
+    private bool TryUseFirstAvailableSong(out IAction? act)
+    {
+        act = null;
+        if (MagesBalladPvE.EnoughLevel) return MagesBalladPvE.CanUse(out act);
+        return ArmysPaeonPvE.EnoughLevel && ArmysPaeonPvE.CanUse(out act);
     }
 
     private bool CanUseWanderersMinuet
@@ -813,7 +834,7 @@ public sealed class BRD_Ascended : BardRotation
         {
             if (EnableSandbagMode) return InMages && ShouldSwapSong;
 
-            if (IsStandardTiming)
+            if (UsesStandardBurstPath)
             {
                 if (InMages) return ShouldSwapSong;
 
@@ -822,7 +843,8 @@ public sealed class BRD_Ascended : BardRotation
                 if (NoSong) return TheWanderersMinuetPvE.Cooldown.IsCoolingDown || MagesBalladPvE.Cooldown.IsCoolingDown;
             }
 
-            if (!Is369 || !ShouldSwapSong) return false;
+            if (!ShouldSwapSong) return false;
+            if (!Is369) return false;
 
             if (IsFirstCycle)
             {
@@ -863,9 +885,9 @@ public sealed class BRD_Ascended : BardRotation
     {
         get
         {
-            if (!InWanderers && !CanBurstChanged) return false;
+            if (!InWanderers) return false;
 
-            if (IsStandardTiming)
+            if (UsesStandardBurstPath)
             {
                 return IsFirstCycle
                     ? HasBattleVoice
@@ -892,18 +914,27 @@ public sealed class BRD_Ascended : BardRotation
     {
         get
         {
-            if (!InWanderers && !CanBurstChanged) return false;
-            if (IsStandardTiming)
+            if (!InWanderers && RadiantFinalePvE.EnoughLevel) return false;
+            var shouldWaitForRadiantFinale = BardAscendedDecisionPolicy.ShouldWaitForRadiantFinaleBeforeBattleVoice(
+                RadiantFinalePvE.EnoughLevel,
+                RadiantFinalePvE.CanUse(out _),
+                HasRadiantFinale,
+                IsLastAbility(ActionID.RadiantFinalePvE));
+
+            if (UsesStandardBurstPath)
             {
                 return CanLateWeave
                        && (IsFirstCycle
                            ? !HasRadiantFinale
-                           : HasRadiantFinale || IsLastAbility(ActionID.RadiantFinalePvE));
+                           : !shouldWaitForRadiantFinale);
             }
             return Is369
                    && (IsFirstCycle
-                       ? !WouldUseDoTs && HasRadiantFinale && CanEarlyWeave
-                       : HasRadiantFinale && CanLateWeave);
+                       ? !WouldUseDoTs
+                         && !shouldWaitForRadiantFinale
+                         && CanEarlyWeave
+                       : !shouldWaitForRadiantFinale
+                         && CanLateWeave);
         }
     }
 
@@ -949,8 +980,7 @@ public sealed class BRD_Ascended : BardRotation
             return true;
         }
 
-        return HeartbreakShotPvE.CanUse(out act, usedUp: usedUp)
-               || BloodletterPvE.CanUse(out act, usedUp: usedUp);
+        return ActiveBloodletterVariant.CanUse(out act, usedUp: usedUp);
     }
 
     private bool TryUseHeartBreakShot(out IAction? act)
@@ -958,14 +988,16 @@ public sealed class BRD_Ascended : BardRotation
         act = null;
         if (IsInSandbagMode || !CanWeave || !EnoughWeaveTime) return false;
 
-        var willHaveMaxCharges = HeartbreakShotPvE.Cooldown.WillHaveXCharges(BloodletterMax, 5);
-        var willHaveOneCharge = HeartbreakShotPvE.Cooldown.WillHaveOneCharge(5);
-        var wontHaveCharge = HeartbreakShotPvE.Cooldown.IsCoolingDown
-                                 && !HeartbreakShotPvE.Cooldown.WillHaveOneCharge(WeaponAhead)
+        var willHaveMaxCharges = ActiveBloodletterVariant.Cooldown.WillHaveXCharges(
+            BloodletterMax,
+            HeartbreakChargeLookahead);
+        var willHaveOneCharge = ActiveBloodletterVariant.Cooldown.WillHaveOneCharge(HeartbreakChargeLookahead);
+        var wontHaveCharge = ActiveBloodletterVariant.Cooldown.IsCoolingDown
+                                 && !ActiveBloodletterVariant.Cooldown.WillHaveOneCharge(WeaponAhead)
                                  && WeaponElapsed <= 1f;
 
         var holdForRagingOrCap = (!InBurst || !HasRagingStrikes)
-            && BloodletterPvE.Cooldown.CurrentCharges < 3
+            && ActiveBloodletterVariant.Cooldown.CurrentCharges < BloodletterMax
             && !willHaveMaxCharges;
         var holdForBurstTiming = InBurst
             && (!willHaveOneCharge || !CanWeave);
@@ -973,10 +1005,10 @@ public sealed class BRD_Ascended : BardRotation
 
         var isInArmysHold = InArmys
             && SongTime <= ArmyHeartbreakHoldThreshold
-            && BloodletterPvE.Cooldown.CurrentCharges < 3
+            && ActiveBloodletterVariant.Cooldown.CurrentCharges < BloodletterMax
             && !willHaveMaxCharges;
 
-        var isInMagesHold = InMages && SongEndAfter(MageRemainTime + WeaponTotal * 0.9f);
+        var isInMagesHold = InMages && SongEndAfter(MageRemainTime + WeaponTotal * MagesHeartbreakHoldGcdMultiplier);
 
         var isEmpyrealBlocking = !NoSong && !InBurst
             && (EmpyrealArrowPvE.Cooldown.WillHaveOneCharge(WeaponTotal) && CanUseEmpyrealArrow
@@ -984,7 +1016,7 @@ public sealed class BRD_Ascended : BardRotation
 
         if (isInWanderersHold || isInArmysHold || isInMagesHold || isEmpyrealBlocking) return false;
 
-        if (SongTimings == BardAscendedSongTiming.Cycle369 && NoSong && HeartbreakShotPvE.CanUse(out act, usedUp: false)) return true;
+        if (SongTimings == BardAscendedSongTiming.Cycle369 && NoSong && ActiveBloodletterVariant.CanUse(out act, usedUp: false)) return true;
 
         if (!CanWeave) return false;
 
@@ -992,7 +1024,7 @@ public sealed class BRD_Ascended : BardRotation
             || (willHaveOneCharge && (InMages || (InArmys && SongTime > 30f)));
         if (shouldUseUsedUp) return TryUseBloodletterVariant(out act, usedUp: true);
 
-        var atChargeCap = BloodletterPvE.Cooldown.CurrentCharges == BloodletterMax || willHaveMaxCharges;
+        var atChargeCap = ActiveBloodletterVariant.Cooldown.CurrentCharges == BloodletterMax || willHaveMaxCharges;
         return atChargeCap && TryUseBloodletterVariant(out act, usedUp: false);
     }
 
@@ -1058,7 +1090,7 @@ public sealed class BRD_Ascended : BardRotation
                 return OpenerPotionTime > 0f || InWanderers;
             }
 
-            if (InWanderers && HasBattleVoice && HasRadiantFinale) return true;
+            if (InBurst) return true;
             return InOddMinuteWindow;
         }
 

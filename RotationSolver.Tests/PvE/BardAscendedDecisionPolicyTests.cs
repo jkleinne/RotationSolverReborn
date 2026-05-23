@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using RotationSolver.RebornRotations.Ranged;
 
 namespace RotationSolver.Tests;
@@ -223,6 +224,131 @@ internal static partial class PvETestSuite
         AssertTrue(BardAscendedDecisionPolicy.ShouldUseOgcdAoE(3), "oGCD AoE should start at three targets");
     }
 
+    static void BardAscendedFirstCycleStartsOnCombatEntryAndTimerReset()
+    {
+        AssertTrue(
+            BardAscendedDecisionPolicy.ShouldStartFirstCycle(
+                isInCombat: true,
+                hasCombatState: false,
+                currentCombatTime: 0.5f,
+                previousCombatTime: 0f),
+            "first cycle should start when combat begins without countdown state");
+        AssertFalse(
+            BardAscendedDecisionPolicy.ShouldStartFirstCycle(
+                isInCombat: true,
+                hasCombatState: true,
+                currentCombatTime: 15f,
+                previousCombatTime: 10f),
+            "first cycle should not restart while combat time advances");
+        AssertTrue(
+            BardAscendedDecisionPolicy.ShouldStartFirstCycle(
+                isInCombat: true,
+                hasCombatState: true,
+                currentCombatTime: 0.25f,
+                previousCombatTime: 120f),
+            "first cycle should restart when a new pull resets combat time before an out of combat tick");
+        AssertFalse(
+            BardAscendedDecisionPolicy.ShouldStartFirstCycle(
+                isInCombat: false,
+                hasCombatState: true,
+                currentCombatTime: 0f,
+                previousCombatTime: 120f),
+            "first cycle should not start while out of combat");
+    }
+
+    static void BardAscendedRuntimeDoesNotCacheLevelSyncedChoices()
+    {
+        var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
+
+        AssertSourceDoesNotMatch(
+            source,
+            @"\bfield\s*\?\?=",
+            "BRD Ascended should not cache action choices that depend on EnoughLevel");
+        AssertSourceDoesNotMatch(
+            source,
+            @"\bif\s*\(\s*field\s*!=\s*null\s*\)\s*return\s+field\s*;",
+            "BRD Ascended should not reuse stale field-backed action lists after level sync");
+        AssertSourceDoesNotMatch(
+            source,
+            @"\bprivate\s+IBaseAction\[\]\s+DoTActions\b",
+            "BRD Ascended should not allocate DoT action arrays in runtime paths");
+        AssertSourceMatches(
+            source,
+            @"\bprivate\s+static\s+IBaseAction\s+ActiveFiller\s*=>\s*BurstShotPvE\.EnoughLevel\s*\?\s*BurstShotPvE\s*:\s*HeavyShotPvE\s*;",
+            "BRD Ascended should select Heavy Shot when Burst Shot is not level-synced");
+        AssertSourceMatches(
+            source,
+            @"\bprivate\s+static\s+IBaseAction\s+ActiveBloodletterVariant\s*=>\s*HeartbreakShotPvE\.EnoughLevel\s*\?\s*HeartbreakShotPvE\s*:\s*BloodletterPvE\s*;",
+            "BRD Ascended should use one canonical Bloodletter variant for fallback and cooldown checks");
+        AssertSourceMatches(
+            source,
+            @"\bTryUseFirstAvailableSong\s*\(\s*out\s+IAction\?\s+act\s*\).*?MagesBalladPvE\.EnoughLevel.*?MagesBalladPvE\.CanUse\(out\s+act\).*?ArmysPaeonPvE\.EnoughLevel\s*&&\s*ArmysPaeonPvE\.CanUse\(out\s+act\)",
+            "BRD Ascended should start the first level-synced song instead of depending on unavailable song cooldowns");
+        AssertSourceMatches(
+            source,
+            @"\bActiveBloodletterVariant\.CanUse\(out\s+act,\s*usedUp:\s*usedUp\)",
+            "BRD Ascended prepull and combat Bloodletter paths should use the level-synced active variant");
+        AssertSourceDoesNotMatch(
+            source,
+            @"\bif\s*\(\s*!\s*Is369\s*\|\|\s*!\s*ShouldSwapSong\s*\)\s*return\s+false\s*;",
+            "BRD Ascended custom song timing should not be blocked from Army's Paeon");
+    }
+
+    static void BardAscendedCustomTimingFollowsStandardBurstPath()
+    {
+        AssertTrue(
+            BardAscendedDecisionPolicy.UsesStandardBurstPath(BardAscendedSongTiming.Standard),
+            "standard timing should use the standard burst path");
+        AssertTrue(
+            BardAscendedDecisionPolicy.UsesStandardBurstPath(BardAscendedSongTiming.AdjustedStandard),
+            "adjusted standard timing should use the standard burst path");
+        AssertTrue(
+            BardAscendedDecisionPolicy.UsesStandardBurstPath(BardAscendedSongTiming.Custom),
+            "custom timing should use the standard burst path with custom song durations");
+        AssertFalse(
+            BardAscendedDecisionPolicy.UsesStandardBurstPath(BardAscendedSongTiming.Cycle369),
+            "3 6 9 timing keeps its dedicated burst path");
+    }
+
+    static void BardAscendedBattleVoiceWaitsOnlyForAvailableRadiantFinale()
+    {
+        AssertTrue(
+            BardAscendedDecisionPolicy.ShouldWaitForRadiantFinaleBeforeBattleVoice(
+                radiantFinaleEnoughLevel: true,
+                radiantFinaleCanUse: true,
+                hasRadiantFinale: false,
+                wasRadiantFinaleLastAction: false),
+            "Battle Voice should wait when Radiant Finale is available but not applied");
+        AssertFalse(
+            BardAscendedDecisionPolicy.ShouldWaitForRadiantFinaleBeforeBattleVoice(
+                radiantFinaleEnoughLevel: false,
+                radiantFinaleCanUse: false,
+                hasRadiantFinale: false,
+                wasRadiantFinaleLastAction: false),
+            "Battle Voice should not wait for Radiant Finale below Radiant Finale level");
+        AssertFalse(
+            BardAscendedDecisionPolicy.ShouldWaitForRadiantFinaleBeforeBattleVoice(
+                radiantFinaleEnoughLevel: true,
+                radiantFinaleCanUse: false,
+                hasRadiantFinale: false,
+                wasRadiantFinaleLastAction: false),
+            "Battle Voice should not wait when Radiant Finale is unlocked but unavailable");
+        AssertFalse(
+            BardAscendedDecisionPolicy.ShouldWaitForRadiantFinaleBeforeBattleVoice(
+                radiantFinaleEnoughLevel: true,
+                radiantFinaleCanUse: true,
+                hasRadiantFinale: true,
+                wasRadiantFinaleLastAction: false),
+            "Battle Voice should not wait after Radiant Finale status is active");
+        AssertFalse(
+            BardAscendedDecisionPolicy.ShouldWaitForRadiantFinaleBeforeBattleVoice(
+                radiantFinaleEnoughLevel: true,
+                radiantFinaleCanUse: true,
+                hasRadiantFinale: false,
+                wasRadiantFinaleLastAction: true),
+            "Battle Voice should not wait immediately after Radiant Finale was used");
+    }
+
     static void BardAscendedPotionPresetsMapToExpectedTimings()
     {
         AssertSequenceEqual(
@@ -265,6 +391,14 @@ internal static partial class PvETestSuite
             [],
             BardAscendedDecisionPolicy.GetPotionTimings(BardAscendedPotionTiming.Custom, [0f, 0f]),
             "custom potion timing should reject all zero timing arrays");
+        AssertSequenceEqual(
+            [300f],
+            BardAscendedDecisionPolicy.GetPotionTimings(BardAscendedPotionTiming.Custom, [300f, 0f, 0f]),
+            "custom potion timing should filter unused zero timing slots");
+        AssertSequenceEqual(
+            [300f],
+            BardAscendedDecisionPolicy.GetPotionTimings(BardAscendedPotionTiming.Custom, [0f, 300f]),
+            "custom potion timing should treat zero as an unused custom timing slot");
     }
 
     static bool ShouldSpendApex(
@@ -278,15 +412,67 @@ internal static partial class PvETestSuite
         bool wouldUseEnhancedFiller = false,
         bool noFutureBlastPossible = false)
     {
-        return BardAscendedDecisionPolicy.ShouldSpendApex(
-            songPhase,
-            soulVoice,
-            isInBurst,
-            wouldUseIronJaws,
-            songSecondsRemaining,
-            targetSecondsRemaining,
-            weaponTotalSeconds,
-            wouldUseEnhancedFiller,
-            noFutureBlastPossible);
+        var input = new BardAscendedApexDecisionInput(
+            SongPhase: songPhase,
+            SoulVoice: soulVoice,
+            IsInBurst: isInBurst,
+            WouldUseIronJaws: wouldUseIronJaws,
+            SongSecondsRemaining: songSecondsRemaining,
+            TargetSecondsRemaining: targetSecondsRemaining,
+            WeaponTotalSeconds: weaponTotalSeconds,
+            WouldUseEnhancedFiller: wouldUseEnhancedFiller,
+            NoFutureBlastPossible: noFutureBlastPossible);
+
+        return BardAscendedDecisionPolicy.ShouldSpendApex(input);
+    }
+
+    static string RepositoryPath(params string[] parts)
+    {
+        var root = FindRepositoryRoot();
+        var segments = new string[parts.Length + 1];
+        segments[0] = root;
+        Array.Copy(parts, 0, segments, 1, parts.Length);
+        return Path.Combine(segments);
+    }
+
+    static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null)
+        {
+            var gitPath = Path.Combine(directory.FullName, ".git");
+            if (Directory.Exists(gitPath) || File.Exists(gitPath))
+            {
+                return directory.FullName;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new InvalidOperationException("Could not locate repository root");
+    }
+
+    static void AssertSourceMatches(string source, string pattern, string message)
+    {
+        AssertTrue(SourcePattern(pattern).IsMatch(source), message);
+    }
+
+    static void AssertSourceDoesNotMatch(string source, string pattern, string message)
+    {
+        AssertFalse(SourcePattern(pattern).IsMatch(source), message);
+    }
+
+    static Regex SourcePattern(string pattern)
+    {
+        return new Regex(pattern, RegexOptions.CultureInvariant | RegexOptions.Singleline);
+    }
+
+    static string StripSourceComments(string source)
+    {
+        return Regex.Replace(
+            source,
+            @"//.*?$|/\*.*?\*/",
+            string.Empty,
+            RegexOptions.CultureInvariant | RegexOptions.Multiline | RegexOptions.Singleline);
     }
 }

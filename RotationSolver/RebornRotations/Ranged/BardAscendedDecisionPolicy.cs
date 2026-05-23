@@ -54,6 +54,17 @@ internal enum BardAscendedPotionTiming
 
 internal readonly record struct BardAscendedSongDurations(float Wanderers, float Mages, float Armys);
 
+internal readonly record struct BardAscendedApexDecisionInput(
+    BardAscendedSongPhase SongPhase,
+    byte SoulVoice,
+    bool IsInBurst,
+    bool WouldUseIronJaws,
+    float SongSecondsRemaining,
+    float TargetSecondsRemaining,
+    float WeaponTotalSeconds,
+    bool WouldUseEnhancedFiller,
+    bool NoFutureBlastPossible);
+
 internal static class BardAscendedDecisionPolicy
 {
     internal const float SongMaxDuration = 45f;
@@ -103,6 +114,23 @@ internal static class BardAscendedDecisionPolicy
         };
     }
 
+    internal static bool UsesStandardBurstPath(BardAscendedSongTiming timing)
+    {
+        return timing != BardAscendedSongTiming.Cycle369;
+    }
+
+    internal static bool ShouldWaitForRadiantFinaleBeforeBattleVoice(
+        bool radiantFinaleEnoughLevel,
+        bool radiantFinaleCanUse,
+        bool hasRadiantFinale,
+        bool wasRadiantFinaleLastAction)
+    {
+        return radiantFinaleEnoughLevel
+            && radiantFinaleCanUse
+            && !hasRadiantFinale
+            && !wasRadiantFinaleLastAction;
+    }
+
     internal static bool ShouldApplyBothDots(float targetTimeToKill, bool isBossTarget, bool replacesEnhancedFiller)
     {
         var minimumTargetSeconds = replacesEnhancedFiller
@@ -131,43 +159,35 @@ internal static class BardAscendedDecisionPolicy
         return TargetMeetsThreshold(targetTimeToKill, isBossTarget, StormbiteOnlyMinimumTargetSeconds);
     }
 
-    internal static bool ShouldSpendApex(
-        BardAscendedSongPhase songPhase,
-        byte soulVoice,
-        bool isInBurst,
-        bool wouldUseIronJaws,
-        float songSecondsRemaining,
-        float targetSecondsRemaining,
-        float weaponTotalSeconds,
-        bool wouldUseEnhancedFiller,
-        bool noFutureBlastPossible)
+    internal static bool ShouldSpendApex(BardAscendedApexDecisionInput input)
     {
         if (ShouldDumpApexBeforeFightEnds(
-            soulVoice,
-            targetSecondsRemaining,
-            weaponTotalSeconds,
-            wouldUseEnhancedFiller,
-            noFutureBlastPossible))
+            input.SoulVoice,
+            input.TargetSecondsRemaining,
+            input.WeaponTotalSeconds,
+            input.WouldUseEnhancedFiller,
+            input.NoFutureBlastPossible))
         {
             return true;
         }
 
-        if (wouldUseIronJaws)
+        if (input.WouldUseIronJaws)
         {
             return false;
         }
 
-        if (isInBurst)
+        if (input.IsInBurst)
         {
-            return soulVoice >= ApexBlastReadySoulVoice;
+            return input.SoulVoice >= ApexBlastReadySoulVoice;
         }
 
-        if (songPhase != BardAscendedSongPhase.MagesBallad)
+        if (input.SongPhase != BardAscendedSongPhase.MagesBallad)
         {
             return false;
         }
 
-        return soulVoice >= SoulVoiceCap || ShouldSpendApexInMageBalladWindow(soulVoice, songSecondsRemaining);
+        return input.SoulVoice >= SoulVoiceCap
+            || ShouldSpendApexInMageBalladWindow(input.SoulVoice, input.SongSecondsRemaining);
     }
 
     internal static bool ShouldUseBlastArrow(bool hasBlastReady, bool wouldUseDots, bool wouldUseIronJaws)
@@ -185,7 +205,16 @@ internal static class BardAscendedDecisionPolicy
         return hostilesInRange >= OgcdAoETargets;
     }
 
-    internal static float[] GetPotionTimings(BardAscendedPotionTiming timing, float[] customTimings)
+    internal static bool ShouldStartFirstCycle(
+        bool isInCombat,
+        bool hasCombatState,
+        float currentCombatTime,
+        float previousCombatTime)
+    {
+        return isInCombat && (!hasCombatState || currentCombatTime < previousCombatTime);
+    }
+
+    internal static ReadOnlySpan<float> GetPotionTimings(BardAscendedPotionTiming timing, float[]? customTimings)
     {
         return timing switch
         {
@@ -253,20 +282,29 @@ internal static class BardAscendedDecisionPolicy
         return targetSecondsRemaining <= weaponTotalSeconds * gcdCount;
     }
 
-    private static float[] GetCustomPotionTimings(float[] customTimings)
+    private static ReadOnlySpan<float> GetCustomPotionTimings(float[]? customTimings)
     {
         if (customTimings is null || customTimings.Length == 0 || ContainsOnlyOpenerPotionTimings(customTimings))
         {
             return [];
         }
 
-        var copiedTimings = new float[customTimings.Length];
-        Array.Copy(customTimings, copiedTimings, customTimings.Length);
+        var positiveTimingCount = CountPositivePotionTimings(customTimings);
+        if (positiveTimingCount == customTimings.Length) return customTimings;
 
-        return copiedTimings;
+        var positiveTimings = new float[positiveTimingCount];
+        var nextPositiveTimingIndex = 0;
+        for (var index = 0; index < customTimings.Length; index++)
+        {
+            if (customTimings[index] <= OpenerPotionSeconds) continue;
+            positiveTimings[nextPositiveTimingIndex] = customTimings[index];
+            nextPositiveTimingIndex++;
+        }
+
+        return positiveTimings;
     }
 
-    private static bool ContainsOnlyOpenerPotionTimings(float[] timings)
+    private static bool ContainsOnlyOpenerPotionTimings(ReadOnlySpan<float> timings)
     {
         for (var index = 0; index < timings.Length; index++)
         {
@@ -277,5 +315,19 @@ internal static class BardAscendedDecisionPolicy
         }
 
         return true;
+    }
+
+    private static int CountPositivePotionTimings(ReadOnlySpan<float> timings)
+    {
+        var count = 0;
+        for (var index = 0; index < timings.Length; index++)
+        {
+            if (timings[index] > OpenerPotionSeconds)
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 }

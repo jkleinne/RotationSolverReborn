@@ -12,39 +12,11 @@ internal static partial class PvETestSuite
         new("bard ascended apex uses planned kill time over song fallback", BardAscendedApexUsesPlannedKillTimeOverSongFallback),
         new("bard ascended blast arrow waits for urgent gcds", BardAscendedBlastArrowWaitsForUrgentGcds),
         new("bard ascended aoe thresholds distinguish gcd and ogcd", BardAscendedAoeThresholdsDistinguishGcdAndOgcd),
+        new("bard ascended first cycle starts on combat entry and timer reset", BardAscendedFirstCycleStartsOnCombatEntryAndTimerReset),
+        new("bard ascended runtime does not cache level synced choices", BardAscendedRuntimeDoesNotCacheLevelSyncedChoices),
+        new("bard ascended custom timing follows standard burst path", BardAscendedCustomTimingFollowsStandardBurstPath),
+        new("bard ascended battle voice waits only for available radiant finale", BardAscendedBattleVoiceWaitsOnlyForAvailableRadiantFinale),
         new("bard ascended potion presets map to expected timings", BardAscendedPotionPresetsMapToExpectedTimings),
         new("bard ascended custom potion timings reject empty input", BardAscendedCustomPotionTimingsRejectEmptyInput),
     ];
-
-    static void AssertTrue(bool actual, string message)
-    {
-        if (!actual)
-        {
-            throw new InvalidOperationException(message);
-        }
-    }
-
-    static void AssertFalse(bool actual, string message)
-    {
-        if (actual)
-        {
-            throw new InvalidOperationException(message);
-        }
-    }
-
-    static void AssertEqual<T>(T expected, T actual, string message)
-    {
-        if (!EqualityComparer<T>.Default.Equals(expected, actual))
-        {
-            throw new InvalidOperationException($"{message}. Expected {expected}, got {actual}");
-        }
-    }
-
-    static void AssertSequenceEqual(float[] expected, float[] actual, string message)
-    {
-        if (!expected.SequenceEqual(actual))
-        {
-            throw new InvalidOperationException($"{message}. Expected [{string.Join(", ", expected)}], got [{string.Join(", ", actual)}]");
-        }
-    }
 }
