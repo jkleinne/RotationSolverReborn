@@ -350,6 +350,7 @@ public sealed class BRD_Ascended : BardRotation
         if (TryUseBurst(out act)) return true;
         if (TryUseApexArrow(out act)
             || TryUseBlastArrow(out act)) return true;
+        if (TryUseResonantArrow(out act)) return true;
         return TryUseFiller(out act)
                || base.GeneralGCD(out act);
     }

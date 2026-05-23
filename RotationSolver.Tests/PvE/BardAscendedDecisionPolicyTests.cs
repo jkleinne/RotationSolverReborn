@@ -297,11 +297,16 @@ internal static partial class PvETestSuite
     static void BardAscendedRuntimeSpendsResonantReadyBeforeFiller()
     {
         var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
+        var generalGcd = ExtractMethodBody(source, "GeneralGCD");
 
         AssertSourceMatches(
             source,
             @"\bTryUseResonantArrow\s*\(\s*out\s+IAction\?\s+act\s*\).*?\bif\s*\(\s*!\s*HasResonantArrow\s*\)\s*return\s+false\s*;.*?\bResonantArrowPvE\.CanUse\(out\s+act,\s*skipComboCheck:\s*true\)",
             "BRD Ascended should spend Resonant Ready instead of blocking filler after burst");
+        AssertSourceMatches(
+            generalGcd,
+            @"\bTryUseBurst\(out\s+act\).*?\bTryUseApexArrow\(out\s+act\).*?\bTryUseBlastArrow\(out\s+act\).*?\bTryUseResonantArrow\(out\s+act\).*?\bTryUseFiller\(out\s+act\)",
+            "BRD Ascended should reach Resonant Arrow before filler even when burst is inactive");
     }
 
     static void BardAscendedCustomTimingFollowsStandardBurstPath()
@@ -475,6 +480,36 @@ internal static partial class PvETestSuite
     static Regex SourcePattern(string pattern)
     {
         return new Regex(pattern, RegexOptions.CultureInvariant | RegexOptions.Singleline);
+    }
+
+    static string ExtractMethodBody(string source, string methodName)
+    {
+        var methodStart = source.IndexOf($"{methodName}(", StringComparison.Ordinal);
+        if (methodStart < 0)
+        {
+            throw new InvalidOperationException($"Could not locate method {methodName}");
+        }
+
+        var bodyStart = source.IndexOf('{', methodStart);
+        if (bodyStart < 0)
+        {
+            throw new InvalidOperationException($"Could not locate method body for {methodName}");
+        }
+
+        var depth = 0;
+        for (var index = bodyStart; index < source.Length; index++)
+        {
+            if (source[index] == '{') depth++;
+            if (source[index] != '}') continue;
+
+            depth--;
+            if (depth == 0)
+            {
+                return source[bodyStart..(index + 1)];
+            }
+        }
+
+        throw new InvalidOperationException($"Could not locate method end for {methodName}");
     }
 
     static string StripSourceComments(string source)
