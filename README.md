@@ -1,103 +1,107 @@
+# [Ascended Rotation Solver Reborn](https://github.com/jkleinne/ascended-rotationsolverreborn)
 
-# [![](https://raw.githubusercontent.com/FFXIV-CombatReborn/RebornAssets/main/IconAssets/RSR_Icon.png)](https://github.com/FFXIV-CombatReborn/RotationSolverReborn)
-
-**Ascended Rotation Solver Reborn, personal fork of RSR**
+[![](https://raw.githubusercontent.com/jkleinne/ascended-rotationsolverreborn/main/Images/Logo.png)](https://github.com/jkleinne/ascended-rotationsolverreborn)
 
 ![Github License](https://img.shields.io/github/license/FFXIV-CombatReborn/RotationSolverReborn.svg?label=License&style=for-the-badge)
 
-This is a personal fork of [FFXIV-CombatReborn/RotationSolverReborn](https://github.com/FFXIV-CombatReborn/RotationSolverReborn). It tracks upstream selectively and keeps a separate package identity, plugin manifest, and Dalamud repository entry for the `ascended-*` plugin set.
+Ascended Rotation Solver Reborn is a personal fork of [RotationSolverReborn](https://github.com/FFXIV-CombatReborn/RotationSolverReborn). It adds focused PvP targeting, PvP action policy work, and an Ascended Bard PvE rotation for Patch 7.5.
 
-The fork focuses on PvP automation quality. Its main additions are `PvPSmart` hostile targeting, PvP burst conservation, Bard control support, and match-aware auto on/off behavior. PvE rotation behavior is intended to stay aligned with upstream.
+This is a third party Dalamud plugin. Square Enix, Dalamud, and the upstream RotationSolverReborn project do not provide support for this fork. Use it only if you understand the risks of third party tools in Final Fantasy XIV.
 
-If you do not specifically want the PvP changes, install upstream RSR instead.
+## Quick Install
 
-## What this fork adds
+Add the Ascended plugin repository to Dalamud:
 
-A new `TargetingType.PvPSmart` mode that replaces the role-blind `Auto(LowHP)` cycle in PvP with a scoring-based selector. For each candidate hostile, the scorer composes a weighted scalar over pure factors and picks the argmax:
-
-- **Invuln short-circuit:** Guard, Hallowed Ground, Living Dead, Holmgang, Superbolide, and PvP-specific invulnerability states such as Undead Redemption and Hidden are skipped outright
-- **Role value:** Healer / Ranged DPS weighted above Melee / Tank
-- **Effective HP & finish:** current HP scaled by active mitigation statuses, with a finish-kill bias when a candidate is within burst range
-- **Mitigation penalty:** heavy DR cooldowns deprioritize a target during the window they're active
-- **Distance penalty:** soft falloff as targets approach the effective range edge
-- **Hysteresis:** small sticky bonus for the previous target to prevent GCD-to-GCD oscillation between near-equal candidates
-- **Crystal carrier awareness** *(Crystalline Conflict)*: the hostile holding the crystal gains a bonus
-- **LB cast awareness:** hostiles mid-cast on a Limit Break gain a bonus (interrupt priority)
-- **Isolation factor:** sigmoid bonus the further a hostile is from its nearest ally (catches stragglers)
-- **Threat factor:** bonus when a hostile is targeting a low-HP ally or a party healer (peel priority)
-- **Burst conservation:** high-impact PvP burst actions are held through unclear windows, blocked during active invulnerability, and spent on valuable, vulnerable, or kill-secure targets
-- **Bard support logic:** Warden's Paean prioritizes cleanse, peel, and engage targets, while Repelling Shot and Silent Nocturne check target value before firing
-- **PvP state handling:** optional auto on/off behavior follows PvP match start, match end, death, countdown, and duty transition signals
-
-Two preset weight profiles (Casual, Ranked) are bundled, plus a Custom preset for hand-tuned weights. Ranked is the default preset. A toggleable debug overlay renders the full per-target score breakdown in real time for tuning.
-
-The existing `PvPHealers` / `PvPDPS` / `PvPTanks` modes remain as explicit role overrides.
-
-### Testing PvP behavior
-
-The PvP changes are experimental and should be validated in live PvP after updates, especially Bard support decisions and burst conservation.
-
-Burst conservation is enabled by default after installing this fork. To toggle it, open RSR settings and go to `Duty` > `PvP`, then use:
-
-```
-Conserve burst in PvP unless the target is valuable, vulnerable, or killable.
-```
-
-For the intended Ranked Crystalline Conflict behavior, also make sure `Target` > `Hostile` has `PvPSmart` in the PvP hostile targeting list, preferably first. The same settings area exposes the PvP scoring preset and the debug overlay toggle.
-
-Some high-impact actions still spend before a charge cap or ready timer would otherwise be wasted, but not while the selected target has active invulnerability or effective invulnerability.
-
-This setting may lower raw total damage because it avoids spending burst into Guard, heavy mitigation, tanks, or low-value targets that are unlikely to die. The goal is higher kill conversion, better secure-kill timing, and fewer wasted burst windows rather than higher scoreboard damage. When testing, compare kill participation, burst held for healer or ranged DPS windows, and missed opportunities where the gate felt too conservative.
-
-### Status & caveats
-
-- Scoring weights still need empirical tuning across Ranked CC matches.
-- Crystal-carrier `StatusID` is still unverified. The carrier factor evaluates to zero until that status is populated.
-- The PvP Limit Break database is populated, but match behavior should still be checked against live casts after game updates.
-
-## Upstream features
-
-Everything below is inherited unchanged from upstream RSR:
-
-- **Dynamic Rotation Guidance (Training Mode):** real-time rotation suggestions tailored to the in-game situation
-- **Customizable Settings:** adjust rotations per preference, encounter, and boss mechanics
-- **Comprehensive Database:** extensive class ability coverage for accurate rotation
-- **User-Friendly Interface:** clean ImGui surface
-- **Regular Updates:** upstream tracks game patches and class changes; this fork periodically pulls from it
-
-## Installing
-
-This plugin is distributed through the [ascended-plugins](https://github.com/jkleinne/ascended-plugins) Dalamud repository, which aggregates all `ascended-*` plugin forks under a single URL. Add it to Dalamud once and any future plugin in that namespace becomes available without extra repository entries.
-
-- Open `/xlsettings` in chat and switch to the Experimental tab
-- Scroll past DevPlugins to the Custom Plugin Repositories section
-- Paste this URL into a free text input:
-
-```
+```text
 https://raw.githubusercontent.com/jkleinne/ascended-plugins/main/pluginmaster.json
 ```
 
-- Click `+`, tick the new entry's checkbox, and save
-- Reopen Dalamud's plugin installer; "Ascended Rotation Solver Reborn" appears under Available Plugins
+1. Open `/xlsettings` in chat.
+2. Go to the Experimental tab.
+3. Find Custom Plugin Repositories.
+4. Paste the URL above into an empty entry.
+5. Click `+`, enable the new entry, and save.
+6. Open Dalamud's plugin installer and install `Ascended Rotation Solver Reborn`.
 
-**Coexistence with upstream RSR:** this fork uses a distinct `InternalName`, so Dalamud loads it as a separate plugin. It does, however, register the same `/rotation` and `/rsr` chat commands as upstream, so the two cannot run simultaneously without command-registration conflicts. Uninstall upstream RSR before installing this fork.
+Do not run upstream RSR at the same time. This fork has its own internal plugin identity, but it still registers `/rotation` and `/rsr`, so the two plugins can conflict over chat commands.
 
-If you'd rather use the official upstream binary distribution:
+## Highlights
 
-```
-https://raw.githubusercontent.com/FFXIV-CombatReborn/CombatRebornRepo/main/pluginmaster.json
-```
+### PvPSmart Targeting
 
-## Contributing
+* Scores PvP targets instead of cycling by raw current HP.
+* Accounts for role value, effective HP, mitigation, range, target stickiness, isolation, threat pressure, and limit break casts.
+* Skips invulnerable or effectively invulnerable targets instead of spending pressure into them.
 
-PvP targeting work goes here. Anything else should be contributed upstream:
+### PvP Action Discipline
 
-- For PvP scoring changes (factors, weights, debug overlay): fork this repo, branch from `main`, open a PR against `jkleinne/ascended-rotationsolverreborn:main`
-- For everything else (rotations, PvE behavior, core engine): contribute to [upstream RSR](https://github.com/FFXIV-CombatReborn/RotationSolverReborn) instead. Changes there flow into this fork on the next sync
+* Conserves burst when the selected target is protected or low value.
+* Adds focused Bard and Machinist ranged job policy for better kill conversion and fewer wasted high impact actions.
+* Includes a PvPSmart debug overlay for tuning and live review.
 
-Combat rotation changes should be validated against [Stone, Sky, Sea](https://ffxiv.consolegameswiki.com/wiki/Stone,_Sky,_Sea) per expansion before submission.
+### BRD Ascended PvE
+
+* Adds `BRD Ascended`, a Patch 7.5 Bard PvE rotation option implemented as `BRD_Ascended`.
+* Targets high end raids, ultimates, savage, extremes, alliance raids, and dungeon runs.
+* Uses the Bard PvE spec work for song timing, DoT thresholds, burst alignment, potion timing, level sync fallback, and AoE behavior.
+
+### Separate Ascended Package
+
+* Installs from the `ascended-plugins` repository.
+* Uses a distinct internal plugin name from upstream RSR.
+* Tracks upstream selectively while keeping fork specific behavior here.
+
+## Quick Setup
+
+For PvP:
+
+1. Open RSR settings.
+2. Go to `Target` > `Hostile`.
+3. Put `PvPSmart` first in the PvP hostile targeting list.
+4. Choose a PvP scoring preset. `Ranked` is the intended default.
+5. Leave burst conservation enabled unless you are deliberately testing raw damage behavior.
+6. Use the PvPSmart debug overlay when tuning target scores or reviewing live target choices.
+
+For Bard PvE:
+
+1. Select `BRD Ascended` from the Bard PvE rotations.
+2. Use standard timing for general content.
+3. Use advanced timing or custom settings only when you are planning around a specific encounter timeline.
+
+## Feature Notes
+
+### PvPSmart
+
+PvPSmart is designed for Crystalline Conflict style target selection. It favors vulnerable high value enemies, avoids protected targets, and tries to reduce target swapping when candidates are close in value.
+
+Crystal carrier and objective weighting are structurally present, but the carrier status signal is not verified in this fork yet. Until that signal is populated, carrier specific scoring should be treated as inactive.
+
+### PvP Burst Conservation
+
+Burst conservation is intended to trade some raw scoreboard damage for better kill windows. It can hold high impact actions when the target has Guard, invulnerability, heavy mitigation, or poor kill value. Some actions may still spend before a charge cap or ready timer would be wasted.
+
+### BRD Ascended
+
+`BRD_Ascended` is built as a complete Bard PvE package rather than a raid only opener script. It supports raid burst alignment, dungeon and alliance raid AoE, target time to kill aware DoTs, and level sync fallbacks.
+
+No automated rotation can be universally optimal for every party comp, kill time, downtime pattern, or future patch. Recheck behavior after FFXIV updates and tune planned fight settings when a fight timeline matters.
+
+### Inherited RSR Behavior
+
+This fork keeps the broader RotationSolverReborn foundation: rotation selection, action guidance, configuration UI, IPC surface, and inherited job support. If you only want upstream behavior without the Ascended changes, install upstream RotationSolverReborn instead.
+
+## Known Limits
+
+* Upstream RSR and this fork should not run together because both register `/rotation` and `/rsr`.
+* Crystal carrier scoring is inactive until the carrier status signal is verified.
+* PvP decisions need live match validation after FFXIV patches.
+* PvE rotations need review after Bard balance, action, or potion changes.
+* Local development builds require Dalamud development assemblies, usually via `DALAMUD_HOME` or the XIVLauncher dev path.
+* Third party plugins are prohibited by the FFXIV terms and support policy. Use at your own risk.
 
 ## Links
 
-- Upstream rotation definitions: [`RotationSolver/RebornRotations`](https://github.com/FFXIV-CombatReborn/RotationSolverReborn/tree/main/RotationSolver/RebornRotations)
-- Upstream Discord: [https://discord.gg/p54TZMPnC9](https://discord.gg/p54TZMPnC9)
+* Ascended plugin repository: https://github.com/jkleinne/ascended-plugins
+* This fork: https://github.com/jkleinne/ascended-rotationsolverreborn
+* Upstream RotationSolverReborn: https://github.com/FFXIV-CombatReborn/RotationSolverReborn
+* Upstream Discord: https://discord.gg/p54TZMPnC9
