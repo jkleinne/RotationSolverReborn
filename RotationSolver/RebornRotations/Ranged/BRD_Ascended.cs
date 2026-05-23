@@ -604,7 +604,7 @@ public sealed class BRD_Ascended : BardRotation
     private bool TryUseResonantArrow(out IAction? act)
     {
         act = null;
-        if (!HasResonantArrow || !InBurst) return false;
+        if (!HasResonantArrow) return false;
         return ResonantArrowPvE.CanUse(out act, skipComboCheck: true);
     }
 

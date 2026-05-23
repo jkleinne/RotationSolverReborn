@@ -14,6 +14,7 @@ internal static partial class PvETestSuite
         new("bard ascended aoe thresholds distinguish gcd and ogcd", BardAscendedAoeThresholdsDistinguishGcdAndOgcd),
         new("bard ascended first cycle starts on combat entry and timer reset", BardAscendedFirstCycleStartsOnCombatEntryAndTimerReset),
         new("bard ascended runtime does not cache level synced choices", BardAscendedRuntimeDoesNotCacheLevelSyncedChoices),
+        new("bard ascended runtime spends resonant ready before filler", BardAscendedRuntimeSpendsResonantReadyBeforeFiller),
         new("bard ascended custom timing follows standard burst path", BardAscendedCustomTimingFollowsStandardBurstPath),
         new("bard ascended battle voice waits only for available radiant finale", BardAscendedBattleVoiceWaitsOnlyForAvailableRadiantFinale),
         new("bard ascended potion presets map to expected timings", BardAscendedPotionPresetsMapToExpectedTimings),

@@ -294,6 +294,16 @@ internal static partial class PvETestSuite
             "BRD Ascended custom song timing should not be blocked from Army's Paeon");
     }
 
+    static void BardAscendedRuntimeSpendsResonantReadyBeforeFiller()
+    {
+        var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
+
+        AssertSourceMatches(
+            source,
+            @"\bTryUseResonantArrow\s*\(\s*out\s+IAction\?\s+act\s*\).*?\bif\s*\(\s*!\s*HasResonantArrow\s*\)\s*return\s+false\s*;.*?\bResonantArrowPvE\.CanUse\(out\s+act,\s*skipComboCheck:\s*true\)",
+            "BRD Ascended should spend Resonant Ready instead of blocking filler after burst");
+    }
+
     static void BardAscendedCustomTimingFollowsStandardBurstPath()
     {
         AssertTrue(
