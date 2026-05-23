@@ -2,7 +2,7 @@
 
 [![](https://raw.githubusercontent.com/jkleinne/ascended-rotationsolverreborn/main/Images/Logo.png)](https://github.com/jkleinne/ascended-rotationsolverreborn)
 
-![Github License](https://img.shields.io/github/license/FFXIV-CombatReborn/RotationSolverReborn.svg?label=License&style=for-the-badge)
+![Github License](https://img.shields.io/github/license/jkleinne/ascended-rotationsolverreborn.svg?label=License&style=for-the-badge)
 
 Ascended Rotation Solver Reborn is a personal fork of [RotationSolverReborn](https://github.com/FFXIV-CombatReborn/RotationSolverReborn). It adds focused PvP targeting, PvP action policy work, and an Ascended Bard PvE rotation for Patch 7.5.
 
@@ -42,7 +42,7 @@ Do not run upstream RSR at the same time. This fork has its own internal plugin 
 ### BRD Ascended PvE
 
 * Adds `BRD Ascended`, a Patch 7.5 Bard PvE rotation option implemented as `BRD_Ascended`.
-* Targets high end raids, ultimates, savage, extremes, alliance raids, and dungeon runs.
+* Intended for high end raids, ultimates, savage, extremes, alliance raids, and dungeon runs.
 * Uses the Bard PvE spec work for song timing, DoT thresholds, burst alignment, potion timing, level sync fallback, and AoE behavior.
 
 ### Separate Ascended Package

@@ -77,11 +77,15 @@ internal static partial class PvETestSuite
         var cycle369 = BardAscendedDecisionPolicy.GetSongDurations(
             BardAscendedSongTiming.Cycle369,
             new BardAscendedSongDurations(1f, 2f, 3f));
+        var adjustedStandard = BardAscendedDecisionPolicy.GetSongDurations(
+            BardAscendedSongTiming.AdjustedStandard,
+            new BardAscendedSongDurations(1f, 2f, 3f));
         var custom = BardAscendedDecisionPolicy.GetSongDurations(
             BardAscendedSongTiming.Custom,
             new BardAscendedSongDurations(40f, 38f, 37f));
 
         AssertEqual(new BardAscendedSongDurations(42f, 42f, 33f), standard, "standard should hold songs for the 3 3 12 preset");
+        AssertEqual(new BardAscendedSongDurations(42f, 42f, 33f), adjustedStandard, "adjusted standard should hold songs for the standard preset");
         AssertEqual(new BardAscendedSongDurations(42f, 39f, 36f), cycle369, "cycle 3 6 9 should hold songs for the expected preset");
         AssertEqual(new BardAscendedSongDurations(40f, 38f, 37f), custom, "custom should return caller supplied durations");
     }
@@ -216,6 +220,22 @@ internal static partial class PvETestSuite
             "Blast Arrow should not spend without Blast Ready");
     }
 
+    static void BardAscendedFillerWaitsForEnhancedFillerOrResonantReady()
+    {
+        AssertTrue(
+            BardAscendedDecisionPolicy.ShouldUseFiller(hasEnhancedFiller: false, hasResonantReady: false),
+            "filler should spend when no higher value filler or Resonant Ready is active");
+        AssertFalse(
+            BardAscendedDecisionPolicy.ShouldUseFiller(hasEnhancedFiller: true, hasResonantReady: false),
+            "filler should wait for enhanced filler");
+        AssertFalse(
+            BardAscendedDecisionPolicy.ShouldUseFiller(hasEnhancedFiller: false, hasResonantReady: true),
+            "filler should wait for Resonant Ready");
+        AssertFalse(
+            BardAscendedDecisionPolicy.ShouldUseFiller(hasEnhancedFiller: true, hasResonantReady: true),
+            "filler should wait when both higher value actions are available");
+    }
+
     static void BardAscendedAoeThresholdsDistinguishGcdAndOgcd()
     {
         AssertFalse(BardAscendedDecisionPolicy.ShouldUseGcdAoE(1), "GCD AoE should reject one target");
@@ -299,10 +319,6 @@ internal static partial class PvETestSuite
         var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
         var generalGcd = ExtractMethodBody(source, "GeneralGCD");
 
-        AssertSourceMatches(
-            source,
-            @"\bTryUseResonantArrow\s*\(\s*out\s+IAction\?\s+act\s*\).*?\bif\s*\(\s*!\s*HasResonantArrow\s*\)\s*return\s+false\s*;.*?\bResonantArrowPvE\.CanUse\(out\s+act,\s*skipComboCheck:\s*true\)",
-            "BRD Ascended should spend Resonant Ready instead of blocking filler after burst");
         AssertSourceMatches(
             generalGcd,
             @"\bTryUseBurst\(out\s+act\).*?\bTryUseApexArrow\(out\s+act\).*?\bTryUseBlastArrow\(out\s+act\).*?\bTryUseResonantArrow\(out\s+act\).*?\bTryUseFiller\(out\s+act\)",

@@ -195,6 +195,11 @@ internal static class BardAscendedDecisionPolicy
         return hasBlastReady && !wouldUseDots && !wouldUseIronJaws;
     }
 
+    internal static bool ShouldUseFiller(bool hasEnhancedFiller, bool hasResonantReady)
+    {
+        return !hasEnhancedFiller && !hasResonantReady;
+    }
+
     internal static bool ShouldUseGcdAoE(int hostilesInRange)
     {
         return hostilesInRange >= GcdAoETargets;

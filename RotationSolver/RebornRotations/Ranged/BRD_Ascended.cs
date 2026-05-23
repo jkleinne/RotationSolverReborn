@@ -657,9 +657,8 @@ public sealed class BRD_Ascended : BardRotation
         if (IsInSandbagMode) return false;
         if (TryUseAoE(out act)) return true;
         if (TryUseEnhancedFiller(out act)) return true;
-        return ActiveFiller.CanUse(out act, skipComboCheck: true)
-               && !CanUseEnhancedFiller
-               && !HasResonantArrow;
+        if (!BardAscendedDecisionPolicy.ShouldUseFiller(CanUseEnhancedFiller, HasResonantArrow)) return false;
+        return ActiveFiller.CanUse(out act, skipComboCheck: true);
     }
 
     #endregion
@@ -1022,7 +1021,7 @@ public sealed class BRD_Ascended : BardRotation
         if (!CanWeave) return false;
 
         var shouldUseUsedUp = InBurst || IsMedicated
-            || (willHaveOneCharge && (InMages || (InArmys && SongTime > 30f)));
+            || (willHaveOneCharge && (InMages || (InArmys && SongTime > ArmyHeartbreakHoldThreshold)));
         if (shouldUseUsedUp) return TryUseBloodletterVariant(out act, usedUp: true);
 
         var atChargeCap = ActiveBloodletterVariant.Cooldown.CurrentCharges == BloodletterMax || willHaveMaxCharges;
@@ -1040,11 +1039,11 @@ public sealed class BRD_Ascended : BardRotation
         var bVWillHaveCharge = BattleVoicePvE.Cooldown.IsCoolingDown
             && BattleVoicePvE.Cooldown.WillHaveOneCharge(SidewinderBuffLookahead);
 
-        if (!EnoughWeaveTime || !SidewinderPvE.CanUse(out act)) return false;
-
         var noBurstIncoming = !rFWillHaveCharge && !bVWillHaveCharge && RagingStrikesPvE.Cooldown.IsCoolingDown;
         var rsExpiring = RagingStrikesPvE.Cooldown.IsCoolingDown && !HasRagingStrikes;
-        return InBurst || !RadiantFinalePvE.EnoughLevel || noBurstIncoming || rsExpiring;
+        if (!(InBurst || !RadiantFinalePvE.EnoughLevel || noBurstIncoming || rsExpiring)) return false;
+        if (!EnoughWeaveTime) return false;
+        return SidewinderPvE.CanUse(out act);
     }
 
     private bool TryUsePitchPerfect(out IAction? act)
