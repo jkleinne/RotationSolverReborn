@@ -292,13 +292,25 @@ internal static partial class PvETestSuite
             source,
             @"\bprivate\s+IBaseAction\[\]\s+DoTActions\b",
             "BRD Ascended should not allocate DoT action arrays in runtime paths");
+        AssertSourceDoesNotMatch(
+            source,
+            @"\bprivate\s+static\s+StatusID\[\]\s+BurstStatus\b",
+            "BRD Ascended burst status selection depends on instance action availability");
+        AssertSourceDoesNotMatch(
+            source,
+            @"\bprivate\s+static\s+IBaseAction\s+(ActiveFiller|ActiveBloodletterVariant)\b",
+            "BRD Ascended level-synced action choices depend on instance action availability");
+        AssertSourceDoesNotMatch(
+            source,
+            @"\bprivate\s+static\s+bool\s+(HasBurstActions|HasSongActions)\b",
+            "BRD Ascended action availability checks depend on instance action availability");
         AssertSourceMatches(
             source,
-            @"\bprivate\s+static\s+IBaseAction\s+ActiveFiller\s*=>\s*BurstShotPvE\.EnoughLevel\s*\?\s*BurstShotPvE\s*:\s*HeavyShotPvE\s*;",
+            @"\bprivate\s+IBaseAction\s+ActiveFiller\s*=>\s*BurstShotPvE\.EnoughLevel\s*\?\s*BurstShotPvE\s*:\s*HeavyShotPvE\s*;",
             "BRD Ascended should select Heavy Shot when Burst Shot is not level-synced");
         AssertSourceMatches(
             source,
-            @"\bprivate\s+static\s+IBaseAction\s+ActiveBloodletterVariant\s*=>\s*HeartbreakShotPvE\.EnoughLevel\s*\?\s*HeartbreakShotPvE\s*:\s*BloodletterPvE\s*;",
+            @"\bprivate\s+IBaseAction\s+ActiveBloodletterVariant\s*=>\s*HeartbreakShotPvE\.EnoughLevel\s*\?\s*HeartbreakShotPvE\s*:\s*BloodletterPvE\s*;",
             "BRD Ascended should use one canonical Bloodletter variant for fallback and cooldown checks");
         AssertSourceMatches(
             source,
@@ -308,6 +320,26 @@ internal static partial class PvETestSuite
             source,
             @"\bActiveBloodletterVariant\.CanUse\(out\s+act,\s*usedUp:\s*usedUp\)",
             "BRD Ascended prepull and combat Bloodletter paths should use the level-synced active variant");
+        AssertSourceMatches(
+            source,
+            @"\bprivate\s+readonly\s+BardAscendedPotions\s+_ascendedPotions\s*;",
+            "BRD Ascended should keep potion timing state on the rotation instance");
+        AssertSourceMatches(
+            source,
+            @"\b_ascendedPotions\s*=\s*new\s+BardAscendedPotions\s*\(\s*this\s*\)\s*;",
+            "BRD Ascended potion conditions should receive the owning rotation instance");
+        AssertSourceMatches(
+            source,
+            @"\bprivate\s+sealed\s+class\s+BardAscendedPotions\s*\(\s*BRD_Ascended\s+rotation\s*\)\s*:\s*Potions",
+            "BRD Ascended potion conditions should bind to a rotation instance");
+        AssertSourceDoesNotMatch(
+            source,
+            @"\bif\s*\(\s*InBurst\s*\)\s*return\s+true\s*;",
+            "BRD Ascended nested potion conditions should not read instance burst state without an owner");
+        AssertSourceMatches(
+            source,
+            @"\bif\s*\(\s*rotation\.InBurst\s*\)\s*return\s+true\s*;",
+            "BRD Ascended nested potion conditions should read burst state from the owning rotation");
         AssertSourceDoesNotMatch(
             source,
             @"\bif\s*\(\s*!\s*Is369\s*\|\|\s*!\s*ShouldSwapSong\s*\)\s*return\s+false\s*;",

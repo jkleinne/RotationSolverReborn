@@ -57,7 +57,7 @@ public sealed class BRD_Ascended : BardRotation
 
     #region Player Status
 
-    private static StatusID[] BurstStatus => (
+    private StatusID[] BurstStatus => (
         RagingStrikesPvE.EnoughLevel,
         BattleVoicePvE.EnoughLevel,
         RadiantFinalePvE.EnoughLevel) switch
@@ -75,17 +75,17 @@ public sealed class BRD_Ascended : BardRotation
     private IBaseAction Stormbite => StormbitePvE.EnoughLevel ? StormbitePvE : WindbitePvE;
 
     private IBaseAction CausticBite => CausticBitePvE.EnoughLevel ? CausticBitePvE : VenomousBitePvE;
-    private static IBaseAction ActiveBloodletterVariant =>
+    private IBaseAction ActiveBloodletterVariant =>
         HeartbreakShotPvE.EnoughLevel ? HeartbreakShotPvE : BloodletterPvE;
-    private static IBaseAction ActiveFiller =>
+    private IBaseAction ActiveFiller =>
         BurstShotPvE.EnoughLevel ? BurstShotPvE : HeavyShotPvE;
 
-    private static bool HasBurstActions =>
+    private bool HasBurstActions =>
         RagingStrikesPvE.EnoughLevel
         || BattleVoicePvE.EnoughLevel
         || RadiantFinalePvE.EnoughLevel;
 
-    private static bool HasSongActions =>
+    private bool HasSongActions =>
         TheWanderersMinuetPvE.EnoughLevel
         || MagesBalladPvE.EnoughLevel
         || ArmysPaeonPvE.EnoughLevel;
@@ -193,30 +193,38 @@ public sealed class BRD_Ascended : BardRotation
     [RotationConfig(CombatType.PvE, Name = "Enable PrepullHeartbreak Shot? - Use with BMR Auto Attack Manager")]
     private bool EnablePrepullHeartbreakShot { get; set; } = true;
 
-    private static readonly BardAscendedPotions AscendedPotions = new();
+    private readonly BardAscendedPotions _ascendedPotions;
+
+    /// <summary>
+    /// Creates rotation-scoped potion state so runtime checks can read this rotation instance.
+    /// </summary>
+    public BRD_Ascended()
+    {
+        _ascendedPotions = new BardAscendedPotions(this);
+    }
 
     [RotationConfig(CombatType.PvE, Name = "Enable Potion Usage")]
-    private static bool PotionUsageEnabled
+    private bool PotionUsageEnabled
     {
-        get => AscendedPotions.Enabled;
-        set => AscendedPotions.Enabled = value;
+        get => _ascendedPotions.Enabled;
+        set => _ascendedPotions.Enabled = value;
     }
 
     [RotationConfig(CombatType.PvE, Name = "Potion Usage Preset", Parent = nameof(PotionUsageEnabled))]
-    private static BardAscendedPotionTiming PotionUsagePreset
+    private BardAscendedPotionTiming PotionUsagePreset
     {
-        get => AscendedPotions.Timing;
-        set => AscendedPotions.Timing = value;
+        get => _ascendedPotions.Timing;
+        set => _ascendedPotions.Timing = value;
     }
 
     [Range(0, 20, ConfigUnitType.Seconds, 0)]
     [RotationConfig(CombatType.PvE,
         Name = "Use Opener Potion at minus time in seconds",
         Parent = nameof(PotionUsageEnabled))]
-    private static float OpenerPotionTime
+    private float OpenerPotionTime
     {
-        get => AscendedPotions.OpenerPotionTime;
-        set => AscendedPotions.OpenerPotionTime = value;
+        get => _ascendedPotions.OpenerPotionTime;
+        set => _ascendedPotions.OpenerPotionTime = value;
     }
 
     [Range(0, 1200, ConfigUnitType.Seconds, 0)]
@@ -260,7 +268,7 @@ public sealed class BRD_Ascended : BardRotation
 
     private void UpdateCustomTimings()
     {
-        AscendedPotions.CustomTimings = new Potions.CustomTimingsData
+        _ascendedPotions.CustomTimings = new Potions.CustomTimingsData
         {
             Timings = [FirstPotionTiming, SecondPotionTiming, ThirdPotionTiming]
         };
@@ -278,7 +286,7 @@ public sealed class BRD_Ascended : BardRotation
     {
         RefreshCombatCycleState();
         IsFirstCycle = true;
-        if (AscendedPotions.ShouldUsePotion(this, out var potionAct)) return potionAct;
+        if (_ascendedPotions.ShouldUsePotion(this, out var potionAct)) return potionAct;
 
         IAction? act;
         if (SongTimings == BardAscendedSongTiming.AdjustedStandard
@@ -306,7 +314,7 @@ public sealed class BRD_Ascended : BardRotation
     {
         RefreshCombatCycleState();
         act = null;
-        if (AscendedPotions.ShouldUsePotion(this, out act)) return true;
+        if (_ascendedPotions.ShouldUsePotion(this, out act)) return true;
 
         if (IsFirstCycle && InArmys && !RadiantFinalePvE.Cooldown.IsCoolingDown) IsFirstCycle = false;
 
@@ -1079,7 +1087,7 @@ public sealed class BRD_Ascended : BardRotation
              && !BattleVoicePvE.Cooldown.HasOneCharge
              && !RagingStrikesPvE.Cooldown.HasOneCharge));
 
-    private class BardAscendedPotions : Potions
+    private sealed class BardAscendedPotions(BRD_Ascended rotation) : Potions
     {
         public BardAscendedPotionTiming Timing { get; set; } = BardAscendedPotionTiming.TwoEight;
 
@@ -1090,7 +1098,7 @@ public sealed class BRD_Ascended : BardRotation
                 return OpenerPotionTime > 0f || InWanderers;
             }
 
-            if (InBurst) return true;
+            if (rotation.InBurst) return true;
             return InOddMinuteWindow;
         }
 
