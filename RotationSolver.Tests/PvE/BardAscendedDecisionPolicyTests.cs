@@ -298,20 +298,20 @@ internal static partial class PvETestSuite
 
         AssertSourceMatches(
             enhancedFiller,
-            @"\bprocAoE\.CanUse\s*\(\s*out\s+act\s*,\s*skipAoeCheck\s*:\s*true\s*,\s*skipComboCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughGcdAoETargets\s*\(\s*act\s*\)",
-            "enhanced filler AoE should resolve its target before applying the Ascended GCD AoE threshold");
+            @"\bprocAoE\.CanUse\s*\(\s*out\s+var\s+procAoEAct\s*,\s*skipAoeCheck\s*:\s*true\s*,\s*skipComboCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughGcdAoETargets\s*\(\s*procAoEAct\s*\).*?\bact\s*=\s*procAoEAct\s*;",
+            "enhanced filler AoE should assign only resolved targets that pass the Ascended GCD AoE threshold");
         AssertSourceMatches(
             aoe,
-            @"\bprocAoE\.CanUse\s*\(\s*out\s+act\s*,\s*skipAoeCheck\s*:\s*true\s*,\s*skipComboCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughGcdAoETargets\s*\(\s*act\s*\)",
-            "proc AoE should resolve its target before applying the Ascended GCD AoE threshold");
+            @"\bprocAoE\.CanUse\s*\(\s*out\s+var\s+procAoEAct\s*,\s*skipAoeCheck\s*:\s*true\s*,\s*skipComboCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughGcdAoETargets\s*\(\s*procAoEAct\s*\).*?\bact\s*=\s*procAoEAct\s*;",
+            "proc AoE should assign only resolved targets that pass the Ascended GCD AoE threshold");
         AssertSourceMatches(
             aoe,
-            @"\baoeAction\.CanUse\s*\(\s*out\s+act\s*,\s*skipAoeCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughGcdAoETargets\s*\(\s*act\s*\)",
-            "standard AoE should resolve its target before applying the Ascended GCD AoE threshold");
+            @"\baoeAction\.CanUse\s*\(\s*out\s+var\s+aoeActionAct\s*,\s*skipAoeCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughGcdAoETargets\s*\(\s*aoeActionAct\s*\).*?\bact\s*=\s*aoeActionAct\s*;",
+            "standard AoE should assign only resolved targets that pass the Ascended GCD AoE threshold");
         AssertSourceMatches(
             bloodletterVariant,
-            @"\bRainOfDeathPvE\.CanUse\s*\(\s*out\s+act\s*,\s*usedUp\s*:\s*usedUp\s*,\s*skipAoeCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughOgcdAoETargets\s*\(\s*act\s*\)",
-            "Rain of Death should resolve its target before applying the Ascended oGCD AoE threshold");
+            @"\bRainOfDeathPvE\.CanUse\s*\(\s*out\s+var\s+rainOfDeathAct\s*,\s*usedUp\s*:\s*usedUp\s*,\s*skipAoeCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughOgcdAoETargets\s*\(\s*rainOfDeathAct\s*\).*?\bact\s*=\s*rainOfDeathAct\s*;",
+            "Rain of Death should assign only resolved targets that pass the Ascended oGCD AoE threshold");
     }
 
     static void BardAscendedFirstCycleStartsOnCombatEntryAndTimerReset()

@@ -628,8 +628,9 @@ public sealed class BRD_Ascended : BardRotation
         if (IsInSandbagMode || !CanUseEnhancedFiller || WouldUseDoTs) return false;
 
         var procAoE = ShadowbitePvE.EnoughLevel ? ShadowbitePvE : WideVolleyPvE;
-        if (procAoE.CanUse(out act, skipAoeCheck: true, skipComboCheck: true) && HasEnoughGcdAoETargets(act))
+        if (procAoE.CanUse(out var procAoEAct, skipAoeCheck: true, skipComboCheck: true) && HasEnoughGcdAoETargets(procAoEAct))
         {
+            act = procAoEAct;
             return true;
         }
 
@@ -645,14 +646,21 @@ public sealed class BRD_Ascended : BardRotation
         if (CanUseEnhancedFiller && !WouldUseDoTs)
         {
             var procAoE = ShadowbitePvE.EnoughLevel ? ShadowbitePvE : WideVolleyPvE;
-            if (procAoE.CanUse(out act, skipAoeCheck: true, skipComboCheck: true) && HasEnoughGcdAoETargets(act))
+            if (procAoE.CanUse(out var procAoEAct, skipAoeCheck: true, skipComboCheck: true) && HasEnoughGcdAoETargets(procAoEAct))
             {
+                act = procAoEAct;
                 return true;
             }
         }
 
         var aoeAction = LadonsbitePvE.EnoughLevel ? LadonsbitePvE : QuickNockPvE;
-        return aoeAction.CanUse(out act, skipAoeCheck: true) && HasEnoughGcdAoETargets(act);
+        if (aoeAction.CanUse(out var aoeActionAct, skipAoeCheck: true) && HasEnoughGcdAoETargets(aoeActionAct))
+        {
+            act = aoeActionAct;
+            return true;
+        }
+
+        return false;
     }
 
     private bool TryUseFiller(out IAction? act)
@@ -978,8 +986,9 @@ public sealed class BRD_Ascended : BardRotation
 
     private bool TryUseBloodletterVariant(out IAction? act, bool usedUp)
     {
-        if (RainOfDeathPvE.CanUse(out act, usedUp: usedUp, skipAoeCheck: true) && HasEnoughOgcdAoETargets(act))
+        if (RainOfDeathPvE.CanUse(out var rainOfDeathAct, usedUp: usedUp, skipAoeCheck: true) && HasEnoughOgcdAoETargets(rainOfDeathAct))
         {
+            act = rainOfDeathAct;
             return true;
         }
 
