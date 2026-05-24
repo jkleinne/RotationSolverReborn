@@ -164,14 +164,19 @@ internal static class BardAscendedOpenerController
         BardAscendedOpenerResult request,
         float remainTime)
     {
-        if (request.Kind != BardAscendedOpenerResultKind.Continue) return false;
-        if (request.RequestKind != BardAscendedOpenerRequestKind.Ability) return false;
-        if (request.WeaveSlot != BardAscendedWeaveSlot.Prepull) return false;
+        if (!HasPendingCountdownPrepullRequest(request)) return false;
 
         return timing == BardAscendedSongTiming.AdjustedStandard
                && request.Action == BardAscendedOpenerAction.HeartbreakShot
             ? remainTime <= AdjustedStandardPrepullHeartbreakWindowSeconds
             : remainTime <= CountdownPrepullActionWindowSeconds;
+    }
+
+    internal static bool HasPendingCountdownPrepullRequest(BardAscendedOpenerResult request)
+    {
+        return request.Kind == BardAscendedOpenerResultKind.Continue
+               && request.RequestKind == BardAscendedOpenerRequestKind.Ability
+               && request.WeaveSlot == BardAscendedWeaveSlot.Prepull;
     }
 
     private static BardAscendedOpenerResult GetNextGcdRequest(BardAscendedOpenerState state)

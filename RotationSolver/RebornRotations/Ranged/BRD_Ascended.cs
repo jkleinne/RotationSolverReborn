@@ -499,12 +499,14 @@ public sealed class BRD_Ascended : BardRotation
         if (!_isStrictOpenerActive) return false;
 
         var abilityRequest = BardAscendedOpenerController.GetNextRequest(BuildOpenerAbilityInput());
+        var hasPendingPrepull = BardAscendedOpenerController.HasPendingCountdownPrepullRequest(abilityRequest);
         if (BardAscendedOpenerController.IsCountdownPrepullRequestReady(SongTimings, abilityRequest, remainTime)
             && TryUseRequestedOpenerAction(abilityRequest, out act))
         {
             return true;
         }
 
+        if (hasPendingPrepull) return false;
         if (remainTime > CountdownDotWindowSeconds) return false;
 
         var gcdRequest = BardAscendedOpenerController.GetNextRequest(BuildOpenerGcdInput());

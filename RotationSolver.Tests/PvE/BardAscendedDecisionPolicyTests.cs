@@ -796,6 +796,25 @@ internal static partial class PvETestSuite
         AssertTrue(atPull, "adjusted standard prepull Heartbreak Shot should fire at countdown zero");
     }
 
+    static void BardAscendedStrictOpenerHoldsPullGcdUntilAdjustedPrepullHeartbreakReady()
+    {
+        var request = BardAscendedOpenerController.GetNextRequest(BardAscendedOpenerInput.ForAbility(
+            BardAscendedOpenerState.Start(BardAscendedSongTiming.AdjustedStandard)));
+
+        AssertTrue(BardAscendedOpenerController.HasPendingCountdownPrepullRequest(request), "adjusted standard Heartbreak Shot should remain pending before pull");
+        AssertFalse(
+            BardAscendedOpenerController.IsCountdownPrepullRequestReady(BardAscendedSongTiming.AdjustedStandard, request, 0.05f),
+            "adjusted standard Heartbreak Shot should not be ready in the final pre-pull DoT window");
+
+        var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
+        var openerCountdownAction = ExtractMethodBody(source, "bool TryUseOpenerCountdownAction");
+
+        AssertSourceMatches(
+            openerCountdownAction,
+            @"\bvar\s+hasPendingPrepull\s*=\s*BardAscendedOpenerController\.HasPendingCountdownPrepullRequest\s*\(\s*abilityRequest\s*\)\s*;.*?IsCountdownPrepullRequestReady\s*\(\s*SongTimings\s*,\s*abilityRequest\s*,\s*remainTime\s*\).*?TryUseRequestedOpenerAction\s*\(\s*abilityRequest\s*,\s*out\s+act\s*\).*?\bif\s*\(\s*hasPendingPrepull\s*\)\s*return\s+false\s*;.*?\bvar\s+gcdRequest\s*=",
+            "BRD Ascended should not request pull GCDs while a prepull opener ability is still pending");
+    }
+
     static void AssertNextGcd(ref BardAscendedOpenerState state, BardAscendedOpenerAction expectedAction, int expectedStep)
     {
         AssertEqual(expectedStep, state.Step, "opener GCD request should be emitted at the expected step");
