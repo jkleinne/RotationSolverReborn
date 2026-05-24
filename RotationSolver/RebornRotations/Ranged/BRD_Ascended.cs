@@ -16,6 +16,11 @@ public sealed class BRD_Ascended : BardRotation
     private const float SidewinderBuffLookahead = 10f;
     private const float HeartbreakChargeLookahead = 5f;
     private const float MagesHeartbreakHoldGcdMultiplier = 0.9f;
+    private const float OpenerPrepullActionWindowSeconds = 1f;
+    private const float AdjustedStandardPrepullHeartbreakWindowSeconds = 0f;
+    private const float Cycle369PrepullHeartbreakWindowSeconds = 1.65f;
+    private const float CountdownDotWindowSeconds = 0.1f;
+    private const float CountdownResetToleranceSeconds = 0.25f;
     #endregion
 
     #region Status Sets
@@ -127,6 +132,10 @@ public sealed class BRD_Ascended : BardRotation
     private static bool IsFirstCycle { get; set; }
     private static bool HasCombatCycleState { get; set; }
     private static float LastCombatTimeRaw { get; set; }
+    private BardAscendedOpenerState _openerState = BardAscendedOpenerState.Start(BardAscendedSongTiming.Standard);
+    private bool _isStrictOpenerActive;
+    private bool _hasStrictOpenerEndedThisCycle;
+    private float _lastCountdownRemainTime;
 
     #endregion
 
@@ -278,24 +287,36 @@ public sealed class BRD_Ascended : BardRotation
     {
         RefreshCombatCycleState();
         IsFirstCycle = true;
-        if (AscendedPotions.ShouldUsePotion(this, out var potionAct)) return potionAct;
+        ResetStrictOpenerForCountdown(remainTime);
+        StartStrictOpenerForCountdown();
+
+        if (TryUseOpenerCountdownAction(remainTime, out var openerAct)) return openerAct;
+        if (ShouldUseCountdownPotionFallback()
+            && AscendedPotions.ShouldUsePotion(this, out var potionAct))
+        {
+            return potionAct;
+        }
 
         IAction? act;
-        if (SongTimings == BardAscendedSongTiming.AdjustedStandard
-            && remainTime <= 0f)
+        if (!_isStrictOpenerActive
+            && SongTimings == BardAscendedSongTiming.AdjustedStandard
+            && remainTime <= AdjustedStandardPrepullHeartbreakWindowSeconds)
         {
             if (ActiveBloodletterVariant.CanUse(out act)) return act;
         }
 
-        if (Is369
+        if (!_isStrictOpenerActive
+            && Is369
             && EnablePrepullHeartbreakShot
-            && remainTime < 1.65f
+            && remainTime < Cycle369PrepullHeartbreakWindowSeconds
             && ActiveBloodletterVariant.CanUse(out act))
         {
             return act;
         }
 
-        return remainTime <= 0.1f && TryUseDoTs(out act) ? act : base.CountDownAction(remainTime);
+        return !_isStrictOpenerActive && remainTime <= CountdownDotWindowSeconds && TryUseDoTs(out act)
+            ? act
+            : base.CountDownAction(remainTime);
     }
 
     #endregion
@@ -306,6 +327,7 @@ public sealed class BRD_Ascended : BardRotation
     {
         RefreshCombatCycleState();
         act = null;
+        if (TryUseOpenerAbility(out act)) return true;
         if (AscendedPotions.ShouldUsePotion(this, out act)) return true;
 
         if (IsFirstCycle && InArmys && !RadiantFinalePvE.Cooldown.IsCoolingDown) IsFirstCycle = false;
@@ -330,6 +352,7 @@ public sealed class BRD_Ascended : BardRotation
         RefreshCombatCycleState();
         act = null;
         if (!CanWeave) return false;
+        if (TryUseOpenerAbility(out act)) return true;
         return TryUseRadiantFinale(out act)
                || TryUseBattleVoice(out act)
                || TryUseRagingStrikes(out act)
@@ -345,6 +368,7 @@ public sealed class BRD_Ascended : BardRotation
     protected override bool GeneralGCD(out IAction? act)
     {
         RefreshCombatCycleState();
+        if (TryUseOpenerGcd(out act)) return true;
         if (TryUseIronJaws(out act)) return true;
         if (TryUseDoTs(out act)) return true;
         if (TryUseBurst(out act)) return true;
@@ -360,6 +384,222 @@ public sealed class BRD_Ascended : BardRotation
     #endregion
 
     #region Extra Methods
+
+    private void StartStrictOpener()
+    {
+        if (IsCustom) return;
+        if (_hasStrictOpenerEndedThisCycle) return;
+
+        _openerState = BardAscendedOpenerState.Start(SongTimings);
+        _isStrictOpenerActive = true;
+    }
+
+    private void StartStrictOpenerForCountdown()
+    {
+        if (_isStrictOpenerActive || _hasStrictOpenerEndedThisCycle) return;
+        StartStrictOpener();
+    }
+
+    private void ResetStrictOpenerForCountdown(float remainTime)
+    {
+        if (InCombat) return;
+
+        var isNewCountdown = remainTime > _lastCountdownRemainTime + CountdownResetToleranceSeconds;
+        _lastCountdownRemainTime = remainTime;
+        if (_isStrictOpenerActive && !isNewCountdown) return;
+        if (_hasStrictOpenerEndedThisCycle && !isNewCountdown) return;
+
+        ResetStrictOpenerProgress();
+    }
+
+    private void ResetStrictOpenerProgress()
+    {
+        _openerState = BardAscendedOpenerState.Start(SongTimings);
+        _isStrictOpenerActive = false;
+        _hasStrictOpenerEndedThisCycle = false;
+    }
+
+    private void ResetStrictOpenerTracking()
+    {
+        ResetStrictOpenerProgress();
+        _lastCountdownRemainTime = 0f;
+    }
+
+    private void ResetStrictOpenerIfNeeded()
+    {
+        if (!InCombat)
+        {
+            if (Service.CountDownTime > 0f) return;
+
+            ResetStrictOpenerTracking();
+            return;
+        }
+
+        if (IsFirstCycle && !_isStrictOpenerActive && !_hasStrictOpenerEndedThisCycle)
+        {
+            StartStrictOpener();
+        }
+    }
+
+    private void EndStrictOpener()
+    {
+        _openerState = _openerState.Complete();
+        _isStrictOpenerActive = false;
+        _hasStrictOpenerEndedThisCycle = true;
+    }
+
+    private static bool ShouldUseCountdownPotionFallback()
+    {
+        return SongTimings is BardAscendedSongTiming.Standard or BardAscendedSongTiming.Custom;
+    }
+
+    private BardAscendedOpenerInput BuildOpenerGcdInput()
+    {
+        return BardAscendedOpenerInput.ForGcd(_openerState);
+    }
+
+    private BardAscendedOpenerInput BuildOpenerAbilityInput()
+    {
+        return BardAscendedOpenerInput.ForAbility(
+            _openerState,
+            pitchPerfectStacks: Repertoire,
+            willGainPitchPerfectStackBeforeNextWeave: EmpyrealArrowPvE.Cooldown.WillHaveOneChargeGCD(1),
+            isEmpyrealArrowNextScriptedAbility: IsNextScriptedOpenerAbility(BardAscendedOpenerAction.EmpyrealArrow),
+            willBurstBuffEndBeforeNextGcd: BurstEndGCD(1) || SongEndAfter(WandRemainTime - DataCenter.CalculatedActionAhead + AnimationLock));
+    }
+
+    private bool IsNextScriptedOpenerAbility(BardAscendedOpenerAction action)
+    {
+        var request = BardAscendedOpenerController.GetNextRequest(BardAscendedOpenerInput.ForAbility(_openerState));
+        return request.Kind == BardAscendedOpenerResultKind.Continue
+               && request.Action == action;
+    }
+
+    private bool TryUseOpenerGcd(out IAction? act)
+    {
+        act = null;
+        ResetStrictOpenerIfNeeded();
+        if (!_isStrictOpenerActive) return false;
+
+        var request = BardAscendedOpenerController.GetNextRequest(BuildOpenerGcdInput());
+        return TryUseRequestedOpenerAction(request, out act);
+    }
+
+    private bool TryUseOpenerAbility(out IAction? act)
+    {
+        act = null;
+        ResetStrictOpenerIfNeeded();
+        if (!_isStrictOpenerActive || !CanWeave) return false;
+
+        var request = BardAscendedOpenerController.GetNextRequest(BuildOpenerAbilityInput());
+        return TryUseRequestedOpenerAction(request, out act);
+    }
+
+    private bool TryUseOpenerCountdownAction(float remainTime, out IAction? act)
+    {
+        act = null;
+        if (!_isStrictOpenerActive || remainTime > OpenerPrepullActionWindowSeconds) return false;
+
+        var abilityRequest = BardAscendedOpenerController.GetNextRequest(BuildOpenerAbilityInput());
+        if (abilityRequest.WeaveSlot == BardAscendedWeaveSlot.Prepull
+            && TryUseRequestedOpenerAction(abilityRequest, out act))
+        {
+            return true;
+        }
+
+        if (remainTime > CountdownDotWindowSeconds) return false;
+
+        var gcdRequest = BardAscendedOpenerController.GetNextRequest(BuildOpenerGcdInput());
+        return TryUseRequestedOpenerAction(gcdRequest, out act);
+    }
+
+    private bool TryUseRequestedOpenerAction(BardAscendedOpenerResult request, out IAction? act)
+    {
+        act = null;
+
+        if (request.Kind == BardAscendedOpenerResultKind.Complete
+            || request.Kind == BardAscendedOpenerResultKind.Break)
+        {
+            EndStrictOpener();
+            return false;
+        }
+
+        if (request.Kind == BardAscendedOpenerResultKind.Skip)
+        {
+            _openerState = request.NextState;
+            return false;
+        }
+
+        if (request.Kind != BardAscendedOpenerResultKind.Continue) return false;
+
+        if (request.Action == BardAscendedOpenerAction.Potion)
+        {
+            if (!TryUseStrictOpenerPotion(out act))
+            {
+                _openerState = request.NextState;
+                return false;
+            }
+
+            _openerState = request.NextState;
+            return true;
+        }
+
+        if (!TryResolveOpenerAction(request.Action, out var requestedAction))
+        {
+            EndStrictOpener();
+            return false;
+        }
+
+        if (!requestedAction.CanUse(out act, skipComboCheck: ShouldSkipComboForOpenerAction(request.Action)))
+        {
+            EndStrictOpener();
+            return false;
+        }
+
+        _openerState = request.NextState;
+        if (_openerState.IsTerminal) _isStrictOpenerActive = false;
+        return true;
+    }
+
+    private bool TryUseStrictOpenerPotion(out IAction? act)
+    {
+        act = null;
+        if (!PotionUsageEnabled || IsMedicated) return false;
+        return UseBurstMedicine(out act);
+    }
+
+    private bool TryResolveOpenerAction(BardAscendedOpenerAction action, out IBaseAction? requestedAction)
+    {
+        requestedAction = action switch
+        {
+            BardAscendedOpenerAction.FlexibleFiller => HasHawksEye ? RefulgentArrowPvE : ActiveFiller,
+            BardAscendedOpenerAction.Stormbite => Stormbite,
+            BardAscendedOpenerAction.CausticBite => CausticBite,
+            BardAscendedOpenerAction.RefulgentArrow => RefulgentArrowPvE,
+            BardAscendedOpenerAction.IronJaws => IronJawsPvE,
+            BardAscendedOpenerAction.RadiantEncore => RadiantEncorePvE,
+            BardAscendedOpenerAction.ResonantArrow => ResonantArrowPvE,
+            BardAscendedOpenerAction.HeartbreakShot => ActiveBloodletterVariant,
+            BardAscendedOpenerAction.TheWanderersMinuet => TheWanderersMinuetPvE,
+            BardAscendedOpenerAction.EmpyrealArrow => EmpyrealArrowPvE,
+            BardAscendedOpenerAction.RadiantFinale => RadiantFinalePvE,
+            BardAscendedOpenerAction.BattleVoice => BattleVoicePvE,
+            BardAscendedOpenerAction.RagingStrikes => RagingStrikesPvE,
+            BardAscendedOpenerAction.Barrage => BarragePvE,
+            BardAscendedOpenerAction.Sidewinder => SidewinderPvE,
+            BardAscendedOpenerAction.PitchPerfect => PitchPerfectPvE,
+            _ => null
+        };
+
+        return requestedAction != null;
+    }
+
+    private static bool ShouldSkipComboForOpenerAction(BardAscendedOpenerAction action)
+    {
+        return action is BardAscendedOpenerAction.RadiantEncore
+            or BardAscendedOpenerAction.ResonantArrow
+            or BardAscendedOpenerAction.PitchPerfect;
+    }
 
     #region GCD Skills
 
@@ -384,12 +624,17 @@ public sealed class BRD_Ascended : BardRotation
 
     private bool AnyDotEnding => DoTsEnding(Stormbite) || DoTsEnding(CausticBite);
 
-    private static void RefreshCombatCycleState()
+    private void RefreshCombatCycleState()
     {
         if (!InCombat)
         {
+            var hadCombatCycleState = HasCombatCycleState;
             HasCombatCycleState = false;
             LastCombatTimeRaw = 0f;
+            if (hadCombatCycleState && Service.CountDownTime <= 0f)
+            {
+                ResetStrictOpenerTracking();
+            }
             return;
         }
 
@@ -400,6 +645,10 @@ public sealed class BRD_Ascended : BardRotation
                 previousCombatTime: LastCombatTimeRaw))
         {
             IsFirstCycle = true;
+            if (!_isStrictOpenerActive)
+            {
+                StartStrictOpener();
+            }
         }
 
         HasCombatCycleState = true;

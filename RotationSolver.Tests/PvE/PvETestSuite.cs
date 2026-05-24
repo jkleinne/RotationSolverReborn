@@ -24,5 +24,14 @@ internal static partial class PvETestSuite
         new("bard ascended battle voice waits only for available radiant finale", BardAscendedBattleVoiceWaitsOnlyForAvailableRadiantFinale),
         new("bard ascended potion presets map to expected timings", BardAscendedPotionPresetsMapToExpectedTimings),
         new("bard ascended custom potion timings reject empty input", BardAscendedCustomPotionTimingsRejectEmptyInput),
+        new("bard ascended strict standard opener emits scripted requests", BardAscendedStrictStandardOpenerEmitsScriptedRequests),
+        new("bard ascended strict adjusted opener emits scripted requests", BardAscendedStrictAdjustedOpenerEmitsScriptedRequests),
+        new("bard ascended strict 3 6 9 opener emits scripted requests", BardAscendedStrict369OpenerEmitsScriptedRequests),
+        new("bard ascended strict opener preserves pitch perfect safety", BardAscendedStrictOpenerPreservesPitchPerfectSafety),
+        new("bard ascended strict opener completes and breaks explicitly", BardAscendedStrictOpenerCompletesAndBreaksExplicitly),
+        new("bard ascended runtime enters strict opener before priority gcds", BardAscendedRuntimeEntersStrictOpenerBeforePriorityGcds),
+        new("bard ascended runtime enters strict opener during countdown", BardAscendedRuntimeEntersStrictOpenerDuringCountdown),
+        new("bard ascended runtime enters strict opener before priority abilities", BardAscendedRuntimeEntersStrictOpenerBeforePriorityAbilities),
+        new("bard ascended runtime advances strict opener only after action success", BardAscendedRuntimeAdvancesStrictOpenerOnlyAfterActionSuccess),
     ];
 }
