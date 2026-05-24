@@ -322,28 +322,58 @@ internal static partial class PvETestSuite
             "BRD Ascended prepull and combat Bloodletter paths should use the level-synced active variant");
         AssertSourceMatches(
             source,
-            @"\bprivate\s+readonly\s+BardAscendedPotions\s+_ascendedPotions\s*;",
-            "BRD Ascended should keep potion timing state on the rotation instance");
+            @"\bprivate\s+static\s+readonly\s+BardAscendedPotions\s+AscendedPotions\s*=\s*new\s*\(\s*\)\s*;",
+            "BRD Ascended should keep potion config state available during base config discovery");
+        AssertSourceDoesNotMatch(
+            source,
+            @"\bprivate\s+readonly\s+BardAscendedPotions\s+_ascendedPotions\b",
+            "BRD Ascended should not put rotation config state behind post-base-constructor instance initialization");
         AssertSourceMatches(
             source,
-            @"\b_ascendedPotions\s*=\s*new\s+BardAscendedPotions\s*\(\s*this\s*\)\s*;",
-            "BRD Ascended potion conditions should receive the owning rotation instance");
-        AssertSourceMatches(
-            source,
-            @"\bprivate\s+sealed\s+class\s+BardAscendedPotions\s*\(\s*BRD_Ascended\s+rotation\s*\)\s*:\s*Potions",
-            "BRD Ascended potion conditions should bind to a rotation instance");
+            @"\bpublic\s+bool\s+ShouldUsePotion\s*\(\s*BRD_Ascended\s+rotation\s*,\s*out\s+IAction\?\s+act\s*,\s*bool\s+clippingCheck\s*=\s*true\s*\)",
+            "BRD Ascended potion conditions should receive the active rotation at runtime");
         AssertSourceDoesNotMatch(
             source,
             @"\bif\s*\(\s*InBurst\s*\)\s*return\s+true\s*;",
             "BRD Ascended nested potion conditions should not read instance burst state without an owner");
         AssertSourceMatches(
             source,
-            @"\bif\s*\(\s*rotation\.InBurst\s*\)\s*return\s+true\s*;",
-            "BRD Ascended nested potion conditions should read burst state from the owning rotation");
+            @"\bif\s*\(\s*_rotation\?\.InBurst\s*==\s*true\s*\)\s*return\s+true\s*;",
+            "BRD Ascended nested potion conditions should read burst state from the active rotation context");
+        AssertSourceMatches(
+            source,
+            @"\bfinally\s*\{.*?_rotation\s*=\s*null\s*;.*?\}",
+            "BRD Ascended potion conditions should clear the active rotation after each check");
         AssertSourceDoesNotMatch(
             source,
             @"\bif\s*\(\s*!\s*Is369\s*\|\|\s*!\s*ShouldSwapSong\s*\)\s*return\s+false\s*;",
             "BRD Ascended custom song timing should not be blocked from Army's Paeon");
+    }
+
+    static void BardAscendedPotionConfigIsConstructorSafe()
+    {
+        var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
+
+        AssertSourceMatches(
+            source,
+            @"\bprivate\s+static\s+readonly\s+BardAscendedPotions\s+AscendedPotions\s*=\s*new\s*\(\s*\)\s*;",
+            "BRD Ascended potion config state should be available before base rotation config discovery runs");
+        AssertSourceDoesNotMatch(
+            source,
+            @"\bprivate\s+readonly\s+BardAscendedPotions\s+_ascendedPotions\b",
+            "BRD Ascended should not initialize potion config state after the base constructor reads rotation configs");
+        AssertSourceDoesNotMatch(
+            source,
+            @"\bget\s*=>\s*_ascendedPotions\.",
+            "BRD Ascended rotation config getters should not depend on post-base-constructor instance fields");
+        AssertSourceMatches(
+            source,
+            @"\bAscendedPotions\.ShouldUsePotion\s*\(\s*this\s*,\s*out\s+(var\s+)?(?:potionAct|act)\s*\)",
+            "BRD Ascended should pass the active rotation when checking potion conditions");
+        AssertSourceMatches(
+            source,
+            @"\bpublic\s+bool\s+ShouldUsePotion\s*\(\s*BRD_Ascended\s+rotation\s*,\s*out\s+IAction\?\s+act\s*,\s*bool\s+clippingCheck\s*=\s*true\s*\)",
+            "BRD Ascended potion helper should accept the active rotation during runtime checks");
     }
 
     static void BardAscendedRuntimeSpendsResonantReadyBeforeFiller()

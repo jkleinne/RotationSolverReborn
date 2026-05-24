@@ -193,28 +193,20 @@ public sealed class BRD_Ascended : BardRotation
     [RotationConfig(CombatType.PvE, Name = "Enable PrepullHeartbreak Shot? - Use with BMR Auto Attack Manager")]
     private bool EnablePrepullHeartbreakShot { get; set; } = true;
 
-    private readonly BardAscendedPotions _ascendedPotions;
-
-    /// <summary>
-    /// Creates rotation-scoped potion state so runtime checks can read this rotation instance.
-    /// </summary>
-    public BRD_Ascended()
-    {
-        _ascendedPotions = new BardAscendedPotions(this);
-    }
+    private static readonly BardAscendedPotions AscendedPotions = new();
 
     [RotationConfig(CombatType.PvE, Name = "Enable Potion Usage")]
     private bool PotionUsageEnabled
     {
-        get => _ascendedPotions.Enabled;
-        set => _ascendedPotions.Enabled = value;
+        get => AscendedPotions.Enabled;
+        set => AscendedPotions.Enabled = value;
     }
 
     [RotationConfig(CombatType.PvE, Name = "Potion Usage Preset", Parent = nameof(PotionUsageEnabled))]
     private BardAscendedPotionTiming PotionUsagePreset
     {
-        get => _ascendedPotions.Timing;
-        set => _ascendedPotions.Timing = value;
+        get => AscendedPotions.Timing;
+        set => AscendedPotions.Timing = value;
     }
 
     [Range(0, 20, ConfigUnitType.Seconds, 0)]
@@ -223,8 +215,8 @@ public sealed class BRD_Ascended : BardRotation
         Parent = nameof(PotionUsageEnabled))]
     private float OpenerPotionTime
     {
-        get => _ascendedPotions.OpenerPotionTime;
-        set => _ascendedPotions.OpenerPotionTime = value;
+        get => AscendedPotions.OpenerPotionTime;
+        set => AscendedPotions.OpenerPotionTime = value;
     }
 
     [Range(0, 1200, ConfigUnitType.Seconds, 0)]
@@ -268,7 +260,7 @@ public sealed class BRD_Ascended : BardRotation
 
     private void UpdateCustomTimings()
     {
-        _ascendedPotions.CustomTimings = new Potions.CustomTimingsData
+        AscendedPotions.CustomTimings = new Potions.CustomTimingsData
         {
             Timings = [FirstPotionTiming, SecondPotionTiming, ThirdPotionTiming]
         };
@@ -286,7 +278,7 @@ public sealed class BRD_Ascended : BardRotation
     {
         RefreshCombatCycleState();
         IsFirstCycle = true;
-        if (_ascendedPotions.ShouldUsePotion(this, out var potionAct)) return potionAct;
+        if (AscendedPotions.ShouldUsePotion(this, out var potionAct)) return potionAct;
 
         IAction? act;
         if (SongTimings == BardAscendedSongTiming.AdjustedStandard
@@ -314,7 +306,7 @@ public sealed class BRD_Ascended : BardRotation
     {
         RefreshCombatCycleState();
         act = null;
-        if (_ascendedPotions.ShouldUsePotion(this, out act)) return true;
+        if (AscendedPotions.ShouldUsePotion(this, out act)) return true;
 
         if (IsFirstCycle && InArmys && !RadiantFinalePvE.Cooldown.IsCoolingDown) IsFirstCycle = false;
 
@@ -1087,9 +1079,24 @@ public sealed class BRD_Ascended : BardRotation
              && !BattleVoicePvE.Cooldown.HasOneCharge
              && !RagingStrikesPvE.Cooldown.HasOneCharge));
 
-    private sealed class BardAscendedPotions(BRD_Ascended rotation) : Potions
+    private sealed class BardAscendedPotions : Potions
     {
+        private BRD_Ascended? _rotation;
+
         public BardAscendedPotionTiming Timing { get; set; } = BardAscendedPotionTiming.TwoEight;
+
+        public bool ShouldUsePotion(BRD_Ascended rotation, out IAction? act, bool clippingCheck = true)
+        {
+            _rotation = rotation;
+            try
+            {
+                return base.ShouldUsePotion(rotation, out act, clippingCheck);
+            }
+            finally
+            {
+                _rotation = null;
+            }
+        }
 
         public override bool IsConditionMet()
         {
@@ -1098,7 +1105,7 @@ public sealed class BRD_Ascended : BardRotation
                 return OpenerPotionTime > 0f || InWanderers;
             }
 
-            if (rotation.InBurst) return true;
+            if (_rotation?.InBurst == true) return true;
             return InOddMinuteWindow;
         }
 
