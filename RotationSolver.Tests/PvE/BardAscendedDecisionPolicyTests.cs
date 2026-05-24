@@ -125,6 +125,29 @@ internal static partial class PvETestSuite
             "Apex should not spend only because Army's Paeon has enough Soul Voice");
     }
 
+    static void BardAscendedApexCapFallbackRespectsBurstAvailability()
+    {
+        AssertFalse(
+            ShouldSpendApex(BardAscendedSongPhase.WanderersMinuet, soulVoice: 100, canEnterBurst: true),
+            "Apex should hold capped Soul Voice in Wanderer's Minuet when burst can enter");
+        AssertTrue(
+            ShouldSpendApex(BardAscendedSongPhase.WanderersMinuet, soulVoice: 100, canEnterBurst: false),
+            "Apex should spend capped Soul Voice in Wanderer's Minuet when burst cannot enter");
+        AssertFalse(
+            ShouldSpendApex(BardAscendedSongPhase.ArmysPaeon, soulVoice: 100, canEnterBurst: true),
+            "Apex should hold capped Soul Voice in Army's Paeon when burst can enter");
+        AssertTrue(
+            ShouldSpendApex(BardAscendedSongPhase.ArmysPaeon, soulVoice: 100, canEnterBurst: false),
+            "Apex should spend capped Soul Voice in Army's Paeon when burst cannot enter");
+        AssertFalse(
+            ShouldSpendApex(
+                BardAscendedSongPhase.WanderersMinuet,
+                soulVoice: 100,
+                wouldUseIronJaws: true,
+                canEnterBurst: false),
+            "Iron Jaws should still block capped Soul Voice fallback");
+    }
+
     static void BardAscendedApexUsesPlannedKillTimeOverSongFallback()
     {
         AssertTrue(
@@ -242,6 +265,53 @@ internal static partial class PvETestSuite
         AssertTrue(BardAscendedDecisionPolicy.ShouldUseGcdAoE(2), "GCD AoE should start at two targets");
         AssertFalse(BardAscendedDecisionPolicy.ShouldUseOgcdAoE(2), "oGCD AoE should reject two targets");
         AssertTrue(BardAscendedDecisionPolicy.ShouldUseOgcdAoE(3), "oGCD AoE should start at three targets");
+    }
+
+    static void BardAscendedRuntimeUsesResolvedAoeTargetCounts()
+    {
+        var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
+        var enhancedFiller = ExtractMethodBody(source, "bool TryUseEnhancedFiller");
+        var aoe = ExtractMethodBody(source, "bool TryUseAoE");
+        var bloodletterVariant = ExtractMethodBody(source, "bool TryUseBloodletterVariant");
+
+        AssertSourceMatches(
+            source,
+            @"\bprivate\s+static\s+bool\s+HasEnoughGcdAoETargets\s*\(\s*IAction\?\s+act\s*\)\s*=>\s*act\s+is\s+IBaseAction\s+baseAction\s*&&\s*BardAscendedDecisionPolicy\.ShouldUseGcdAoE\s*\(\s*baseAction\.Target\.AffectedTargets\.Length\s*\)\s*;",
+            "BRD Ascended should gate GCD AoE by the resolved action affected target count");
+        AssertSourceMatches(
+            source,
+            @"\bprivate\s+static\s+bool\s+HasEnoughOgcdAoETargets\s*\(\s*IAction\?\s+act\s*\)\s*=>\s*act\s+is\s+IBaseAction\s+baseAction\s*&&\s*BardAscendedDecisionPolicy\.ShouldUseOgcdAoE\s*\(\s*baseAction\.Target\.AffectedTargets\.Length\s*\)\s*;",
+            "BRD Ascended should gate oGCD AoE by the resolved action affected target count");
+
+        AssertSourceDoesNotMatch(
+            enhancedFiller,
+            @"\bNumberOfHostilesInRange\b",
+            "enhanced filler AoE should not use field hostiles before target resolution");
+        AssertSourceDoesNotMatch(
+            aoe,
+            @"\bNumberOfHostilesInRange\b",
+            "GCD AoE should not use field hostiles before target resolution");
+        AssertSourceDoesNotMatch(
+            bloodletterVariant,
+            @"\bNumberOfHostilesInRange\b",
+            "Rain of Death should not use field hostiles before target resolution");
+
+        AssertSourceMatches(
+            enhancedFiller,
+            @"\bprocAoE\.CanUse\s*\(\s*out\s+var\s+procAoEAct\s*,\s*skipAoeCheck\s*:\s*true\s*,\s*skipComboCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughGcdAoETargets\s*\(\s*procAoEAct\s*\).*?\bact\s*=\s*procAoEAct\s*;",
+            "enhanced filler AoE should assign only resolved targets that pass the Ascended GCD AoE threshold");
+        AssertSourceMatches(
+            aoe,
+            @"\bprocAoE\.CanUse\s*\(\s*out\s+var\s+procAoEAct\s*,\s*skipAoeCheck\s*:\s*true\s*,\s*skipComboCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughGcdAoETargets\s*\(\s*procAoEAct\s*\).*?\bact\s*=\s*procAoEAct\s*;",
+            "proc AoE should assign only resolved targets that pass the Ascended GCD AoE threshold");
+        AssertSourceMatches(
+            aoe,
+            @"\baoeAction\.CanUse\s*\(\s*out\s+var\s+aoeActionAct\s*,\s*skipAoeCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughGcdAoETargets\s*\(\s*aoeActionAct\s*\).*?\bact\s*=\s*aoeActionAct\s*;",
+            "standard AoE should assign only resolved targets that pass the Ascended GCD AoE threshold");
+        AssertSourceMatches(
+            bloodletterVariant,
+            @"\bRainOfDeathPvE\.CanUse\s*\(\s*out\s+var\s+rainOfDeathAct\s*,\s*usedUp\s*:\s*usedUp\s*,\s*skipAoeCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughOgcdAoETargets\s*\(\s*rainOfDeathAct\s*\).*?\bact\s*=\s*rainOfDeathAct\s*;",
+            "Rain of Death should assign only resolved targets that pass the Ascended oGCD AoE threshold");
     }
 
     static void BardAscendedFirstCycleStartsOnCombatEntryAndTimerReset()
@@ -387,6 +457,25 @@ internal static partial class PvETestSuite
             "BRD Ascended should reach Resonant Arrow before filler even when burst is inactive");
     }
 
+    static void BardAscendedRuntimeSpendsPitchPerfectBeforeBurstHold()
+    {
+        var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
+        var pitchPerfect = ExtractMethodBody(source, "bool TryUsePitchPerfect");
+
+        AssertSourceDoesNotMatch(
+            pitchPerfect,
+            @"!\s*InBurst\s*&&\s*!\s*RagingStrikesPvE\.Cooldown\.IsCoolingDown",
+            "Pitch Perfect should not inherit the pre-stack burst-ready hold");
+        AssertSourceMatches(
+            pitchPerfect,
+            @"\bPitchPerfectPvE\.CanUse\s*\(\s*out\s+act\s*,\s*skipAoeCheck\s*:\s*true\s*,\s*skipComboCheck\s*:\s*true\s*\)",
+            "Pitch Perfect should skip AoE and combo checks before evaluating stack safety");
+        AssertSourceMatches(
+            pitchPerfect,
+            @"\bif\s*\(\s*Repertoire\s*==\s*3\s*\)\s*return\s+true\s*;",
+            "Pitch Perfect should still spend immediately at three stacks");
+    }
+
     static void BardAscendedCustomTimingFollowsStandardBurstPath()
     {
         AssertTrue(
@@ -499,6 +588,7 @@ internal static partial class PvETestSuite
         byte soulVoice,
         bool isInBurst = false,
         bool wouldUseIronJaws = false,
+        bool canEnterBurst = true,
         float songSecondsRemaining = 45f,
         float targetSecondsRemaining = float.PositiveInfinity,
         float weaponTotalSeconds = 2.48f,
@@ -510,6 +600,7 @@ internal static partial class PvETestSuite
             SoulVoice: soulVoice,
             IsInBurst: isInBurst,
             WouldUseIronJaws: wouldUseIronJaws,
+            CanEnterBurst: canEnterBurst,
             SongSecondsRemaining: songSecondsRemaining,
             TargetSecondsRemaining: targetSecondsRemaining,
             WeaponTotalSeconds: weaponTotalSeconds,

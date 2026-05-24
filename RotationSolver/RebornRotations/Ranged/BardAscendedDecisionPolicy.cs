@@ -59,6 +59,7 @@ internal readonly record struct BardAscendedApexDecisionInput(
     byte SoulVoice,
     bool IsInBurst,
     bool WouldUseIronJaws,
+    bool CanEnterBurst,
     float SongSecondsRemaining,
     float TargetSecondsRemaining,
     float WeaponTotalSeconds,
@@ -176,6 +177,11 @@ internal static class BardAscendedDecisionPolicy
             return false;
         }
 
+        if (!input.CanEnterBurst && input.SoulVoice >= SoulVoiceCap)
+        {
+            return true;
+        }
+
         if (input.IsInBurst)
         {
             return input.SoulVoice >= ApexBlastReadySoulVoice;
@@ -200,14 +206,14 @@ internal static class BardAscendedDecisionPolicy
         return !hasEnhancedFiller && !hasResonantReady;
     }
 
-    internal static bool ShouldUseGcdAoE(int hostilesInRange)
+    internal static bool ShouldUseGcdAoE(int affectedTargets)
     {
-        return hostilesInRange >= GcdAoETargets;
+        return affectedTargets >= GcdAoETargets;
     }
 
-    internal static bool ShouldUseOgcdAoE(int hostilesInRange)
+    internal static bool ShouldUseOgcdAoE(int affectedTargets)
     {
-        return hostilesInRange >= OgcdAoETargets;
+        return affectedTargets >= OgcdAoETargets;
     }
 
     internal static bool ShouldStartFirstCycle(

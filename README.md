@@ -43,7 +43,7 @@ Do not run upstream RSR at the same time. This fork has its own internal plugin 
 
 * Adds `BRD Ascended`, a Patch 7.5 Bard PvE rotation option implemented as `BRD_Ascended`.
 * Intended for high end raids, ultimates, savage, extremes, alliance raids, and dungeon runs.
-* Uses the Bard PvE spec work for song timing, DoT thresholds, burst alignment, potion timing, level sync fallback, and AoE behavior.
+* Uses the Bard PvE spec work for song timing, DoT thresholds, burst alignment, potion timing, resource cap safety, level sync fallback, and resolved target AoE behavior.
 
 ### Separate Ascended Package
 
@@ -82,7 +82,7 @@ Burst conservation is intended to trade some raw scoreboard damage for better ki
 
 ### BRD Ascended
 
-`BRD_Ascended` is built as a complete Bard PvE package rather than a raid only opener script. It supports raid burst alignment, dungeon and alliance raid AoE, target time to kill aware DoTs, and level sync fallbacks.
+`BRD_Ascended` is built as a complete Bard PvE package rather than a raid only opener script. It supports raid burst alignment, capped resource fallback, dungeon and alliance raid AoE based on resolved action targets, target time to kill aware DoTs, and level sync fallbacks.
 
 No automated rotation can be universally optimal for every party comp, kill time, downtime pattern, or future patch. Recheck behavior after FFXIV updates and tune planned fight settings when a fight timeline matters.
 
