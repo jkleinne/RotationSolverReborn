@@ -29,6 +29,7 @@ internal static partial class PvETestSuite
         new("bard ascended strict 3 6 9 opener emits scripted requests", BardAscendedStrict369OpenerEmitsScriptedRequests),
         new("bard ascended strict opener preserves pitch perfect safety", BardAscendedStrictOpenerPreservesPitchPerfectSafety),
         new("bard ascended strict opener completes and breaks explicitly", BardAscendedStrictOpenerCompletesAndBreaksExplicitly),
+        new("bard ascended strict opener delays adjusted prepull heartbreak until pull", BardAscendedStrictOpenerDelaysAdjustedPrepullHeartbreakUntilPull),
         new("bard ascended runtime enters strict opener before priority gcds", BardAscendedRuntimeEntersStrictOpenerBeforePriorityGcds),
         new("bard ascended runtime enters strict opener during countdown", BardAscendedRuntimeEntersStrictOpenerDuringCountdown),
         new("bard ascended runtime enters strict opener before priority abilities", BardAscendedRuntimeEntersStrictOpenerBeforePriorityAbilities),

@@ -781,6 +781,21 @@ internal static partial class PvETestSuite
         AssertTrue(prematureGcd.NextState.IsTerminal, "pending required weave break should mark terminal state");
     }
 
+    static void BardAscendedStrictOpenerDelaysAdjustedPrepullHeartbreakUntilPull()
+    {
+        var request = BardAscendedOpenerController.GetNextRequest(BardAscendedOpenerInput.ForAbility(
+            BardAscendedOpenerState.Start(BardAscendedSongTiming.AdjustedStandard)));
+
+        AssertEqual(BardAscendedOpenerAction.HeartbreakShot, request.Action, "adjusted standard prepull should request Heartbreak Shot");
+        AssertEqual(BardAscendedWeaveSlot.Prepull, request.WeaveSlot, "adjusted standard Heartbreak Shot should be a prepull request");
+
+        var early = BardAscendedOpenerController.IsCountdownPrepullRequestReady(BardAscendedSongTiming.AdjustedStandard, request, 0.5f);
+        var atPull = BardAscendedOpenerController.IsCountdownPrepullRequestReady(BardAscendedSongTiming.AdjustedStandard, request, 0f);
+
+        AssertFalse(early, "adjusted standard prepull Heartbreak Shot should not fire before countdown zero");
+        AssertTrue(atPull, "adjusted standard prepull Heartbreak Shot should fire at countdown zero");
+    }
+
     static void AssertNextGcd(ref BardAscendedOpenerState state, BardAscendedOpenerAction expectedAction, int expectedStep)
     {
         AssertEqual(expectedStep, state.Step, "opener GCD request should be emitted at the expected step");
@@ -859,7 +874,7 @@ internal static partial class PvETestSuite
             "BRD Ascended should reset stale active opener state for a fresh countdown before starting prepull actions");
         AssertSourceMatches(
             openerCountdownAction,
-            @"\bvar\s+abilityRequest\s*=\s*BardAscendedOpenerController\.GetNextRequest\s*\(\s*BuildOpenerAbilityInput\s*\(\s*\)\s*\)\s*;.*?abilityRequest\.WeaveSlot\s*==\s*BardAscendedWeaveSlot\.Prepull.*?TryUseRequestedOpenerAction\s*\(\s*abilityRequest\s*,\s*out\s+act\s*\).*?\bvar\s+gcdRequest\s*=\s*BardAscendedOpenerController\.GetNextRequest\s*\(\s*BuildOpenerGcdInput\s*\(\s*\)\s*\)\s*;.*?TryUseRequestedOpenerAction\s*\(\s*gcdRequest\s*,\s*out\s+act\s*\)",
+            @"\bvar\s+abilityRequest\s*=\s*BardAscendedOpenerController\.GetNextRequest\s*\(\s*BuildOpenerAbilityInput\s*\(\s*\)\s*\)\s*;.*?BardAscendedOpenerController\.IsCountdownPrepullRequestReady\s*\(\s*SongTimings\s*,\s*abilityRequest\s*,\s*remainTime\s*\).*?TryUseRequestedOpenerAction\s*\(\s*abilityRequest\s*,\s*out\s+act\s*\).*?\bvar\s+gcdRequest\s*=\s*BardAscendedOpenerController\.GetNextRequest\s*\(\s*BuildOpenerGcdInput\s*\(\s*\)\s*\)\s*;.*?TryUseRequestedOpenerAction\s*\(\s*gcdRequest\s*,\s*out\s+act\s*\)",
             "BRD Ascended countdown should advance strict opener state for pull GCDs instead of using legacy DoT fallback");
         AssertSourceMatches(
             countDownAction,
@@ -875,7 +890,7 @@ internal static partial class PvETestSuite
             "BRD Ascended should reserve non-standard opener potion slots for the strict opener script");
         AssertSourceMatches(
             countDownAction,
-            @"!\s*_isStrictOpenerActive\s*&&\s*SongTimings\s*==\s*BardAscendedSongTiming\.AdjustedStandard\s*&&\s*remainTime\s*<=\s*AdjustedStandardPrepullHeartbreakWindowSeconds",
+            @"!\s*_isStrictOpenerActive\s*&&\s*SongTimings\s*==\s*BardAscendedSongTiming\.AdjustedStandard\s*&&\s*remainTime\s*<=\s*BardAscendedOpenerController\.AdjustedStandardPrepullHeartbreakWindowSeconds",
             "BRD Ascended should gate legacy adjusted prepull Heartbreak fallback off during strict opener mode");
         AssertSourceMatches(
             countDownAction,

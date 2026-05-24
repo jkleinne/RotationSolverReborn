@@ -16,8 +16,6 @@ public sealed class BRD_Ascended : BardRotation
     private const float SidewinderBuffLookahead = 10f;
     private const float HeartbreakChargeLookahead = 5f;
     private const float MagesHeartbreakHoldGcdMultiplier = 0.9f;
-    private const float OpenerPrepullActionWindowSeconds = 1f;
-    private const float AdjustedStandardPrepullHeartbreakWindowSeconds = 0f;
     private const float Cycle369PrepullHeartbreakWindowSeconds = 1.65f;
     private const float CountdownDotWindowSeconds = 0.1f;
     private const float CountdownResetToleranceSeconds = 0.25f;
@@ -300,7 +298,7 @@ public sealed class BRD_Ascended : BardRotation
         IAction? act;
         if (!_isStrictOpenerActive
             && SongTimings == BardAscendedSongTiming.AdjustedStandard
-            && remainTime <= AdjustedStandardPrepullHeartbreakWindowSeconds)
+            && remainTime <= BardAscendedOpenerController.AdjustedStandardPrepullHeartbreakWindowSeconds)
         {
             if (ActiveBloodletterVariant.CanUse(out act)) return act;
         }
@@ -498,10 +496,10 @@ public sealed class BRD_Ascended : BardRotation
     private bool TryUseOpenerCountdownAction(float remainTime, out IAction? act)
     {
         act = null;
-        if (!_isStrictOpenerActive || remainTime > OpenerPrepullActionWindowSeconds) return false;
+        if (!_isStrictOpenerActive) return false;
 
         var abilityRequest = BardAscendedOpenerController.GetNextRequest(BuildOpenerAbilityInput());
-        if (abilityRequest.WeaveSlot == BardAscendedWeaveSlot.Prepull
+        if (BardAscendedOpenerController.IsCountdownPrepullRequestReady(SongTimings, abilityRequest, remainTime)
             && TryUseRequestedOpenerAction(abilityRequest, out act))
         {
             return true;

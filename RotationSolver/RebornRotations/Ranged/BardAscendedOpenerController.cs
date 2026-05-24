@@ -136,6 +136,8 @@ internal static class BardAscendedOpenerController
     private const int Cycle369RadiantEncoreStep = 5;
     private const int Cycle369BarrageTargetStep = 6;
     private const int NoStacks = 0;
+    private const float CountdownPrepullActionWindowSeconds = 1f;
+    internal const float AdjustedStandardPrepullHeartbreakWindowSeconds = 0f;
 
     internal static BardAscendedOpenerResult GetNextRequest(BardAscendedOpenerInput input)
     {
@@ -155,6 +157,21 @@ internal static class BardAscendedOpenerController
             BardAscendedOpenerRequestKind.Ability => GetNextAbilityRequest(input),
             _ => NoAction(input.State)
         };
+    }
+
+    internal static bool IsCountdownPrepullRequestReady(
+        BardAscendedSongTiming timing,
+        BardAscendedOpenerResult request,
+        float remainTime)
+    {
+        if (request.Kind != BardAscendedOpenerResultKind.Continue) return false;
+        if (request.RequestKind != BardAscendedOpenerRequestKind.Ability) return false;
+        if (request.WeaveSlot != BardAscendedWeaveSlot.Prepull) return false;
+
+        return timing == BardAscendedSongTiming.AdjustedStandard
+               && request.Action == BardAscendedOpenerAction.HeartbreakShot
+            ? remainTime <= AdjustedStandardPrepullHeartbreakWindowSeconds
+            : remainTime <= CountdownPrepullActionWindowSeconds;
     }
 
     private static BardAscendedOpenerResult GetNextGcdRequest(BardAscendedOpenerState state)
