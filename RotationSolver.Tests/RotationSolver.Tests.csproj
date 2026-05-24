@@ -32,6 +32,7 @@
 		<Compile Include="..\RotationSolver.Basic\Data\PvPModeClassifier.cs" Link="PvPModeClassifier.cs" />
 		<Compile Include="..\RotationSolver.Basic\Rotations\FrontlinePvPRoleActionPolicy.cs" Link="FrontlinePvPRoleActionPolicy.cs" />
 		<Compile Include="..\RotationSolver\Commands\AutoOffPolicy.cs" Link="AutoOffPolicy.cs" />
+		<Compile Include="..\RotationSolver\RebornRotations\Ranged\BardAscendedDecisionPolicy.cs" Link="BardAscendedDecisionPolicy.cs" />
 		<Compile Include="..\RotationSolver\RebornRotations\PVPRotations\Ranged\BardPvPDecisionPolicy.cs" Link="BardPvPDecisionPolicy.cs" />
 		<Compile Include="..\RotationSolver\RebornRotations\PVPRotations\Ranged\BardPvPOffensiveDecisionPolicy.cs" Link="BardPvPOffensiveDecisionPolicy.cs" />
 		<Compile Include="..\RotationSolver\RebornRotations\PVPRotations\Ranged\BardPvPTargetPolicy.cs" Link="BardPvPTargetPolicy.cs" />
