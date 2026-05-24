@@ -125,6 +125,29 @@ internal static partial class PvETestSuite
             "Apex should not spend only because Army's Paeon has enough Soul Voice");
     }
 
+    static void BardAscendedApexCapFallbackRespectsBurstAvailability()
+    {
+        AssertFalse(
+            ShouldSpendApex(BardAscendedSongPhase.WanderersMinuet, soulVoice: 100, canEnterBurst: true),
+            "Apex should hold capped Soul Voice in Wanderer's Minuet when burst can enter");
+        AssertTrue(
+            ShouldSpendApex(BardAscendedSongPhase.WanderersMinuet, soulVoice: 100, canEnterBurst: false),
+            "Apex should spend capped Soul Voice in Wanderer's Minuet when burst cannot enter");
+        AssertFalse(
+            ShouldSpendApex(BardAscendedSongPhase.ArmysPaeon, soulVoice: 100, canEnterBurst: true),
+            "Apex should hold capped Soul Voice in Army's Paeon when burst can enter");
+        AssertTrue(
+            ShouldSpendApex(BardAscendedSongPhase.ArmysPaeon, soulVoice: 100, canEnterBurst: false),
+            "Apex should spend capped Soul Voice in Army's Paeon when burst cannot enter");
+        AssertFalse(
+            ShouldSpendApex(
+                BardAscendedSongPhase.WanderersMinuet,
+                soulVoice: 100,
+                wouldUseIronJaws: true,
+                canEnterBurst: false),
+            "Iron Jaws should still block capped Soul Voice fallback");
+    }
+
     static void BardAscendedApexUsesPlannedKillTimeOverSongFallback()
     {
         AssertTrue(
@@ -387,6 +410,25 @@ internal static partial class PvETestSuite
             "BRD Ascended should reach Resonant Arrow before filler even when burst is inactive");
     }
 
+    static void BardAscendedRuntimeSpendsPitchPerfectBeforeBurstHold()
+    {
+        var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
+        var pitchPerfect = ExtractMethodBody(source, "bool TryUsePitchPerfect");
+
+        AssertSourceDoesNotMatch(
+            pitchPerfect,
+            @"!\s*InBurst\s*&&\s*!\s*RagingStrikesPvE\.Cooldown\.IsCoolingDown",
+            "Pitch Perfect should not inherit the pre-stack burst-ready hold");
+        AssertSourceMatches(
+            pitchPerfect,
+            @"\bPitchPerfectPvE\.CanUse\s*\(\s*out\s+act\s*,\s*skipAoeCheck\s*:\s*true\s*,\s*skipComboCheck\s*:\s*true\s*\)",
+            "Pitch Perfect should skip AoE and combo checks before evaluating stack safety");
+        AssertSourceMatches(
+            pitchPerfect,
+            @"\bif\s*\(\s*Repertoire\s*==\s*3\s*\)\s*return\s+true\s*;",
+            "Pitch Perfect should still spend immediately at three stacks");
+    }
+
     static void BardAscendedCustomTimingFollowsStandardBurstPath()
     {
         AssertTrue(
@@ -499,6 +541,7 @@ internal static partial class PvETestSuite
         byte soulVoice,
         bool isInBurst = false,
         bool wouldUseIronJaws = false,
+        bool canEnterBurst = true,
         float songSecondsRemaining = 45f,
         float targetSecondsRemaining = float.PositiveInfinity,
         float weaponTotalSeconds = 2.48f,
@@ -510,6 +553,7 @@ internal static partial class PvETestSuite
             SoulVoice: soulVoice,
             IsInBurst: isInBurst,
             WouldUseIronJaws: wouldUseIronJaws,
+            CanEnterBurst: canEnterBurst,
             SongSecondsRemaining: songSecondsRemaining,
             TargetSecondsRemaining: targetSecondsRemaining,
             WeaponTotalSeconds: weaponTotalSeconds,

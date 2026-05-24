@@ -565,6 +565,7 @@ public sealed class BRD_Ascended : BardRotation
         SoulVoice: SoulVoice,
         IsInBurst: InBurst,
         WouldUseIronJaws: WouldUseIronJaws,
+        CanEnterBurst: CanBurst,
         SongSecondsRemaining: SongTime,
         TargetSecondsRemaining: EffectiveTargetTimeToKill,
         WeaponTotalSeconds: WeaponTotal,
@@ -1050,9 +1051,8 @@ public sealed class BRD_Ascended : BardRotation
     {
         act = null;
         if (IsInSandbagMode || Song != Song.WanderersMinuet) return false;
-        if (!InBurst && !RagingStrikesPvE.Cooldown.IsCoolingDown) return false;
 
-        if (!PitchPerfectPvE.CanUse(out act)) return false;
+        if (!PitchPerfectPvE.CanUse(out act, skipAoeCheck: true, skipComboCheck: true)) return false;
 
         if (Repertoire == 3) return true;
         if (Repertoire == 2 && EmpyrealArrowPvE.Cooldown.WillHaveOneChargeGCD(1)) return true;
