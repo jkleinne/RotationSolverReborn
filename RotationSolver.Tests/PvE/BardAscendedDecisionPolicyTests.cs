@@ -267,6 +267,53 @@ internal static partial class PvETestSuite
         AssertTrue(BardAscendedDecisionPolicy.ShouldUseOgcdAoE(3), "oGCD AoE should start at three targets");
     }
 
+    static void BardAscendedRuntimeUsesResolvedAoeTargetCounts()
+    {
+        var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
+        var enhancedFiller = ExtractMethodBody(source, "bool TryUseEnhancedFiller");
+        var aoe = ExtractMethodBody(source, "bool TryUseAoE");
+        var bloodletterVariant = ExtractMethodBody(source, "bool TryUseBloodletterVariant");
+
+        AssertSourceMatches(
+            source,
+            @"\bprivate\s+static\s+bool\s+HasEnoughGcdAoETargets\s*\(\s*IAction\?\s+act\s*\)\s*=>\s*act\s+is\s+IBaseAction\s+baseAction\s*&&\s*BardAscendedDecisionPolicy\.ShouldUseGcdAoE\s*\(\s*baseAction\.Target\.AffectedTargets\.Length\s*\)\s*;",
+            "BRD Ascended should gate GCD AoE by the resolved action affected target count");
+        AssertSourceMatches(
+            source,
+            @"\bprivate\s+static\s+bool\s+HasEnoughOgcdAoETargets\s*\(\s*IAction\?\s+act\s*\)\s*=>\s*act\s+is\s+IBaseAction\s+baseAction\s*&&\s*BardAscendedDecisionPolicy\.ShouldUseOgcdAoE\s*\(\s*baseAction\.Target\.AffectedTargets\.Length\s*\)\s*;",
+            "BRD Ascended should gate oGCD AoE by the resolved action affected target count");
+
+        AssertSourceDoesNotMatch(
+            enhancedFiller,
+            @"\bNumberOfHostilesInRange\b",
+            "enhanced filler AoE should not use field hostiles before target resolution");
+        AssertSourceDoesNotMatch(
+            aoe,
+            @"\bNumberOfHostilesInRange\b",
+            "GCD AoE should not use field hostiles before target resolution");
+        AssertSourceDoesNotMatch(
+            bloodletterVariant,
+            @"\bNumberOfHostilesInRange\b",
+            "Rain of Death should not use field hostiles before target resolution");
+
+        AssertSourceMatches(
+            enhancedFiller,
+            @"\bprocAoE\.CanUse\s*\(\s*out\s+act\s*,\s*skipAoeCheck\s*:\s*true\s*,\s*skipComboCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughGcdAoETargets\s*\(\s*act\s*\)",
+            "enhanced filler AoE should resolve its target before applying the Ascended GCD AoE threshold");
+        AssertSourceMatches(
+            aoe,
+            @"\bprocAoE\.CanUse\s*\(\s*out\s+act\s*,\s*skipAoeCheck\s*:\s*true\s*,\s*skipComboCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughGcdAoETargets\s*\(\s*act\s*\)",
+            "proc AoE should resolve its target before applying the Ascended GCD AoE threshold");
+        AssertSourceMatches(
+            aoe,
+            @"\baoeAction\.CanUse\s*\(\s*out\s+act\s*,\s*skipAoeCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughGcdAoETargets\s*\(\s*act\s*\)",
+            "standard AoE should resolve its target before applying the Ascended GCD AoE threshold");
+        AssertSourceMatches(
+            bloodletterVariant,
+            @"\bRainOfDeathPvE\.CanUse\s*\(\s*out\s+act\s*,\s*usedUp\s*:\s*usedUp\s*,\s*skipAoeCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughOgcdAoETargets\s*\(\s*act\s*\)",
+            "Rain of Death should resolve its target before applying the Ascended oGCD AoE threshold");
+    }
+
     static void BardAscendedFirstCycleStartsOnCombatEntryAndTimerReset()
     {
         AssertTrue(

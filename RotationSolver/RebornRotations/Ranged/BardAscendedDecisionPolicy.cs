@@ -206,14 +206,14 @@ internal static class BardAscendedDecisionPolicy
         return !hasEnhancedFiller && !hasResonantReady;
     }
 
-    internal static bool ShouldUseGcdAoE(int hostilesInRange)
+    internal static bool ShouldUseGcdAoE(int affectedTargets)
     {
-        return hostilesInRange >= GcdAoETargets;
+        return affectedTargets >= GcdAoETargets;
     }
 
-    internal static bool ShouldUseOgcdAoE(int hostilesInRange)
+    internal static bool ShouldUseOgcdAoE(int affectedTargets)
     {
-        return hostilesInRange >= OgcdAoETargets;
+        return affectedTargets >= OgcdAoETargets;
     }
 
     internal static bool ShouldStartFirstCycle(

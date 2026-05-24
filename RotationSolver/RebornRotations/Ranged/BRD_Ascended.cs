@@ -614,18 +614,23 @@ public sealed class BRD_Ascended : BardRotation
 
     #region Filler GCDs
 
+    private static bool HasEnoughGcdAoETargets(IAction? act) =>
+        act is IBaseAction baseAction
+        && BardAscendedDecisionPolicy.ShouldUseGcdAoE(baseAction.Target.AffectedTargets.Length);
+
+    private static bool HasEnoughOgcdAoETargets(IAction? act) =>
+        act is IBaseAction baseAction
+        && BardAscendedDecisionPolicy.ShouldUseOgcdAoE(baseAction.Target.AffectedTargets.Length);
+
     private bool TryUseEnhancedFiller(out IAction? act)
     {
         act = null;
         if (IsInSandbagMode || !CanUseEnhancedFiller || WouldUseDoTs) return false;
 
-        if (BardAscendedDecisionPolicy.ShouldUseGcdAoE(NumberOfHostilesInRange))
+        var procAoE = ShadowbitePvE.EnoughLevel ? ShadowbitePvE : WideVolleyPvE;
+        if (procAoE.CanUse(out act, skipAoeCheck: true, skipComboCheck: true) && HasEnoughGcdAoETargets(act))
         {
-            var procAoE = ShadowbitePvE.EnoughLevel ? ShadowbitePvE : WideVolleyPvE;
-            if (procAoE.CanUse(out act, skipAoeCheck: true, skipComboCheck: true))
-            {
-                return true;
-            }
+            return true;
         }
 
         var procArrow = RefulgentArrowPvE.EnoughLevel ? RefulgentArrowPvE : StraightShotPvE;
@@ -636,20 +641,18 @@ public sealed class BRD_Ascended : BardRotation
     {
         act = null;
         if (IsInSandbagMode) return false;
-        if (!BardAscendedDecisionPolicy.ShouldUseGcdAoE(NumberOfHostilesInRange)) return false;
 
         if (CanUseEnhancedFiller && !WouldUseDoTs)
         {
             var procAoE = ShadowbitePvE.EnoughLevel ? ShadowbitePvE : WideVolleyPvE;
-            if (procAoE.CanUse(out act, skipAoeCheck: true, skipComboCheck: true))
+            if (procAoE.CanUse(out act, skipAoeCheck: true, skipComboCheck: true) && HasEnoughGcdAoETargets(act))
             {
                 return true;
             }
         }
 
-        return LadonsbitePvE.EnoughLevel
-            ? LadonsbitePvE.CanUse(out act, skipAoeCheck: true)
-            : QuickNockPvE.CanUse(out act, skipAoeCheck: true);
+        var aoeAction = LadonsbitePvE.EnoughLevel ? LadonsbitePvE : QuickNockPvE;
+        return aoeAction.CanUse(out act, skipAoeCheck: true) && HasEnoughGcdAoETargets(act);
     }
 
     private bool TryUseFiller(out IAction? act)
@@ -975,8 +978,7 @@ public sealed class BRD_Ascended : BardRotation
 
     private bool TryUseBloodletterVariant(out IAction? act, bool usedUp)
     {
-        if (BardAscendedDecisionPolicy.ShouldUseOgcdAoE(NumberOfHostilesInRange)
-            && RainOfDeathPvE.CanUse(out act, usedUp: usedUp, skipAoeCheck: true))
+        if (RainOfDeathPvE.CanUse(out act, usedUp: usedUp, skipAoeCheck: true) && HasEnoughOgcdAoETargets(act))
         {
             return true;
         }
