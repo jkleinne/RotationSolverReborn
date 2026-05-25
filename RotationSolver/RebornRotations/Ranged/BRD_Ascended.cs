@@ -167,19 +167,6 @@ public sealed class BRD_Ascended : BardRotation
                && CurrentTarget.HasStatus(true, action.Setting.TargetStatusProvide);
     }
 
-    private static bool TargetHasBossIcon => CurrentTarget?.IsBossFromIcon() == true;
-
-    private static bool TargetIsBoss
-    {
-        get
-        {
-            if (CurrentTarget == null) return false;
-
-            return CurrentTarget.IsBossFromIcon()
-                   || CurrentTarget.IsBossFromTTK();
-        }
-    }
-
     #endregion
 
     #endregion
@@ -834,17 +821,7 @@ public sealed class BRD_Ascended : BardRotation
     private static bool TryPreviewActionTarget(
         IBaseAction action,
         out IBattleChara target,
-        bool skipStatusProvideCheck = false,
-        bool skipStatusNeed = false,
-        bool skipTargetStatusNeedCheck = false,
-        bool skipComboCheck = false,
-        bool skipCastingCheck = false,
-        bool usedUp = false,
-        bool skipAoeCheck = false,
-        bool skipTTKCheck = false,
-        byte gcdCountForAbility = 0,
-        bool checkActionManager = false,
-        TargetType targetOverride = default)
+        bool skipStatusProvideCheck = false)
     {
         target = null!;
         var wasActionPreview = IBaseAction.ActionPreview;
@@ -854,17 +831,7 @@ public sealed class BRD_Ascended : BardRotation
             IBaseAction.ActionPreview = true;
             if (!action.CanUse(
                     out _,
-                    skipStatusProvideCheck: skipStatusProvideCheck,
-                    skipStatusNeed: skipStatusNeed,
-                    skipTargetStatusNeedCheck: skipTargetStatusNeedCheck,
-                    skipComboCheck: skipComboCheck,
-                    skipCastingCheck: skipCastingCheck,
-                    usedUp: usedUp,
-                    skipAoeCheck: skipAoeCheck,
-                    skipTTKCheck: skipTTKCheck,
-                    gcdCountForAbility: gcdCountForAbility,
-                    checkActionManager: checkActionManager,
-                    targetOverride: targetOverride))
+                    skipStatusProvideCheck: skipStatusProvideCheck))
             {
                 return false;
             }

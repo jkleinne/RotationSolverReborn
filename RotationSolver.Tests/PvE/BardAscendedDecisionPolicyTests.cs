@@ -139,11 +139,19 @@ internal static partial class PvETestSuite
             previewTarget,
             @"action\.PreviewTarget\?\.Target",
             "preview helper should expose the resolved preview target");
+        AssertSourceDoesNotMatch(
+            previewTarget,
+            @"\b(skipStatusNeed|skipTargetStatusNeedCheck|skipComboCheck|skipCastingCheck|usedUp|skipAoeCheck|skipTTKCheck|gcdCountForAbility|checkActionManager|targetOverride)\b",
+            "preview helper should expose only the status-provide skip required by DoT probes");
 
         AssertSourceDoesNotMatch(
             targetAwareHelpers,
             forbiddenHardTargetHelpers,
             "target aware candidate helpers should not reference hard target helpers");
+        AssertSourceDoesNotMatch(
+            source,
+            @"\bprivate\s+static\s+bool\s+(TargetHasBossIcon|TargetIsBoss)\b",
+            "hard-target boss helpers should be removed after resolved-target DoT gating");
         AssertSourceDoesNotMatch(
             dotTargetTimeToKill,
             @"\b(CurrentTarget|EffectiveTargetTimeToKill)\b",
