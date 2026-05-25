@@ -6,6 +6,7 @@ internal static partial class PvETestSuite
     [
         new("bard ascended dot thresholds honor target time", BardAscendedDotThresholdsHonorTargetTime),
         new("bard ascended dot thresholds use boss fallback only when ttk is unknown", BardAscendedDotThresholdsUseBossFallbackOnlyWhenTtkIsUnknown),
+        new("bard ascended dot runtime uses resolved target ttk", BardAscendedDotRuntimeUsesResolvedTargetTtk),
         new("bard ascended song presets map to expected durations", BardAscendedSongPresetsMapToExpectedDurations),
         new("bard ascended apex spends during burst and mage ballad windows", BardAscendedApexSpendsDuringBurstAndMageBalladWindows),
         new("bard ascended apex holds during army paeon", BardAscendedApexHoldsDuringArmyPaeon),
