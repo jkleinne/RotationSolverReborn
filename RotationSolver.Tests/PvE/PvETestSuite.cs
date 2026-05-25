@@ -10,6 +10,7 @@ internal static partial class PvETestSuite
         new("bard ascended apex spends during burst and mage ballad windows", BardAscendedApexSpendsDuringBurstAndMageBalladWindows),
         new("bard ascended apex holds during army paeon", BardAscendedApexHoldsDuringArmyPaeon),
         new("bard ascended apex cap fallback respects burst availability", BardAscendedApexCapFallbackRespectsBurstAvailability),
+        new("bard ascended runtime feeds burst actionability to apex policy", BardAscendedRuntimeFeedsBurstActionabilityToApexPolicy),
         new("bard ascended apex uses planned kill time over song fallback", BardAscendedApexUsesPlannedKillTimeOverSongFallback),
         new("bard ascended blast arrow waits for urgent gcds", BardAscendedBlastArrowWaitsForUrgentGcds),
         new("bard ascended filler waits for enhanced filler or resonant ready", BardAscendedFillerWaitsForEnhancedFillerOrResonantReady),

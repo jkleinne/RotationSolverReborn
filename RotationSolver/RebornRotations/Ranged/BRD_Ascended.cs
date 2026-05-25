@@ -127,6 +127,19 @@ public sealed class BRD_Ascended : BardRotation
         }
     }
 
+    private bool CanEnterBurstWindow
+    {
+        get
+        {
+            if (!CanBurst) return false;
+            if (InBurst) return true;
+
+            return CanStartBurstWithRadiantFinale(out _)
+                   || CanStartBurstWithBattleVoice(out _)
+                   || CanStartBurstWithRagingStrikes(out _);
+        }
+    }
+
     private static bool IsFirstCycle { get; set; }
     private static bool HasCombatCycleState { get; set; }
     private static float LastCombatTimeRaw { get; set; }
@@ -814,7 +827,7 @@ public sealed class BRD_Ascended : BardRotation
         SoulVoice: SoulVoice,
         IsInBurst: InBurst,
         WouldUseIronJaws: WouldUseIronJaws,
-        CanEnterBurst: CanBurst,
+        CanEnterBurst: CanEnterBurstWindow,
         SongSecondsRemaining: SongTime,
         TargetSecondsRemaining: EffectiveTargetTimeToKill,
         WeaponTotalSeconds: WeaponTotal,
@@ -1142,91 +1155,103 @@ public sealed class BRD_Ascended : BardRotation
         return action.Cooldown.RecastTimeElapsedRaw > WeaponTotal;
     }
 
-    private bool CanUseRadiantFinale
+    private bool CanStartBurstWithRadiantFinale(out IAction? act)
     {
-        get
+        act = null;
+        if (!CanBurst) return false;
+        if (!InWanderers) return false;
+
+        if (UsesStandardBurstPath)
         {
-            if (!InWanderers) return false;
+            var canStart = IsFirstCycle
+                ? HasBattleVoice
+                : ElapsedIsMoreThanGCD(TheWanderersMinuetPvE) && RecastIsLessThanGCD(BattleVoicePvE);
 
-            if (UsesStandardBurstPath)
-            {
-                return IsFirstCycle
-                    ? HasBattleVoice
-                    : ElapsedIsMoreThanGCD(TheWanderersMinuetPvE) && RecastIsLessThanGCD(BattleVoicePvE);
-            }
-
-            return Is369
-                   && (IsFirstCycle
-                       ? !WouldUseDoTs && CanLateWeave
-                       : ElapsedIsMoreThanGCD(TheWanderersMinuetPvE) && RecastIsLessThanGCD(BattleVoicePvE) && CanEarlyWeave
-                   );
+            return canStart && RadiantFinalePvE.CanUse(out act);
         }
+
+        if (!Is369) return false;
+
+        var canStart369 = IsFirstCycle
+            ? !WouldUseDoTs
+            : ElapsedIsMoreThanGCD(TheWanderersMinuetPvE) && RecastIsLessThanGCD(BattleVoicePvE);
+
+        return canStart369 && RadiantFinalePvE.CanUse(out act);
     }
 
     private bool TryUseRadiantFinale(out IAction? act)
     {
         act = null;
-        if (!CanBurst) return false;
+        if (Is369 && (IsFirstCycle ? !CanLateWeave : !CanEarlyWeave)) return false;
 
-        return CanUseRadiantFinale && RadiantFinalePvE.CanUse(out act);
+        return CanStartBurstWithRadiantFinale(out act);
     }
 
-    private bool CanUseBattleVoice
+    private bool CanStartBurstWithBattleVoice(out IAction? act)
     {
-        get
-        {
-            if (!InWanderers && RadiantFinalePvE.EnoughLevel) return false;
-            var shouldWaitForRadiantFinale = BardAscendedDecisionPolicy.ShouldWaitForRadiantFinaleBeforeBattleVoice(
-                RadiantFinalePvE.EnoughLevel,
-                RadiantFinalePvE.CanUse(out _),
-                HasRadiantFinale,
-                IsLastAbility(ActionID.RadiantFinalePvE));
+        act = null;
+        if (!CanBurst) return false;
+        if (!InWanderers && RadiantFinalePvE.EnoughLevel) return false;
+        var shouldWaitForRadiantFinale = BardAscendedDecisionPolicy.ShouldWaitForRadiantFinaleBeforeBattleVoice(
+            RadiantFinalePvE.EnoughLevel,
+            RadiantFinalePvE.CanUse(out _),
+            HasRadiantFinale,
+            IsLastAbility(ActionID.RadiantFinalePvE));
 
-            if (UsesStandardBurstPath)
-            {
-                return CanLateWeave
-                       && (IsFirstCycle
-                           ? !HasRadiantFinale
-                           : !shouldWaitForRadiantFinale);
-            }
-            return Is369
-                   && (IsFirstCycle
-                       ? !WouldUseDoTs
-                         && !shouldWaitForRadiantFinale
-                         && CanEarlyWeave
-                       : !shouldWaitForRadiantFinale
-                         && CanLateWeave);
+        if (UsesStandardBurstPath)
+        {
+            var canStart = IsFirstCycle
+                ? !HasRadiantFinale
+                : !shouldWaitForRadiantFinale;
+
+            return canStart && BattleVoicePvE.CanUse(out act);
         }
+
+        if (!Is369) return false;
+
+        var canStart369 = IsFirstCycle
+            ? !WouldUseDoTs && !shouldWaitForRadiantFinale
+            : !shouldWaitForRadiantFinale;
+
+        return canStart369 && BattleVoicePvE.CanUse(out act);
     }
 
     private bool TryUseBattleVoice(out IAction? act)
     {
         act = null;
-        if (!CanBurst) return false;
+        if (UsesStandardBurstPath && !CanLateWeave) return false;
+        if (Is369 && (IsFirstCycle ? !CanEarlyWeave : !CanLateWeave)) return false;
 
-        return CanUseBattleVoice && BattleVoicePvE.CanUse(out act);
+        return CanStartBurstWithBattleVoice(out act);
     }
 
-    private bool TryUseRagingStrikes(out IAction? act)
+    private bool CanStartBurstWithRagingStrikes(out IAction? act)
     {
         act = null;
         if (!CanBurst) return false;
 
         var hasOtherBurst = false;
         var allOtherPresent = true;
-        foreach (var s in BurstStatus)
+        foreach (var status in BurstStatus)
         {
-            if (s == StatusID.RagingStrikes) continue;
+            if (status == StatusID.RagingStrikes) continue;
             hasOtherBurst = true;
-            if (StatusHelper.PlayerHasStatus(true, s)) continue;
+            if (StatusHelper.PlayerHasStatus(true, status)) continue;
             allOtherPresent = false;
             break;
         }
 
-        if (!hasOtherBurst || allOtherPresent)
-            return RagingStrikesPvE.CanUse(out act) && CanLateWeave;
+        if (hasOtherBurst && !allOtherPresent) return false;
 
-        return false;
+        return RagingStrikesPvE.CanUse(out act);
+    }
+
+    private bool TryUseRagingStrikes(out IAction? act)
+    {
+        act = null;
+        if (!CanLateWeave) return false;
+
+        return CanStartBurstWithRagingStrikes(out act);
     }
 
     #endregion

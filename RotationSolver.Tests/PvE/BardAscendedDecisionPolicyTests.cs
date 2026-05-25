@@ -148,6 +148,75 @@ internal static partial class PvETestSuite
             "Iron Jaws should still block capped Soul Voice fallback");
     }
 
+    static void BardAscendedRuntimeFeedsBurstActionabilityToApexPolicy()
+    {
+        var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
+        var pendingRadiantFinaleGate = ExtractMethodBody(source, "bool CanStartBurstWithRadiantFinale");
+        var pendingBattleVoiceGate = ExtractMethodBody(source, "bool CanStartBurstWithBattleVoice");
+        var pendingRagingGate = ExtractMethodBody(source, "bool CanStartBurstWithRagingStrikes");
+        var tryUseRadiantFinale = ExtractMethodBody(source, "bool TryUseRadiantFinale");
+        var tryUseBattleVoice = ExtractMethodBody(source, "bool TryUseBattleVoice");
+        var tryUseRagingStrikes = ExtractMethodBody(source, "bool TryUseRagingStrikes");
+
+        AssertTrue(
+            ShouldSpendApex(BardAscendedSongPhase.ArmysPaeon, soulVoice: 100, canEnterBurst: false),
+            "Apex should spend capped Soul Voice when Army's Paeon prevents burst from starting");
+        AssertFalse(
+            ShouldSpendApex(BardAscendedSongPhase.ArmysPaeon, soulVoice: 100, canEnterBurst: true),
+            "Apex should hold capped Soul Voice when burst can enter");
+        AssertTrue(
+            ShouldSpendApex(BardAscendedSongPhase.MagesBallad, soulVoice: 100, canEnterBurst: true, songSecondsRemaining: 30f),
+            "Mage's Ballad cap spending should not depend on burst actionability");
+        AssertFalse(
+            ShouldSpendApex(
+                BardAscendedSongPhase.ArmysPaeon,
+                soulVoice: 100,
+                wouldUseIronJaws: true,
+                canEnterBurst: false),
+            "Iron Jaws should keep priority over the capped Soul Voice recovery fallback");
+
+        AssertSourceMatches(
+            source,
+            @"\bCanEnterBurst:\s*CanEnterBurstWindow\b",
+            "BRD Ascended should pass runtime burst actionability into Apex decisions");
+        AssertSourceDoesNotMatch(
+            source,
+            @"\bCanEnterBurst:\s*CanBurst\b",
+            "BRD Ascended should not pass raw burst permission into Apex decisions");
+        AssertSourceMatches(
+            source,
+            @"\bprivate\s+bool\s+CanEnterBurstWindow\s*\{.*?if\s*\(\s*!\s*CanBurst\s*\)\s*return\s+false\s*;.*?if\s*\(\s*InBurst\s*\)\s*return\s+true\s*;.*?return\s+CanStartBurstWithRadiantFinale\(out\s+_\)\s*\|\|\s*CanStartBurstWithBattleVoice\(out\s+_\)\s*\|\|\s*CanStartBurstWithRagingStrikes\(out\s+_\)\s*;",
+            "BRD Ascended should treat Army's Paeon as non actionable when song-gated buffs cannot start");
+        AssertSourceDoesNotMatch(
+            pendingRadiantFinaleGate,
+            @"\bCanLateWeave\b|\bCanEarlyWeave\b",
+            "pending Radiant Finale burst entry should not depend on the current weave slot");
+        AssertSourceDoesNotMatch(
+            pendingBattleVoiceGate,
+            @"\bCanLateWeave\b|\bCanEarlyWeave\b",
+            "pending Battle Voice burst entry should not depend on the current weave slot");
+        AssertSourceMatches(
+            pendingRagingGate,
+            @"\bif\s*\(\s*!\s*CanBurst\s*\)\s*return\s+false\s*;.*?return\s+RagingStrikesPvE\.CanUse\(out\s+act\)\s*;",
+            "BRD Ascended should allow pending Raging Strikes to keep Apex aligned before the next weave slot");
+        AssertSourceDoesNotMatch(
+            pendingRagingGate,
+            @"\bCanLateWeave\b",
+            "pending Raging Strikes burst entry should not depend on the current weave slot");
+        AssertSourceMatches(
+            tryUseRadiantFinale,
+            @"\bif\s*\(\s*Is369\s*&&\s*\(\s*IsFirstCycle\s*\?\s*!\s*CanLateWeave\s*:\s*!\s*CanEarlyWeave\s*\)\s*\)\s*return\s+false\s*;.*?return\s+CanStartBurstWithRadiantFinale\(out\s+act\)\s*;",
+            "TryUseRadiantFinale should keep 3 6 9 weave timing at the action-use boundary");
+        AssertSourceMatches(
+            tryUseBattleVoice,
+            @"\bif\s*\(\s*UsesStandardBurstPath\s*&&\s*!\s*CanLateWeave\s*\)\s*return\s+false\s*;.*?if\s*\(\s*Is369\s*&&\s*\(\s*IsFirstCycle\s*\?\s*!\s*CanEarlyWeave\s*:\s*!\s*CanLateWeave\s*\)\s*\)\s*return\s+false\s*;.*?return\s+CanStartBurstWithBattleVoice\(out\s+act\)\s*;",
+            "TryUseBattleVoice should keep weave timing at the action-use boundary");
+        AssertSourceMatches(
+            tryUseRagingStrikes,
+            @"\bif\s*\(\s*!\s*CanLateWeave\s*\)\s*return\s+false\s*;.*?return\s+CanStartBurstWithRagingStrikes\(out\s+act\)\s*;",
+            "TryUseRagingStrikes should keep current weave timing at the action-use boundary");
+    }
+
     static void BardAscendedApexUsesPlannedKillTimeOverSongFallback()
     {
         AssertTrue(
@@ -349,6 +418,7 @@ internal static partial class PvETestSuite
     static void BardAscendedRuntimeDoesNotCacheLevelSyncedChoices()
     {
         var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
+        var potionCondition = ExtractMethodBody(source, "override bool IsConditionMet");
 
         AssertSourceDoesNotMatch(
             source,
@@ -403,11 +473,11 @@ internal static partial class PvETestSuite
             @"\bpublic\s+bool\s+ShouldUsePotion\s*\(\s*BRD_Ascended\s+rotation\s*,\s*out\s+IAction\?\s+act\s*,\s*bool\s+clippingCheck\s*=\s*true\s*\)",
             "BRD Ascended potion conditions should receive the active rotation at runtime");
         AssertSourceDoesNotMatch(
-            source,
+            potionCondition,
             @"\bif\s*\(\s*InBurst\s*\)\s*return\s+true\s*;",
             "BRD Ascended nested potion conditions should not read instance burst state without an owner");
         AssertSourceMatches(
-            source,
+            potionCondition,
             @"\bif\s*\(\s*_rotation\?\.InBurst\s*==\s*true\s*\)\s*return\s+true\s*;",
             "BRD Ascended nested potion conditions should read burst state from the active rotation context");
         AssertSourceMatches(
