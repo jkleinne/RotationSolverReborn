@@ -213,6 +213,12 @@ public sealed class BRD_Ascended : BardRotation
     [RotationConfig(CombatType.PvE, Name = "Enable PrepullHeartbreak Shot? - Use with BMR Auto Attack Manager")]
     private bool EnablePrepullHeartbreakShot { get; set; } = true;
 
+    [RotationConfig(CombatType.PvE, Name = "Use Warden's Paean on other players")]
+    private bool UseWardenPaeanOnParty { get; set; } = true;
+
+    [RotationConfig(CombatType.PvE, Name = "Prevent the use of defense abilities during burst")]
+    private bool PreventDefenseDuringBurst { get; set; } = true;
+
     private static readonly BardAscendedPotions AscendedPotions = new();
 
     [RotationConfig(CombatType.PvE, Name = "Enable Potion Usage")]
@@ -338,6 +344,13 @@ public sealed class BRD_Ascended : BardRotation
     {
         RefreshCombatCycleState();
         act = null;
+
+        if (StatusHelper.PlayerHasStatus(false, StatusID.Doom)
+            && TheWardensPaeanPvE.CanUse(out act))
+        {
+            return true;
+        }
+
         if (TryUseOpenerAbility(out act)) return true;
         if (AscendedPotions.ShouldUsePotion(this, out act)) return true;
 
@@ -348,6 +361,39 @@ public sealed class BRD_Ascended : BardRotation
                || TryUseBarrage(out act)
                || TryUsePitchPerfect(out act)
                || base.EmergencyAbility(nextGCD, out act);
+    }
+
+    [RotationDesc(ActionID.TheWardensPaeanPvE)]
+    protected override bool DispelAbility(IAction nextGCD, out IAction? act)
+    {
+        if (UseWardenPaeanOnParty && TheWardensPaeanPvE.CanUse(out act))
+        {
+            return true;
+        }
+
+        return base.DispelAbility(nextGCD, out act);
+    }
+
+    [RotationDesc(ActionID.NaturesMinnePvE)]
+    protected override bool HealSingleAbility(IAction nextGCD, out IAction? act)
+    {
+        if (NaturesMinnePvE.CanUse(out act))
+        {
+            return true;
+        }
+
+        return base.HealSingleAbility(nextGCD, out act);
+    }
+
+    [RotationDesc(ActionID.TroubadourPvE)]
+    protected override bool DefenseAreaAbility(IAction nextGCD, out IAction? act)
+    {
+        if ((!PreventDefenseDuringBurst || !InBurst) && TroubadourPvE.CanUse(out act))
+        {
+            return true;
+        }
+
+        return base.DefenseAreaAbility(nextGCD, out act);
     }
 
     protected override bool GeneralAbility(IAction nextGCD, out IAction? act)

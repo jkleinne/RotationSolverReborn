@@ -423,6 +423,40 @@ internal static partial class PvETestSuite
             "no-song starts should keep normal opener behavior");
     }
 
+    static void BardAscendedRuntimeUsesSupportActionHooks()
+    {
+        var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
+        var emergencyAbility = ExtractMethodBody(source, "EmergencyAbility");
+        var dispelAbility = ExtractMethodBody(source, "DispelAbility");
+        var healSingleAbility = ExtractMethodBody(source, "HealSingleAbility");
+        var defenseAreaAbility = ExtractMethodBody(source, "DefenseAreaAbility");
+
+        AssertSourceMatches(
+            source,
+            @"\bprivate\s+bool\s+UseWardenPaeanOnParty\s*\{\s*get;\s*set;\s*\}\s*=\s*true\s*;",
+            "BRD Ascended should expose configurable party Warden's Paean usage");
+        AssertSourceMatches(
+            source,
+            @"\bprivate\s+bool\s+PreventDefenseDuringBurst\s*\{\s*get;\s*set;\s*\}\s*=\s*true\s*;",
+            "BRD Ascended should expose configurable Troubadour burst protection");
+        AssertSourceMatches(
+            emergencyAbility,
+            @"StatusHelper\.PlayerHasStatus\s*\(\s*false\s*,\s*StatusID\.Doom\s*\).*?TheWardensPaeanPvE\.CanUse\s*\(\s*out\s+act\s*\)\s*\)\s*\{\s*return\s+true\s*;\s*\}\s*if\s*\(\s*TryUseOpenerAbility",
+            "BRD Ascended should spend Warden's Paean on self Doom before DPS emergency actions");
+        AssertSourceMatches(
+            dispelAbility,
+            @"UseWardenPaeanOnParty\s*&&\s*TheWardensPaeanPvE\.CanUse\s*\(\s*out\s+act\s*\)\s*\)\s*\{\s*return\s+true\s*;\s*\}\s*return\s+base\.DispelAbility\s*\(\s*nextGCD\s*,\s*out\s+act\s*\)",
+            "BRD Ascended should use Warden's Paean from the dispel hook");
+        AssertSourceMatches(
+            healSingleAbility,
+            @"NaturesMinnePvE\.CanUse\s*\(\s*out\s+act\s*\)\s*\)\s*\{\s*return\s+true\s*;\s*\}\s*return\s+base\.HealSingleAbility\s*\(\s*nextGCD\s*,\s*out\s+act\s*\)",
+            "BRD Ascended should use Nature's Minne from the single-target heal hook");
+        AssertSourceMatches(
+            defenseAreaAbility,
+            @"\(\s*!\s*PreventDefenseDuringBurst\s*\|\|\s*!\s*InBurst\s*\)\s*&&\s*TroubadourPvE\.CanUse\s*\(\s*out\s+act\s*\)\s*\)\s*\{\s*return\s+true\s*;\s*\}\s*return\s+base\.DefenseAreaAbility\s*\(\s*nextGCD\s*,\s*out\s+act\s*\)",
+            "BRD Ascended should use Troubadour from the area defense hook while respecting burst protection");
+    }
+
     static void BardAscendedFirstCycleStartsOnCombatEntryAndTimerReset()
     {
         AssertTrue(
