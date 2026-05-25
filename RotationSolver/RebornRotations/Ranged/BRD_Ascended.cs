@@ -1056,7 +1056,13 @@ public sealed class BRD_Ascended : BardRotation
         if (IsInSandbagMode) return false;
         if (TryUseAoE(out act)) return true;
         if (TryUseEnhancedFiller(out act)) return true;
-        if (!BardAscendedDecisionPolicy.ShouldUseFiller(CanUseEnhancedFiller, HasResonantArrow)) return false;
+        if (!BardAscendedDecisionPolicy.ShouldUseFiller(
+                hasEnhancedFiller: false,
+                hasResonantReady: HasResonantArrow))
+        {
+            return false;
+        }
+
         return ActiveFiller.CanUse(out act, skipComboCheck: true);
     }
 

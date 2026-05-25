@@ -328,6 +328,21 @@ internal static partial class PvETestSuite
             "filler should wait when both higher value actions are available");
     }
 
+    static void BardAscendedRuntimeFallsBackWhenEnhancedFillerCannotResolve()
+    {
+        var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
+        var filler = ExtractMethodBody(source, "bool TryUseFiller");
+
+        AssertSourceMatches(
+            filler,
+            @"\bif\s*\(\s*TryUseEnhancedFiller\s*\(\s*out\s+act\s*\)\s*\)\s*return\s+true\s*;.*?\bBardAscendedDecisionPolicy\.ShouldUseFiller\s*\(\s*hasEnhancedFiller:\s*false\s*,\s*hasResonantReady:\s*HasResonantArrow\s*\).*?\bActiveFiller\.CanUse\s*\(\s*out\s+act\s*,\s*skipComboCheck:\s*true\s*\)",
+            "BRD Ascended should let normal filler recover when enhanced filler status exists but the proc action cannot be selected");
+        AssertSourceDoesNotMatch(
+            filler,
+            @"\bBardAscendedDecisionPolicy\.ShouldUseFiller\s*\(\s*CanUseEnhancedFiller\s*,\s*HasResonantArrow\s*\)",
+            "BRD Ascended should not block normal filler solely because an enhanced filler status exists");
+    }
+
     static void BardAscendedAoeThresholdsDistinguishGcdAndOgcd()
     {
         AssertFalse(BardAscendedDecisionPolicy.ShouldUseGcdAoE(1), "GCD AoE should reject one target");

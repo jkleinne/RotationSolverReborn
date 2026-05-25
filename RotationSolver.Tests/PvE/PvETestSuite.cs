@@ -14,6 +14,7 @@ internal static partial class PvETestSuite
         new("bard ascended apex uses planned kill time over song fallback", BardAscendedApexUsesPlannedKillTimeOverSongFallback),
         new("bard ascended blast arrow waits for urgent gcds", BardAscendedBlastArrowWaitsForUrgentGcds),
         new("bard ascended filler waits for enhanced filler or resonant ready", BardAscendedFillerWaitsForEnhancedFillerOrResonantReady),
+        new("bard ascended runtime falls back when enhanced filler cannot resolve", BardAscendedRuntimeFallsBackWhenEnhancedFillerCannotResolve),
         new("bard ascended aoe thresholds distinguish gcd and ogcd", BardAscendedAoeThresholdsDistinguishGcdAndOgcd),
         new("bard ascended runtime uses resolved aoe target counts", BardAscendedRuntimeUsesResolvedAoeTargetCounts),
         new("bard ascended first cycle starts on combat entry and timer reset", BardAscendedFirstCycleStartsOnCombatEntryAndTimerReset),
