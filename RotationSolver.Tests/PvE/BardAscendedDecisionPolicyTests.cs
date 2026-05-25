@@ -383,6 +383,46 @@ internal static partial class PvETestSuite
             "Rain of Death should assign only resolved targets that pass the Ascended oGCD AoE threshold");
     }
 
+    static void BardAscendedDirtyStartRecoveryOnlyUsesDungeonSongStarts()
+    {
+        AssertTrue(
+            BardAscendedDecisionPolicy.ShouldUseDirtyStartRecovery(
+                enablePlannedFightMode: false,
+                isFirstCycle: true,
+                BardAscendedSongPhase.MagesBallad),
+            "Mage's Ballad first-cycle dungeon starts should enter dirty-start recovery");
+        AssertTrue(
+            BardAscendedDecisionPolicy.ShouldUseDirtyStartRecovery(
+                enablePlannedFightMode: false,
+                isFirstCycle: true,
+                BardAscendedSongPhase.ArmysPaeon),
+            "Army's Paeon first-cycle dungeon starts should enter dirty-start recovery");
+        AssertFalse(
+            BardAscendedDecisionPolicy.ShouldUseDirtyStartRecovery(
+                enablePlannedFightMode: true,
+                isFirstCycle: true,
+                BardAscendedSongPhase.MagesBallad),
+            "planned fight mode should preserve strict opener alignment");
+        AssertFalse(
+            BardAscendedDecisionPolicy.ShouldUseDirtyStartRecovery(
+                enablePlannedFightMode: false,
+                isFirstCycle: false,
+                BardAscendedSongPhase.MagesBallad),
+            "later song cycles should not enter dirty-start recovery");
+        AssertFalse(
+            BardAscendedDecisionPolicy.ShouldUseDirtyStartRecovery(
+                enablePlannedFightMode: false,
+                isFirstCycle: true,
+                BardAscendedSongPhase.WanderersMinuet),
+            "Wanderer's Minuet starts should keep normal opener behavior");
+        AssertFalse(
+            BardAscendedDecisionPolicy.ShouldUseDirtyStartRecovery(
+                enablePlannedFightMode: false,
+                isFirstCycle: true,
+                BardAscendedSongPhase.None),
+            "no-song starts should keep normal opener behavior");
+    }
+
     static void BardAscendedFirstCycleStartsOnCombatEntryAndTimerReset()
     {
         AssertTrue(

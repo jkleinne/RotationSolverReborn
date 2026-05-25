@@ -225,6 +225,18 @@ internal static class BardAscendedDecisionPolicy
         return isInCombat && (!hasCombatState || currentCombatTime < previousCombatTime);
     }
 
+    internal static bool ShouldUseDirtyStartRecovery(
+        bool enablePlannedFightMode,
+        bool isFirstCycle,
+        BardAscendedSongPhase songPhase)
+    {
+        if (enablePlannedFightMode) return false;
+        if (!isFirstCycle) return false;
+
+        return songPhase is BardAscendedSongPhase.MagesBallad
+            or BardAscendedSongPhase.ArmysPaeon;
+    }
+
     internal static ReadOnlySpan<float> GetPotionTimings(BardAscendedPotionTiming timing, float[]? customTimings)
     {
         return timing switch
