@@ -143,9 +143,17 @@ public sealed class BRD_Ascended : BardRotation
     private static bool IsFirstCycle { get; set; }
     private static bool HasCombatCycleState { get; set; }
     private static float LastCombatTimeRaw { get; set; }
+    private enum BardAscendedDirtyStartRecoveryState
+    {
+        Inactive,
+        Armed,
+        BurstStarted
+    }
+
     private BardAscendedOpenerState _openerState = BardAscendedOpenerState.Start(BardAscendedSongTiming.Standard);
     private bool _isStrictOpenerActive;
     private bool _hasStrictOpenerEndedThisCycle;
+    private BardAscendedDirtyStartRecoveryState _dirtyStartRecoveryState;
     private float _lastCountdownRemainTime;
 
     #endregion
@@ -212,6 +220,12 @@ public sealed class BRD_Ascended : BardRotation
 
     [RotationConfig(CombatType.PvE, Name = "Enable PrepullHeartbreak Shot? - Use with BMR Auto Attack Manager")]
     private bool EnablePrepullHeartbreakShot { get; set; } = true;
+
+    [RotationConfig(CombatType.PvE, Name = "Use Warden's Paean on other players")]
+    private bool UseWardenPaeanOnParty { get; set; } = true;
+
+    [RotationConfig(CombatType.PvE, Name = "Prevent the use of defense abilities during burst")]
+    private bool PreventDefenseDuringBurst { get; set; } = true;
 
     private static readonly BardAscendedPotions AscendedPotions = new();
 
@@ -338,6 +352,13 @@ public sealed class BRD_Ascended : BardRotation
     {
         RefreshCombatCycleState();
         act = null;
+
+        if (StatusHelper.PlayerHasStatus(false, StatusID.Doom)
+            && TheWardensPaeanPvE.CanUse(out act))
+        {
+            return true;
+        }
+
         if (TryUseOpenerAbility(out act)) return true;
         if (AscendedPotions.ShouldUsePotion(this, out act)) return true;
 
@@ -348,6 +369,39 @@ public sealed class BRD_Ascended : BardRotation
                || TryUseBarrage(out act)
                || TryUsePitchPerfect(out act)
                || base.EmergencyAbility(nextGCD, out act);
+    }
+
+    [RotationDesc(ActionID.TheWardensPaeanPvE)]
+    protected override bool DispelAbility(IAction nextGCD, out IAction? act)
+    {
+        if (UseWardenPaeanOnParty && TheWardensPaeanPvE.CanUse(out act))
+        {
+            return true;
+        }
+
+        return base.DispelAbility(nextGCD, out act);
+    }
+
+    [RotationDesc(ActionID.NaturesMinnePvE)]
+    protected override bool HealSingleAbility(IAction nextGCD, out IAction? act)
+    {
+        if (NaturesMinnePvE.CanUse(out act))
+        {
+            return true;
+        }
+
+        return base.HealSingleAbility(nextGCD, out act);
+    }
+
+    [RotationDesc(ActionID.TroubadourPvE)]
+    protected override bool DefenseAreaAbility(IAction nextGCD, out IAction? act)
+    {
+        if ((!PreventDefenseDuringBurst || (!InBurst && !IsDirtyStartRecoveryBurstWindow)) && TroubadourPvE.CanUse(out act))
+        {
+            return true;
+        }
+
+        return base.DefenseAreaAbility(nextGCD, out act);
     }
 
     protected override bool GeneralAbility(IAction nextGCD, out IAction? act)
@@ -458,6 +512,73 @@ public sealed class BRD_Ascended : BardRotation
         _isStrictOpenerActive = false;
         _hasStrictOpenerEndedThisCycle = true;
     }
+
+    private void StartDirtyStartRecoveryIfNeeded()
+    {
+        if (!BardAscendedDecisionPolicy.ShouldUseDirtyStartRecovery(
+                EnablePlannedFightMode,
+                IsFirstCycle,
+                CurrentSongPhase))
+        {
+            return;
+        }
+
+        _dirtyStartRecoveryState = BardAscendedDirtyStartRecoveryState.Armed;
+        EndStrictOpener();
+    }
+
+    private void ResetDirtyStartRecovery()
+    {
+        _dirtyStartRecoveryState = BardAscendedDirtyStartRecoveryState.Inactive;
+    }
+
+    private void ClearDirtyStartRecoveryIfResolved()
+    {
+        if (!IsDirtyStartRecoveryActive) return;
+
+        if (_dirtyStartRecoveryState is BardAscendedDirtyStartRecoveryState.Armed)
+        {
+            if (InWanderers) ResetDirtyStartRecovery();
+            return;
+        }
+
+        if (!PlayerHasAnyDirtyStartRecoveryBurstStatus() && !WasLastDirtyStartRecoveryBurstAction())
+        {
+            ResetDirtyStartRecovery();
+        }
+    }
+
+    private void MarkDirtyStartRecoveryBurstStarted()
+    {
+        if (IsDirtyStartRecoveryActive)
+        {
+            _dirtyStartRecoveryState = BardAscendedDirtyStartRecoveryState.BurstStarted;
+        }
+    }
+
+    private bool PlayerHasAnyDirtyStartRecoveryBurstStatus()
+    {
+        return HasRagingStrikes || HasBattleVoice || HasRadiantFinale;
+    }
+
+    private bool WasLastDirtyStartRecoveryBurstAction()
+    {
+        return IsLastAbility(ActionID.RadiantFinalePvE)
+            || IsLastAbility(ActionID.BattleVoicePvE)
+            || IsLastAbility(ActionID.RagingStrikesPvE);
+    }
+
+    private bool IsDirtyStartRecoveryActive =>
+        _dirtyStartRecoveryState is not BardAscendedDirtyStartRecoveryState.Inactive;
+
+    private bool IsDirtyStartRecoveryBurstWindow =>
+        IsDirtyStartRecoveryActive
+        && (_dirtyStartRecoveryState is BardAscendedDirtyStartRecoveryState.BurstStarted
+            || PlayerHasAnyDirtyStartRecoveryBurstStatus()
+            || WasLastDirtyStartRecoveryBurstAction());
+
+    private bool CanUseDirtyStartRecoveryRadiantEncore =>
+        IsDirtyStartRecoveryBurstWindow && IsLastAbility(ActionID.RadiantFinalePvE);
 
     private static bool ShouldUseCountdownPotionFallback()
     {
@@ -644,6 +765,7 @@ public sealed class BRD_Ascended : BardRotation
             var hadCombatCycleState = HasCombatCycleState;
             HasCombatCycleState = false;
             LastCombatTimeRaw = 0f;
+            ResetDirtyStartRecovery();
             if (hadCombatCycleState && Service.CountDownTime <= 0f)
             {
                 ResetStrictOpenerTracking();
@@ -658,12 +780,14 @@ public sealed class BRD_Ascended : BardRotation
                 previousCombatTime: LastCombatTimeRaw))
         {
             IsFirstCycle = true;
-            if (!_isStrictOpenerActive)
+            StartDirtyStartRecoveryIfNeeded();
+            if (!_isStrictOpenerActive && !IsDirtyStartRecoveryActive)
             {
                 StartStrictOpener();
             }
         }
 
+        ClearDirtyStartRecoveryIfResolved();
         HasCombatCycleState = true;
         LastCombatTimeRaw = DataCenter.CombatTimeRaw;
     }
@@ -803,7 +927,7 @@ public sealed class BRD_Ascended : BardRotation
     private bool TryUseBurst(out IAction? act)
     {
         act = null;
-        if (!InBurst) return false;
+        if (!InBurst && !IsDirtyStartRecoveryBurstWindow) return false;
         if (TryUseRadiantEncore(out act)) return true;
         if (TryUseApexArrow(out act) || TryUseBlastArrow(out act)) return true;
         if (TryUseResonantArrow(out act)) return true;
@@ -861,7 +985,8 @@ public sealed class BRD_Ascended : BardRotation
     private bool TryUseRadiantEncore(out IAction? act)
     {
         act = null;
-        if (!HasRadiantFinale || !InBurst) return false;
+        if (!HasRadiantFinale && !CanUseDirtyStartRecoveryRadiantEncore) return false;
+        if (!InBurst && !IsDirtyStartRecoveryBurstWindow) return false;
         return RadiantEncorePvE.CanUse(out act, skipComboCheck: true);
     }
 
@@ -946,7 +1071,7 @@ public sealed class BRD_Ascended : BardRotation
     private bool TryUseBarrage(out IAction? act)
     {
         act = null;
-        if (IsInSandbagMode || !InBurst) return false;
+        if (IsInSandbagMode || (!InBurst && !IsDirtyStartRecoveryBurstWindow)) return false;
 
         if (HasHawksEye && !BurstEndGCD(3)) return false;
 
@@ -1159,7 +1284,7 @@ public sealed class BRD_Ascended : BardRotation
     {
         act = null;
         if (!CanBurst) return false;
-        if (!InWanderers) return false;
+        if (!InWanderers && !IsDirtyStartRecoveryActive) return false;
 
         if (UsesStandardBurstPath)
         {
@@ -1184,14 +1309,20 @@ public sealed class BRD_Ascended : BardRotation
         act = null;
         if (Is369 && (IsFirstCycle ? !CanLateWeave : !CanEarlyWeave)) return false;
 
-        return CanStartBurstWithRadiantFinale(out act);
+        if (CanStartBurstWithRadiantFinale(out act))
+        {
+            MarkDirtyStartRecoveryBurstStarted();
+            return true;
+        }
+
+        return false;
     }
 
     private bool CanStartBurstWithBattleVoice(out IAction? act)
     {
         act = null;
         if (!CanBurst) return false;
-        if (!InWanderers && RadiantFinalePvE.EnoughLevel) return false;
+        if (!InWanderers && RadiantFinalePvE.EnoughLevel && !IsDirtyStartRecoveryActive) return false;
         var shouldWaitForRadiantFinale = BardAscendedDecisionPolicy.ShouldWaitForRadiantFinaleBeforeBattleVoice(
             RadiantFinalePvE.EnoughLevel,
             RadiantFinalePvE.CanUse(out _),
@@ -1222,7 +1353,13 @@ public sealed class BRD_Ascended : BardRotation
         if (UsesStandardBurstPath && !CanLateWeave) return false;
         if (Is369 && (IsFirstCycle ? !CanEarlyWeave : !CanLateWeave)) return false;
 
-        return CanStartBurstWithBattleVoice(out act);
+        if (CanStartBurstWithBattleVoice(out act))
+        {
+            MarkDirtyStartRecoveryBurstStarted();
+            return true;
+        }
+
+        return false;
     }
 
     private bool CanStartBurstWithRagingStrikes(out IAction? act)
@@ -1251,7 +1388,13 @@ public sealed class BRD_Ascended : BardRotation
         act = null;
         if (!CanLateWeave) return false;
 
-        return CanStartBurstWithRagingStrikes(out act);
+        if (CanStartBurstWithRagingStrikes(out act))
+        {
+            MarkDirtyStartRecoveryBurstStarted();
+            return true;
+        }
+
+        return false;
     }
 
     #endregion
