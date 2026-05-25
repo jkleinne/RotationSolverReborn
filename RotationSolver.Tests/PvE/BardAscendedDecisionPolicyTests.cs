@@ -205,15 +205,15 @@ internal static partial class PvETestSuite
             "pending Raging Strikes burst entry should not depend on the current weave slot");
         AssertSourceMatches(
             tryUseRadiantFinale,
-            @"\bif\s*\(\s*Is369\s*&&\s*\(\s*IsFirstCycle\s*\?\s*!\s*CanLateWeave\s*:\s*!\s*CanEarlyWeave\s*\)\s*\)\s*return\s+false\s*;.*?return\s+CanStartBurstWithRadiantFinale\(out\s+act\)\s*;",
+            @"\bif\s*\(\s*Is369\s*&&\s*\(\s*IsFirstCycle\s*\?\s*!\s*CanLateWeave\s*:\s*!\s*CanEarlyWeave\s*\)\s*\)\s*return\s+false\s*;.*?if\s*\(\s*CanStartBurstWithRadiantFinale\(out\s+act\)\s*\)\s*\{.*?MarkDirtyStartRecoveryBurstStarted\s*\(\s*\)\s*;.*?return\s+true\s*;.*?\}.*?return\s+false\s*;",
             "TryUseRadiantFinale should keep 3 6 9 weave timing at the action-use boundary");
         AssertSourceMatches(
             tryUseBattleVoice,
-            @"\bif\s*\(\s*UsesStandardBurstPath\s*&&\s*!\s*CanLateWeave\s*\)\s*return\s+false\s*;.*?if\s*\(\s*Is369\s*&&\s*\(\s*IsFirstCycle\s*\?\s*!\s*CanEarlyWeave\s*:\s*!\s*CanLateWeave\s*\)\s*\)\s*return\s+false\s*;.*?return\s+CanStartBurstWithBattleVoice\(out\s+act\)\s*;",
+            @"\bif\s*\(\s*UsesStandardBurstPath\s*&&\s*!\s*CanLateWeave\s*\)\s*return\s+false\s*;.*?if\s*\(\s*Is369\s*&&\s*\(\s*IsFirstCycle\s*\?\s*!\s*CanEarlyWeave\s*:\s*!\s*CanLateWeave\s*\)\s*\)\s*return\s+false\s*;.*?if\s*\(\s*CanStartBurstWithBattleVoice\(out\s+act\)\s*\)\s*\{.*?MarkDirtyStartRecoveryBurstStarted\s*\(\s*\)\s*;.*?return\s+true\s*;.*?\}.*?return\s+false\s*;",
             "TryUseBattleVoice should keep weave timing at the action-use boundary");
         AssertSourceMatches(
             tryUseRagingStrikes,
-            @"\bif\s*\(\s*!\s*CanLateWeave\s*\)\s*return\s+false\s*;.*?return\s+CanStartBurstWithRagingStrikes\(out\s+act\)\s*;",
+            @"\bif\s*\(\s*!\s*CanLateWeave\s*\)\s*return\s+false\s*;.*?if\s*\(\s*CanStartBurstWithRagingStrikes\(out\s+act\)\s*\)\s*\{.*?MarkDirtyStartRecoveryBurstStarted\s*\(\s*\)\s*;.*?return\s+true\s*;.*?\}.*?return\s+false\s*;",
             "TryUseRagingStrikes should keep current weave timing at the action-use boundary");
     }
 
@@ -455,6 +455,80 @@ internal static partial class PvETestSuite
             defenseAreaAbility,
             @"\(\s*!\s*PreventDefenseDuringBurst\s*\|\|\s*!\s*InBurst\s*\)\s*&&\s*TroubadourPvE\.CanUse\s*\(\s*out\s+act\s*\)\s*\)\s*\{\s*return\s+true\s*;\s*\}\s*return\s+base\.DefenseAreaAbility\s*\(\s*nextGCD\s*,\s*out\s+act\s*\)",
             "BRD Ascended should use Troubadour from the area defense hook while respecting burst protection");
+    }
+
+    static void BardAscendedRuntimeRecoversDirtySongStartsBeforePriority()
+    {
+        var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
+        var refreshCombatCycle = ExtractMethodBody(source, "void RefreshCombatCycleState");
+        var startDirtyRecovery = ExtractMethodBody(source, "void StartDirtyStartRecoveryIfNeeded");
+        var clearDirtyRecovery = ExtractMethodBody(source, "void ClearDirtyStartRecoveryIfResolved");
+        var tryUseBurst = ExtractMethodBody(source, "bool TryUseBurst");
+        var tryUseRadiantEncore = ExtractMethodBody(source, "bool TryUseRadiantEncore");
+        var tryUseBarrage = ExtractMethodBody(source, "bool TryUseBarrage");
+        var tryUseRadiantFinale = ExtractMethodBody(source, "bool TryUseRadiantFinale");
+        var tryUseBattleVoice = ExtractMethodBody(source, "bool TryUseBattleVoice");
+        var tryUseRagingStrikes = ExtractMethodBody(source, "bool TryUseRagingStrikes");
+        var generalGcd = ExtractMethodBody(source, "bool GeneralGCD");
+        var radiantFinaleGate = ExtractMethodBody(source, "bool CanStartBurstWithRadiantFinale");
+        var battleVoiceGate = ExtractMethodBody(source, "bool CanStartBurstWithBattleVoice");
+
+        AssertSourceMatches(
+            source,
+            @"\bprivate\s+bool\s+_isDirtyStartRecoveryActive\s*;",
+            "BRD Ascended should track active dirty-start recovery");
+        AssertSourceMatches(
+            source,
+            @"\bprivate\s+bool\s+_hasDirtyStartRecoveryBurstStarted\s*;",
+            "BRD Ascended should track when the recovered burst window has started");
+        AssertSourceMatches(
+            refreshCombatCycle,
+            @"StartDirtyStartRecoveryIfNeeded\s*\(\s*\)\s*;.*?if\s*\(\s*!\s*_isStrictOpenerActive\s*&&\s*!\s*_isDirtyStartRecoveryActive\s*\)\s*\{?\s*StartStrictOpener\s*\(\s*\)",
+            "dirty-start recovery should run before strict opener can restart");
+        AssertSourceMatches(
+            startDirtyRecovery,
+            @"ShouldUseDirtyStartRecovery\s*\(\s*EnablePlannedFightMode\s*,\s*IsFirstCycle\s*,\s*CurrentSongPhase\s*\).*?_isDirtyStartRecoveryActive\s*=\s*true\s*;.*?_hasDirtyStartRecoveryBurstStarted\s*=\s*false\s*;.*?EndStrictOpener\s*\(\s*\)",
+            "dirty-start recovery should be policy-gated and end strict opener tracking");
+        AssertSourceMatches(
+            clearDirtyRecovery,
+            @"if\s*\(\s*!\s*_hasDirtyStartRecoveryBurstStarted\s*\)\s*\{.*?if\s*\(\s*InWanderers\s*\)\s*ResetDirtyStartRecovery\s*\(\s*\).*?return\s*;.*?if\s*\(\s*!\s*PlayerHasAnyDirtyStartRecoveryBurstStatus\s*\(\s*\)\s*&&\s*!\s*WasLastDirtyStartRecoveryBurstAction\s*\(\s*\)\s*\)\s*\{.*?ResetDirtyStartRecovery\s*\(\s*\)",
+            "dirty-start recovery should clear on Wanderer's recovery or after the recovered burst window ends");
+        AssertSourceMatches(
+            radiantFinaleGate,
+            @"if\s*\(\s*!\s*InWanderers\s*&&\s*!\s*_isDirtyStartRecoveryActive\s*\)\s*return\s+false\s*;",
+            "Radiant Finale should only loosen Wanderer's alignment during dirty-start recovery");
+        AssertSourceMatches(
+            battleVoiceGate,
+            @"if\s*\(\s*!\s*InWanderers\s*&&\s*RadiantFinalePvE\.EnoughLevel\s*&&\s*!\s*_isDirtyStartRecoveryActive\s*\)\s*return\s+false\s*;",
+            "Battle Voice should only loosen Wanderer's alignment during dirty-start recovery");
+        AssertSourceMatches(
+            tryUseRadiantFinale,
+            @"CanStartBurstWithRadiantFinale\s*\(\s*out\s+act\s*\).*?MarkDirtyStartRecoveryBurstStarted\s*\(\s*\).*?return\s+true",
+            "Radiant Finale should mark the recovered burst window after action selection");
+        AssertSourceMatches(
+            tryUseBattleVoice,
+            @"CanStartBurstWithBattleVoice\s*\(\s*out\s+act\s*\).*?MarkDirtyStartRecoveryBurstStarted\s*\(\s*\).*?return\s+true",
+            "Battle Voice should mark the recovered burst window after action selection");
+        AssertSourceMatches(
+            tryUseRagingStrikes,
+            @"CanStartBurstWithRagingStrikes\s*\(\s*out\s+act\s*\).*?MarkDirtyStartRecoveryBurstStarted\s*\(\s*\).*?return\s+true",
+            "Raging Strikes should mark the recovered burst window after action selection");
+        AssertSourceMatches(
+            tryUseBarrage,
+            @"if\s*\(\s*IsInSandbagMode\s*\|\|\s*\(\s*!\s*InBurst\s*&&\s*!\s*IsDirtyStartRecoveryBurstWindow\s*\)\s*\)\s*return\s+false\s*;",
+            "Barrage should only loosen its burst requirement during the recovered burst window");
+        AssertSourceMatches(
+            tryUseRadiantEncore,
+            @"if\s*\(\s*!\s*HasRadiantFinale\s*&&\s*!\s*CanUseDirtyStartRecoveryRadiantEncore\s*\)\s*return\s+false\s*;.*?if\s*\(\s*!\s*InBurst\s*&&\s*!\s*IsDirtyStartRecoveryBurstWindow\s*\)\s*return\s+false\s*;",
+            "Radiant Encore should only loosen its burst requirement during the recovered burst window");
+        AssertSourceMatches(
+            tryUseBurst,
+            @"if\s*\(\s*!\s*InBurst\s*&&\s*!\s*IsDirtyStartRecoveryBurstWindow\s*\)\s*return\s+false\s*;",
+            "burst GCD priority should be available during the recovered burst window");
+        AssertSourceMatches(
+            generalGcd,
+            @"\bif\s*\(\s*TryUseResonantArrow\s*\(\s*out\s+act\s*\)\s*\)\s*return\s+true\s*;.*?return\s+TryUseFiller",
+            "Resonant Arrow should remain available outside the full InBurst gate");
     }
 
     static void BardAscendedFirstCycleStartsOnCombatEntryAndTimerReset()
@@ -1126,7 +1200,7 @@ internal static partial class PvETestSuite
             "BRD Ascended should disable opener requests after completion or break");
         AssertSourceMatches(
             refreshCombatCycle,
-            @"\bIsFirstCycle\s*=\s*true\s*;.*?\bif\s*\(\s*!\s*_isStrictOpenerActive\s*\)\s*\{?\s*StartStrictOpener\s*\(\s*\)",
+            @"\bIsFirstCycle\s*=\s*true\s*;.*?StartDirtyStartRecoveryIfNeeded\s*\(\s*\)\s*;.*?\bif\s*\(\s*!\s*_isStrictOpenerActive\s*&&\s*!\s*_isDirtyStartRecoveryActive\s*\)\s*\{?\s*StartStrictOpener\s*\(\s*\)",
             "BRD Ascended should preserve countdown opener state when combat starts");
     }
 
