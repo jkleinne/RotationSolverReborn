@@ -453,8 +453,8 @@ internal static partial class PvETestSuite
             "BRD Ascended should use Nature's Minne from the single-target heal hook");
         AssertSourceMatches(
             defenseAreaAbility,
-            @"\(\s*!\s*PreventDefenseDuringBurst\s*\|\|\s*!\s*InBurst\s*\)\s*&&\s*TroubadourPvE\.CanUse\s*\(\s*out\s+act\s*\)\s*\)\s*\{\s*return\s+true\s*;\s*\}\s*return\s+base\.DefenseAreaAbility\s*\(\s*nextGCD\s*,\s*out\s+act\s*\)",
-            "BRD Ascended should use Troubadour from the area defense hook while respecting burst protection");
+            @"\(\s*!\s*PreventDefenseDuringBurst\s*\|\|\s*\(\s*!\s*InBurst\s*&&\s*!\s*IsDirtyStartRecoveryBurstWindow\s*\)\s*\)\s*&&\s*TroubadourPvE\.CanUse\s*\(\s*out\s+act\s*\)\s*\)\s*\{\s*return\s+true\s*;\s*\}\s*return\s+base\.DefenseAreaAbility\s*\(\s*nextGCD\s*,\s*out\s+act\s*\)",
+            "BRD Ascended should use Troubadour from the area defense hook while respecting all burst windows");
     }
 
     static void BardAscendedRuntimeRecoversDirtySongStartsBeforePriority()
@@ -475,31 +475,31 @@ internal static partial class PvETestSuite
 
         AssertSourceMatches(
             source,
-            @"\bprivate\s+bool\s+_isDirtyStartRecoveryActive\s*;",
-            "BRD Ascended should track active dirty-start recovery");
+            @"\bprivate\s+enum\s+BardAscendedDirtyStartRecoveryState\s*\{[^}]*\bInactive\b[^}]*\bArmed\b[^}]*\bBurstStarted\b[^}]*\}",
+            "BRD Ascended should model dirty-start recovery state explicitly");
         AssertSourceMatches(
             source,
-            @"\bprivate\s+bool\s+_hasDirtyStartRecoveryBurstStarted\s*;",
-            "BRD Ascended should track when the recovered burst window has started");
+            @"\bprivate\s+BardAscendedDirtyStartRecoveryState\s+_dirtyStartRecoveryState\s*;",
+            "BRD Ascended should own the dirty-start recovery state in one field");
         AssertSourceMatches(
             refreshCombatCycle,
-            @"StartDirtyStartRecoveryIfNeeded\s*\(\s*\)\s*;.*?if\s*\(\s*!\s*_isStrictOpenerActive\s*&&\s*!\s*_isDirtyStartRecoveryActive\s*\)\s*\{?\s*StartStrictOpener\s*\(\s*\)",
+            @"StartDirtyStartRecoveryIfNeeded\s*\(\s*\)\s*;.*?if\s*\(\s*!\s*_isStrictOpenerActive\s*&&\s*!\s*IsDirtyStartRecoveryActive\s*\)\s*\{?\s*StartStrictOpener\s*\(\s*\)",
             "dirty-start recovery should run before strict opener can restart");
         AssertSourceMatches(
             startDirtyRecovery,
-            @"ShouldUseDirtyStartRecovery\s*\(\s*EnablePlannedFightMode\s*,\s*IsFirstCycle\s*,\s*CurrentSongPhase\s*\).*?_isDirtyStartRecoveryActive\s*=\s*true\s*;.*?_hasDirtyStartRecoveryBurstStarted\s*=\s*false\s*;.*?EndStrictOpener\s*\(\s*\)",
+            @"ShouldUseDirtyStartRecovery\s*\(\s*EnablePlannedFightMode\s*,\s*IsFirstCycle\s*,\s*CurrentSongPhase\s*\).*?_dirtyStartRecoveryState\s*=\s*BardAscendedDirtyStartRecoveryState\.Armed\s*;.*?EndStrictOpener\s*\(\s*\)",
             "dirty-start recovery should be policy-gated and end strict opener tracking");
         AssertSourceMatches(
             clearDirtyRecovery,
-            @"if\s*\(\s*!\s*_hasDirtyStartRecoveryBurstStarted\s*\)\s*\{.*?if\s*\(\s*InWanderers\s*\)\s*ResetDirtyStartRecovery\s*\(\s*\).*?return\s*;.*?if\s*\(\s*!\s*PlayerHasAnyDirtyStartRecoveryBurstStatus\s*\(\s*\)\s*&&\s*!\s*WasLastDirtyStartRecoveryBurstAction\s*\(\s*\)\s*\)\s*\{.*?ResetDirtyStartRecovery\s*\(\s*\)",
+            @"if\s*\(\s*!\s*IsDirtyStartRecoveryActive\s*\)\s*return\s*;.*?if\s*\(\s*_dirtyStartRecoveryState\s+is\s+BardAscendedDirtyStartRecoveryState\.Armed\s*\)\s*\{.*?if\s*\(\s*InWanderers\s*\)\s*ResetDirtyStartRecovery\s*\(\s*\).*?return\s*;.*?if\s*\(\s*!\s*PlayerHasAnyDirtyStartRecoveryBurstStatus\s*\(\s*\)\s*&&\s*!\s*WasLastDirtyStartRecoveryBurstAction\s*\(\s*\)\s*\)\s*\{.*?ResetDirtyStartRecovery\s*\(\s*\)",
             "dirty-start recovery should clear on Wanderer's recovery or after the recovered burst window ends");
         AssertSourceMatches(
             radiantFinaleGate,
-            @"if\s*\(\s*!\s*InWanderers\s*&&\s*!\s*_isDirtyStartRecoveryActive\s*\)\s*return\s+false\s*;",
+            @"if\s*\(\s*!\s*InWanderers\s*&&\s*!\s*IsDirtyStartRecoveryActive\s*\)\s*return\s+false\s*;",
             "Radiant Finale should only loosen Wanderer's alignment during dirty-start recovery");
         AssertSourceMatches(
             battleVoiceGate,
-            @"if\s*\(\s*!\s*InWanderers\s*&&\s*RadiantFinalePvE\.EnoughLevel\s*&&\s*!\s*_isDirtyStartRecoveryActive\s*\)\s*return\s+false\s*;",
+            @"if\s*\(\s*!\s*InWanderers\s*&&\s*RadiantFinalePvE\.EnoughLevel\s*&&\s*!\s*IsDirtyStartRecoveryActive\s*\)\s*return\s+false\s*;",
             "Battle Voice should only loosen Wanderer's alignment during dirty-start recovery");
         AssertSourceMatches(
             tryUseRadiantFinale,
@@ -1200,7 +1200,7 @@ internal static partial class PvETestSuite
             "BRD Ascended should disable opener requests after completion or break");
         AssertSourceMatches(
             refreshCombatCycle,
-            @"\bIsFirstCycle\s*=\s*true\s*;.*?StartDirtyStartRecoveryIfNeeded\s*\(\s*\)\s*;.*?\bif\s*\(\s*!\s*_isStrictOpenerActive\s*&&\s*!\s*_isDirtyStartRecoveryActive\s*\)\s*\{?\s*StartStrictOpener\s*\(\s*\)",
+            @"\bIsFirstCycle\s*=\s*true\s*;.*?StartDirtyStartRecoveryIfNeeded\s*\(\s*\)\s*;.*?\bif\s*\(\s*!\s*_isStrictOpenerActive\s*&&\s*!\s*IsDirtyStartRecoveryActive\s*\)\s*\{?\s*StartStrictOpener\s*\(\s*\)",
             "BRD Ascended should preserve countdown opener state when combat starts");
     }
 
