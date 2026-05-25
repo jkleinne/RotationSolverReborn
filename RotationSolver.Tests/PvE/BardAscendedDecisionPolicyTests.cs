@@ -69,6 +69,131 @@ internal static partial class PvETestSuite
             "boss targets with known planned kill time should still honor the Stormbite floor");
     }
 
+    static void BardAscendedDotRuntimeUsesResolvedTargetTtk()
+    {
+        var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
+        var ironJawsCandidate = ExtractMethodBody(source, "bool HasTargetAwareIronJawsCandidate");
+        var dotCandidate = ExtractMethodBody(source, "bool HasTargetAwareDoTCandidate");
+        var stormbiteCandidate = ExtractMethodBody(source, "bool HasTargetAwareStormbiteCandidate");
+        var causticCandidate = ExtractMethodBody(source, "bool HasTargetAwareCausticBiteCandidate");
+        var tryUseIronJaws = ExtractMethodBody(source, "bool TryUseIronJaws");
+        var tryUseDoTs = ExtractMethodBody(source, "bool TryUseDoTs");
+        var previewTarget = ExtractMethodBody(source, "bool TryPreviewActionTarget");
+        var dotTargetTimeToKill = ExtractMethodBody(source, "float GetDotTargetTimeToKill");
+        var dotBossTarget = ExtractMethodBody(source, "bool IsDotBossTarget");
+        var hasTargetStatusData = ExtractMethodBody(source, "bool HasTargetStatusData");
+        var shouldUseIronJaws = ExtractMethodBody(source, "bool ShouldUseIronJawsOnTarget");
+        var shouldUseStormbite = ExtractMethodBody(source, "bool ShouldUseStormbiteOnTarget");
+        var shouldUseCausticBite = ExtractMethodBody(source, "bool ShouldUseCausticBiteOnTarget");
+        var targetAwareHelpers = string.Join(
+            Environment.NewLine,
+            ironJawsCandidate,
+            dotCandidate,
+            stormbiteCandidate,
+            causticCandidate,
+            tryUseIronJaws,
+            tryUseDoTs);
+        var forbiddenHardTargetHelpers =
+            @"\b(CurrentTarget|EffectiveTargetTimeToKill|TargetIsBoss|CanDoTMobs|TargetHasAllDots|AnyDotEnding|DoTsEnding)\b";
+
+        AssertSourceMatches(
+            source,
+            @"\bprivate\s+bool\s+WouldUseIronJaws\s*=>\s*HasTargetAwareIronJawsCandidate\s*\(\s*\)\s*;",
+            "WouldUseIronJaws should delegate to the target aware Iron Jaws candidate path");
+        AssertSourceMatches(
+            source,
+            @"\bprivate\s+bool\s+WouldUseDoTs\s*=>\s*HasTargetAwareDoTCandidate\s*\(\s*\)\s*;",
+            "WouldUseDoTs should delegate to the target aware DoT candidate path");
+
+        AssertSourceMatches(
+            ironJawsCandidate,
+            @"TryPreviewActionTarget\s*\(\s*IronJawsPvE\s*,\s*out\s+var\s+target\s*,\s*skipStatusProvideCheck\s*:\s*true\s*\).*?ShouldUseIronJawsOnTarget\s*\(\s*target\s*\)",
+            "Iron Jaws candidate should preview the resolved target before threshold evaluation");
+        AssertSourceMatches(
+            stormbiteCandidate,
+            @"TryPreviewActionTarget\s*\(\s*Stormbite\s*,\s*out\s+var\s+stormbiteTarget\s*,\s*skipStatusProvideCheck\s*:\s*true\s*\).*?ShouldUseStormbiteOnTarget\s*\(\s*stormbiteTarget\s*\)",
+            "Stormbite candidate should preview the resolved target before threshold evaluation");
+        AssertSourceMatches(
+            causticCandidate,
+            @"TryPreviewActionTarget\s*\(\s*CausticBite\s*,\s*out\s+var\s+causticTarget\s*,\s*skipStatusProvideCheck\s*:\s*true\s*\).*?ShouldUseCausticBiteOnTarget\s*\(\s*causticTarget\s*\)",
+            "Caustic Bite candidate should preview the resolved target before threshold evaluation");
+        AssertSourceMatches(
+            dotCandidate,
+            @"HasTargetAwareStormbiteCandidate\s*\(\s*\).*?HasTargetAwareCausticBiteCandidate\s*\(\s*\)",
+            "DoT candidate should compose the target aware Stormbite and Caustic Bite paths");
+
+        AssertSourceMatches(
+            tryUseIronJaws,
+            @"HasTargetAwareIronJawsCandidate\s*\(\s*\).*?IronJawsPvE\.CanUse\s*\(\s*out\s+act\s*,\s*skipStatusProvideCheck\s*:\s*true\s*\)",
+            "TryUseIronJaws should commit only after the target aware candidate passes");
+        AssertSourceMatches(
+            tryUseDoTs,
+            @"HasTargetAwareStormbiteCandidate\s*\(\s*\).*?Stormbite\.CanUse\s*\(\s*out\s+act\s*,\s*skipStatusProvideCheck\s*:\s*true\s*\).*?HasTargetAwareCausticBiteCandidate\s*\(\s*\).*?CausticBite\.CanUse\s*\(\s*out\s+act\s*,\s*skipStatusProvideCheck\s*:\s*true\s*\)",
+            "TryUseDoTs should commit through target aware candidates with named status skips");
+
+        AssertSourceMatches(
+            previewTarget,
+            @"var\s+wasActionPreview\s*=\s*IBaseAction\.ActionPreview\s*;.*?try\s*\{.*?IBaseAction\.ActionPreview\s*=\s*true\s*;.*?action\.CanUse\s*\(.*?finally\s*\{.*?IBaseAction\.ActionPreview\s*=\s*wasActionPreview\s*;",
+            "preview helper should restore ActionPreview after every probe");
+        AssertSourceMatches(
+            previewTarget,
+            @"action\.PreviewTarget\?\.Target",
+            "preview helper should expose the resolved preview target");
+        AssertSourceDoesNotMatch(
+            previewTarget,
+            @"\b(skipStatusNeed|skipTargetStatusNeedCheck|skipComboCheck|skipCastingCheck|usedUp|skipAoeCheck|skipTTKCheck|gcdCountForAbility|checkActionManager|targetOverride)\b",
+            "preview helper should expose only the status-provide skip required by DoT probes");
+
+        AssertSourceDoesNotMatch(
+            targetAwareHelpers,
+            forbiddenHardTargetHelpers,
+            "target aware candidate helpers should not reference hard target helpers");
+        AssertSourceDoesNotMatch(
+            source,
+            @"\bprivate\s+static\s+bool\s+(TargetHasBossIcon|TargetIsBoss)\b",
+            "hard-target boss helpers should be removed after resolved-target DoT gating");
+        AssertSourceDoesNotMatch(
+            dotTargetTimeToKill,
+            @"\b(CurrentTarget|EffectiveTargetTimeToKill)\b",
+            "target time to kill should be read from the resolved target");
+        AssertSourceDoesNotMatch(
+            dotBossTarget,
+            @"\bTargetIsBoss\b",
+            "boss fallback should be evaluated from the resolved target");
+        AssertSourceMatches(
+            hasTargetStatusData,
+            @"return\s+action\.Setting\.TargetStatusProvide\s*!=\s*null\s*;",
+            "status data should reject candidates before threshold evaluation when missing");
+        AssertSourceMatches(
+            shouldUseIronJaws,
+            @"HasTargetStatusData\s*\(\s*Stormbite\s*\).*?HasTargetStatusData\s*\(\s*CausticBite\s*\).*?BardAscendedDecisionPolicy\.ShouldRefreshIronJaws",
+            "Iron Jaws threshold evaluation should require target status data first");
+        AssertSourceMatches(
+            shouldUseStormbite,
+            @"HasTargetStatusData\s*\(\s*Stormbite\s*\).*?HasTargetStatusData\s*\(\s*CausticBite\s*\).*?BardAscendedDecisionPolicy\.(ShouldApplyBothDots|ShouldApplyStormbiteOnly)",
+            "Stormbite threshold evaluation should require target status data first");
+        AssertSourceMatches(
+            shouldUseStormbite,
+            @"hasStormbite\s*&&\s*\(\s*IronJawsPvE\.EnoughLevel\s*\|\|\s*!\s*TargetDoTEnding\s*\(\s*target\s*,\s*Stormbite\s*\)\s*\).*?BardAscendedDecisionPolicy\.ShouldApplyStormbiteOnly",
+            "Stormbite refresh without Iron Jaws should still apply the target TTK threshold");
+        AssertSourceDoesNotMatch(
+            shouldUseStormbite,
+            @"return\s+!\s*IronJawsPvE\.EnoughLevel\s*&&\s*TargetDoTEnding\s*\(\s*target\s*,\s*Stormbite\s*\)",
+            "Stormbite refresh should not bypass the target TTK threshold");
+        AssertSourceMatches(
+            shouldUseCausticBite,
+            @"HasTargetStatusData\s*\(\s*Stormbite\s*\).*?HasTargetStatusData\s*\(\s*CausticBite\s*\).*?BardAscendedDecisionPolicy\.(ShouldApplyBothDots|ShouldApplyCausticOnly)",
+            "Caustic Bite threshold evaluation should require target status data first");
+        AssertSourceMatches(
+            shouldUseCausticBite,
+            @"hasCausticBite\s*&&\s*\(\s*IronJawsPvE\.EnoughLevel\s*\|\|\s*!\s*TargetDoTEnding\s*\(\s*target\s*,\s*CausticBite\s*\)\s*\).*?BardAscendedDecisionPolicy\.ShouldApplyCausticOnly",
+            "Caustic Bite refresh without Iron Jaws should still apply the target TTK threshold");
+        AssertSourceDoesNotMatch(
+            shouldUseCausticBite,
+            @"return\s+!\s*IronJawsPvE\.EnoughLevel\s*&&\s*TargetDoTEnding\s*\(\s*target\s*,\s*CausticBite\s*\)",
+            "Caustic Bite refresh should not bypass the target TTK threshold");
+    }
+
     static void BardAscendedSongPresetsMapToExpectedDurations()
     {
         var standard = BardAscendedDecisionPolicy.GetSongDurations(

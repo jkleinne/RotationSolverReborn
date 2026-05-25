@@ -167,19 +167,6 @@ public sealed class BRD_Ascended : BardRotation
                && CurrentTarget.HasStatus(true, action.Setting.TargetStatusProvide);
     }
 
-    private static bool TargetHasBossIcon => CurrentTarget?.IsBossFromIcon() == true;
-
-    private static bool TargetIsBoss
-    {
-        get
-        {
-            if (CurrentTarget == null) return false;
-
-            return CurrentTarget.IsBossFromIcon()
-                   || CurrentTarget.IsBossFromTTK();
-        }
-    }
-
     #endregion
 
     #endregion
@@ -752,12 +739,6 @@ public sealed class BRD_Ascended : BardRotation
         }
     }
 
-    private bool CanDoTMobs => CurrentTarget != null && (!DoTsBoss || TargetHasBossIcon);
-
-    private bool TargetHasAllDots => TargetHasDoT(Stormbite) && TargetHasDoT(CausticBite);
-
-    private bool AnyDotEnding => DoTsEnding(Stormbite) || DoTsEnding(CausticBite);
-
     private void RefreshCombatCycleState()
     {
         if (!InCombat)
@@ -792,132 +773,196 @@ public sealed class BRD_Ascended : BardRotation
         LastCombatTimeRaw = DataCenter.CombatTimeRaw;
     }
 
-    private bool WouldUseIronJaws
+    private bool WouldUseIronJaws => HasTargetAwareIronJawsCandidate();
+
+    private bool WouldUseDoTs => HasTargetAwareDoTCandidate();
+
+    private static bool TargetHasDoT(IBattleChara target, IBaseAction action)
     {
-        get
+        var targetStatusProvide = action.Setting.TargetStatusProvide;
+        return targetStatusProvide != null
+               && target.HasStatus(true, targetStatusProvide);
+    }
+
+    private static bool HasTargetStatusData(IBaseAction action)
+    {
+        return action.Setting.TargetStatusProvide != null;
+    }
+
+    private static bool TargetDoTEnding(IBattleChara target, IBaseAction action)
+    {
+        var targetStatusProvide = action.Setting.TargetStatusProvide;
+        return TargetHasDoT(target, action)
+               && targetStatusProvide != null
+               && target.WillStatusEndGCD(1, DoTEndBuffer, true, targetStatusProvide);
+    }
+
+    private bool CanUseDoTOnTarget(IBattleChara target)
+    {
+        return !DoTsBoss || target.IsBossFromIcon();
+    }
+
+    private float GetDotTargetTimeToKill(IBattleChara target)
+    {
+        if (EnablePlannedFightMode && PlannedFightKillTime > 0f)
         {
-            if (!IronJawsPvE.EnoughLevel || !CanDoTMobs) return false;
-            if (!TargetHasAllDots) return false;
-            if (!BardAscendedDecisionPolicy.ShouldRefreshIronJaws(
-                    EffectiveTargetTimeToKill,
-                    TargetIsBoss,
-                    CanUseEnhancedFiller))
+            return Math.Max(0f, PlannedFightKillTime - DataCenter.CombatTimeRaw);
+        }
+
+        return target.GetTTK();
+    }
+
+    private static bool IsDotBossTarget(IBattleChara target)
+    {
+        return target.IsBossFromIcon()
+               || target.IsBossFromTTK();
+    }
+
+    private static bool TryPreviewActionTarget(
+        IBaseAction action,
+        out IBattleChara target,
+        bool skipStatusProvideCheck = false)
+    {
+        target = null!;
+        var wasActionPreview = IBaseAction.ActionPreview;
+
+        try
+        {
+            IBaseAction.ActionPreview = true;
+            if (!action.CanUse(
+                    out _,
+                    skipStatusProvideCheck: skipStatusProvideCheck))
             {
                 return false;
             }
 
-            if (!InBurst && AnyDotEnding) return true;
-            return InBurst && BurstEndGCD(1) && !IsLastGCD(ActionID.IronJawsPvE);
-        }
-    }
+            var previewTarget = action.PreviewTarget?.Target;
+            if (previewTarget == null)
+            {
+                return false;
+            }
 
-    private bool WouldUseDoTs
-    {
-        get
+            target = previewTarget;
+            return true;
+        }
+        finally
         {
-            if (!CanDoTMobs || CurrentTarget == null) return false;
-
-            var missingStormbite = !TargetHasDoT(Stormbite);
-            var missingCaustic = !TargetHasDoT(CausticBite);
-            if (missingStormbite && missingCaustic)
-            {
-                return BardAscendedDecisionPolicy.ShouldApplyBothDots(
-                    EffectiveTargetTimeToKill,
-                    TargetIsBoss,
-                    CanUseEnhancedFiller);
-            }
-
-            if (missingCaustic)
-            {
-                return BardAscendedDecisionPolicy.ShouldApplyCausticOnly(EffectiveTargetTimeToKill, TargetIsBoss);
-            }
-
-            if (missingStormbite)
-            {
-                return BardAscendedDecisionPolicy.ShouldApplyStormbiteOnly(EffectiveTargetTimeToKill, TargetIsBoss);
-            }
-
-            return !IronJawsPvE.EnoughLevel && (DoTsEnding(Stormbite) || DoTsEnding(CausticBite));
+            IBaseAction.ActionPreview = wasActionPreview;
         }
     }
 
-    private static bool DoTsEnding(IBaseAction action)
+    private bool ShouldUseIronJawsOnTarget(IBattleChara target)
     {
-        return CurrentTarget != null
-               && TargetHasDoT(action)
-               && action.Setting.TargetStatusProvide != null
-               && CurrentTarget.WillStatusEndGCD(1, DoTEndBuffer, true, action.Setting.TargetStatusProvide);
-    }
-
-    private bool TryUseIronJaws(out IAction? act)
-    {
-        act = null;
-        if (!IronJawsPvE.EnoughLevel || !CanDoTMobs) return false;
-        if (!TargetHasAllDots) return false;
+        if (!CanUseDoTOnTarget(target)) return false;
+        if (!HasTargetStatusData(Stormbite) || !HasTargetStatusData(CausticBite)) return false;
+        if (!TargetHasDoT(target, Stormbite) || !TargetHasDoT(target, CausticBite)) return false;
         if (!BardAscendedDecisionPolicy.ShouldRefreshIronJaws(
-                EffectiveTargetTimeToKill,
-                TargetIsBoss,
+                GetDotTargetTimeToKill(target),
+                IsDotBossTarget(target),
                 CanUseEnhancedFiller))
         {
             return false;
         }
 
-        if (!InBurst && AnyDotEnding)
+        var hasEndingDoT = TargetDoTEnding(target, Stormbite)
+                           || TargetDoTEnding(target, CausticBite);
+        if (!InBurst && hasEndingDoT) return true;
+        return InBurst && BurstEndGCD(1) && !IsLastGCD(ActionID.IronJawsPvE);
+    }
+
+    private bool ShouldUseStormbiteOnTarget(IBattleChara target)
+    {
+        if (!CanUseDoTOnTarget(target)) return false;
+        if (!HasTargetStatusData(Stormbite) || !HasTargetStatusData(CausticBite)) return false;
+
+        var hasStormbite = TargetHasDoT(target, Stormbite);
+        var hasCausticBite = TargetHasDoT(target, CausticBite);
+        if (hasStormbite && (IronJawsPvE.EnoughLevel || !TargetDoTEnding(target, Stormbite)))
         {
-            return IronJawsPvE.CanUse(out act, true);
+            return false;
         }
 
-        if (InBurst && BurstEndGCD(1) && !IsLastGCD(ActionID.IronJawsPvE))
+        var targetTimeToKill = GetDotTargetTimeToKill(target);
+        var isBossTarget = IsDotBossTarget(target);
+        if (!hasStormbite && !hasCausticBite)
         {
-            return IronJawsPvE.CanUse(out act, true);
+            return BardAscendedDecisionPolicy.ShouldApplyBothDots(
+                targetTimeToKill,
+                isBossTarget,
+                CanUseEnhancedFiller);
         }
 
-        return false;
+        return BardAscendedDecisionPolicy.ShouldApplyStormbiteOnly(targetTimeToKill, isBossTarget);
+    }
+
+    private bool ShouldUseCausticBiteOnTarget(IBattleChara target)
+    {
+        if (!CanUseDoTOnTarget(target)) return false;
+        if (!HasTargetStatusData(Stormbite) || !HasTargetStatusData(CausticBite)) return false;
+
+        var hasStormbite = TargetHasDoT(target, Stormbite);
+        var hasCausticBite = TargetHasDoT(target, CausticBite);
+        if (hasCausticBite && (IronJawsPvE.EnoughLevel || !TargetDoTEnding(target, CausticBite)))
+        {
+            return false;
+        }
+
+        var targetTimeToKill = GetDotTargetTimeToKill(target);
+        var isBossTarget = IsDotBossTarget(target);
+        if (!hasStormbite && !hasCausticBite)
+        {
+            return BardAscendedDecisionPolicy.ShouldApplyBothDots(
+                targetTimeToKill,
+                isBossTarget,
+                CanUseEnhancedFiller);
+        }
+
+        return BardAscendedDecisionPolicy.ShouldApplyCausticOnly(targetTimeToKill, isBossTarget);
+    }
+
+    private bool HasTargetAwareIronJawsCandidate()
+    {
+        return IronJawsPvE.EnoughLevel
+               && TryPreviewActionTarget(IronJawsPvE, out var target, skipStatusProvideCheck: true)
+               && ShouldUseIronJawsOnTarget(target);
+    }
+
+    private bool HasTargetAwareStormbiteCandidate()
+    {
+        return TryPreviewActionTarget(Stormbite, out var stormbiteTarget, skipStatusProvideCheck: true)
+               && ShouldUseStormbiteOnTarget(stormbiteTarget);
+    }
+
+    private bool HasTargetAwareCausticBiteCandidate()
+    {
+        return TryPreviewActionTarget(CausticBite, out var causticTarget, skipStatusProvideCheck: true)
+               && ShouldUseCausticBiteOnTarget(causticTarget);
+    }
+
+    private bool HasTargetAwareDoTCandidate()
+    {
+        return HasTargetAwareStormbiteCandidate()
+               || HasTargetAwareCausticBiteCandidate();
+    }
+
+    private bool TryUseIronJaws(out IAction? act)
+    {
+        act = null;
+        return HasTargetAwareIronJawsCandidate()
+               && IronJawsPvE.CanUse(out act, skipStatusProvideCheck: true);
     }
 
     private bool TryUseDoTs(out IAction? act)
     {
         act = null;
-        if (CurrentTarget == null || !CanDoTMobs) return false;
-
-        var missingStormbite = !TargetHasDoT(Stormbite);
-        var missingCaustic = !TargetHasDoT(CausticBite);
-
-        if (missingStormbite && missingCaustic)
-        {
-            if (!BardAscendedDecisionPolicy.ShouldApplyBothDots(
-                    EffectiveTargetTimeToKill,
-                    TargetIsBoss,
-                    CanUseEnhancedFiller))
-            {
-                return false;
-            }
-
-            return Stormbite.CanUse(out act, true)
-                   || CausticBite.CanUse(out act, true);
-        }
-
-        if (missingCaustic
-            && BardAscendedDecisionPolicy.ShouldApplyCausticOnly(EffectiveTargetTimeToKill, TargetIsBoss)
-            && CausticBite.CanUse(out act, true))
+        if (HasTargetAwareStormbiteCandidate()
+            && Stormbite.CanUse(out act, skipStatusProvideCheck: true))
         {
             return true;
         }
 
-        if (missingStormbite
-            && BardAscendedDecisionPolicy.ShouldApplyStormbiteOnly(EffectiveTargetTimeToKill, TargetIsBoss)
-            && Stormbite.CanUse(out act, true))
-        {
-            return true;
-        }
-
-        if (IronJawsPvE.EnoughLevel) return false;
-
-        var stormEnding = DoTsEnding(Stormbite);
-        var causticEnding = DoTsEnding(CausticBite);
-
-        return stormEnding && Stormbite.CanUse(out act, true)
-               || causticEnding && CausticBite.CanUse(out act, true);
+        return HasTargetAwareCausticBiteCandidate()
+               && CausticBite.CanUse(out act, skipStatusProvideCheck: true);
     }
 
     #endregion
