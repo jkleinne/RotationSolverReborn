@@ -1475,26 +1475,30 @@ public sealed class BRD_Ascended : BardRotation
             : 0f;
     }
 
-    private static bool CanRecoverBloodletterChargesAfterSpend(
-        int currentCharges,
-        int maximumCharges,
-        bool isCooldownTicking,
-        float firstChargeTimeRemaining,
-        float oneChargeRecastTime,
-        float recoveryHorizon)
+    private readonly record struct BloodletterChargeRecoveryForecast
     {
-        if (currentCharges <= 0) return false;
+        public int CurrentCharges { get; init; }
+        public int MaximumCharges { get; init; }
+        public bool IsCooldownTicking { get; init; }
+        public float FirstChargeTimeRemaining { get; init; }
+        public float OneChargeRecastTime { get; init; }
+        public float RecoveryHorizon { get; init; }
+    }
 
-        var chargesAfterSpend = Math.Max(currentCharges - 1, 0);
-        var chargesNeeded = maximumCharges - chargesAfterSpend;
+    private static bool CanRecoverBloodletterChargesAfterSpend(BloodletterChargeRecoveryForecast forecast)
+    {
+        if (forecast.CurrentCharges <= 0) return false;
+
+        var chargesAfterSpend = Math.Max(forecast.CurrentCharges - 1, 0);
+        var chargesNeeded = forecast.MaximumCharges - chargesAfterSpend;
         if (chargesNeeded <= 0) return true;
-        if (recoveryHorizon <= 0f) return false;
+        if (forecast.RecoveryHorizon <= 0f) return false;
 
-        var firstChargeRecoveryTime = isCooldownTicking && currentCharges < maximumCharges
-            ? Math.Max(0f, firstChargeTimeRemaining)
-            : oneChargeRecastTime;
-        var fullRecoveryTime = firstChargeRecoveryTime + (chargesNeeded - 1) * oneChargeRecastTime;
-        return fullRecoveryTime <= recoveryHorizon;
+        var firstChargeRecoveryTime = forecast.IsCooldownTicking && forecast.CurrentCharges < forecast.MaximumCharges
+            ? Math.Max(0f, forecast.FirstChargeTimeRemaining)
+            : forecast.OneChargeRecastTime;
+        var fullRecoveryTime = firstChargeRecoveryTime + (chargesNeeded - 1) * forecast.OneChargeRecastTime;
+        return fullRecoveryTime <= forecast.RecoveryHorizon;
     }
 
     private bool TryUseHeartBreakShot(out IAction? act)
@@ -1513,13 +1517,15 @@ public sealed class BRD_Ascended : BardRotation
             return TryUseBloodletterVariant(out act, usedUp: true);
         }
 
-        var canRecoverAfterSpend = CanRecoverBloodletterChargesAfterSpend(
-            cooldown.CurrentCharges,
-            BloodletterMax,
-            cooldown.IsCoolingDown,
-            cooldown.RecastTimeRemainOneCharge,
-            cooldown.RecastTimeOneChargeRaw,
-            GetBloodletterBurstEntryHorizon());
+        var canRecoverAfterSpend = CanRecoverBloodletterChargesAfterSpend(new BloodletterChargeRecoveryForecast
+        {
+            CurrentCharges = cooldown.CurrentCharges,
+            MaximumCharges = BloodletterMax,
+            IsCooldownTicking = cooldown.IsCoolingDown,
+            FirstChargeTimeRemaining = cooldown.RecastTimeRemainOneCharge,
+            OneChargeRecastTime = cooldown.RecastTimeOneChargeRaw,
+            RecoveryHorizon = GetBloodletterBurstEntryHorizon(),
+        });
         return (canRecoverAfterSpend || willHaveMaxCharges) && TryUseBloodletterVariant(out act, usedUp: true);
     }
 

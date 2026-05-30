@@ -1314,12 +1314,20 @@ internal static partial class PvETestSuite
             @"if\s*\(\s*CanEnterBurstWindow\s*\)\s*return\s+0f\s*;.*?return\s+InArmys\s*&&\s*SongTime\s*<=\s*ArmyHeartbreakHoldThreshold\s*\?\s*Math\.Max\s*\(\s*0f\s*,\s*SongTime\s*-\s*ArmyRemainTime\s*\)\s*:\s*0f\s*;",
             "Bloodletter reservation horizon should use the planned Army song swap point");
         AssertSourceMatches(
+            source,
+            @"private\s+readonly\s+record\s+struct\s+BloodletterChargeRecoveryForecast\s*\{.*?int\s+CurrentCharges\s*\{\s*get;\s*init;\s*\}.*?int\s+MaximumCharges\s*\{\s*get;\s*init;\s*\}.*?bool\s+IsCooldownTicking\s*\{\s*get;\s*init;\s*\}.*?float\s+FirstChargeTimeRemaining\s*\{\s*get;\s*init;\s*\}.*?float\s+OneChargeRecastTime\s*\{\s*get;\s*init;\s*\}.*?float\s+RecoveryHorizon\s*\{\s*get;\s*init;\s*\}",
+            "Bloodletter recovery inputs should be grouped to avoid primitive parameter ordering");
+        AssertSourceMatches(
+            source,
+            @"private\s+static\s+bool\s+CanRecoverBloodletterChargesAfterSpend\s*\(\s*BloodletterChargeRecoveryForecast\s+forecast\s*\)",
+            "Bloodletter recovery should accept grouped forecast inputs");
+        AssertSourceMatches(
             chargeForecast,
-            @"var\s+chargesAfterSpend\s*=\s*Math\.Max\s*\(\s*currentCharges\s*-\s*1\s*,\s*0\s*\).*?var\s+chargesNeeded\s*=\s*maximumCharges\s*-\s*chargesAfterSpend",
+            @"var\s+chargesAfterSpend\s*=\s*Math\.Max\s*\(\s*forecast\.CurrentCharges\s*-\s*1\s*,\s*0\s*\).*?var\s+chargesNeeded\s*=\s*forecast\.MaximumCharges\s*-\s*chargesAfterSpend",
             "Bloodletter recovery should forecast from the post-spend charge count");
         AssertSourceMatches(
             chargeForecast,
-            @"var\s+firstChargeRecoveryTime\s*=\s*isCooldownTicking\s*&&\s*currentCharges\s*<\s*maximumCharges\s*\?\s*Math\.Max\s*\(\s*0f\s*,\s*firstChargeTimeRemaining\s*\)\s*:\s*oneChargeRecastTime\s*;",
+            @"var\s+firstChargeRecoveryTime\s*=\s*forecast\.IsCooldownTicking\s*&&\s*forecast\.CurrentCharges\s*<\s*forecast\.MaximumCharges\s*\?\s*Math\.Max\s*\(\s*0f\s*,\s*forecast\.FirstChargeTimeRemaining\s*\)\s*:\s*forecast\.OneChargeRecastTime\s*;",
             "Bloodletter recovery should distinguish an existing cooldown tick from a fresh full-charge spend");
         AssertSourceMatches(
             tryUseHeartbreak,
