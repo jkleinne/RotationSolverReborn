@@ -15,7 +15,6 @@ public sealed class BRD_Ascended : BardRotation
     private const float ArmyHeartbreakHoldThreshold = 30f;
     private const float SidewinderBuffLookahead = 10f;
     private const float HeartbreakChargeLookahead = 5f;
-    private const float MagesHeartbreakHoldGcdMultiplier = 0.9f;
     private const float Cycle369PrepullHeartbreakWindowSeconds = 1.65f;
     private const float CountdownDotWindowSeconds = 0.1f;
     private const float CountdownResetToleranceSeconds = 0.25f;
@@ -1463,49 +1462,45 @@ public sealed class BRD_Ascended : BardRotation
         return ActiveBloodletterVariant.CanUse(out act, usedUp: usedUp);
     }
 
+    private bool IsBloodletterBurstReservationActive()
+    {
+        return CanEnterBurstWindow || (InArmys && SongTime <= ArmyHeartbreakHoldThreshold);
+    }
+
+    private float GetBloodletterBurstEntryHorizon()
+    {
+        if (CanEnterBurstWindow) return 0f;
+        return InArmys && SongTime <= ArmyHeartbreakHoldThreshold
+            ? Math.Max(0f, SongTime - ArmyRemainTime)
+            : 0f;
+    }
+
     private bool TryUseHeartBreakShot(out IAction? act)
     {
         act = null;
         if (IsInSandbagMode || !CanWeave || !EnoughWeaveTime) return false;
 
-        var willHaveMaxCharges = ActiveBloodletterVariant.Cooldown.WillHaveXCharges(
+        var cooldown = ActiveBloodletterVariant.Cooldown;
+        var willHaveMaxCharges = cooldown.WillHaveXCharges(
             BloodletterMax,
             HeartbreakChargeLookahead);
-        var willHaveOneCharge = ActiveBloodletterVariant.Cooldown.WillHaveOneCharge(HeartbreakChargeLookahead);
-        var wontHaveCharge = ActiveBloodletterVariant.Cooldown.IsCoolingDown
-                                 && !ActiveBloodletterVariant.Cooldown.WillHaveOneCharge(WeaponAhead)
-                                 && WeaponElapsed <= 1f;
+        var reservationActive = IsBloodletterBurstReservationActive();
 
-        var holdForRagingOrCap = (!InBurst || !HasRagingStrikes)
-            && ActiveBloodletterVariant.Cooldown.CurrentCharges < BloodletterMax
-            && !willHaveMaxCharges;
-        var holdForBurstTiming = InBurst
-            && (!willHaveOneCharge || !CanWeave);
-        var isInWanderersHold = InWanderers && (holdForRagingOrCap || holdForBurstTiming);
+        if (InBurst || !reservationActive)
+        {
+            return TryUseBloodletterVariant(out act, usedUp: true);
+        }
 
-        var isInArmysHold = InArmys
-            && SongTime <= ArmyHeartbreakHoldThreshold
-            && ActiveBloodletterVariant.Cooldown.CurrentCharges < BloodletterMax
-            && !willHaveMaxCharges;
-
-        var isInMagesHold = InMages && SongEndAfter(MageRemainTime + WeaponTotal * MagesHeartbreakHoldGcdMultiplier);
-
-        var isEmpyrealBlocking = !NoSong && !InBurst
-            && (EmpyrealArrowPvE.Cooldown.WillHaveOneCharge(WeaponTotal) && CanUseEmpyrealArrow
-                || wontHaveCharge);
-
-        if (isInWanderersHold || isInArmysHold || isInMagesHold || isEmpyrealBlocking) return false;
-
-        if (SongTimings == BardAscendedSongTiming.Cycle369 && NoSong && ActiveBloodletterVariant.CanUse(out act, usedUp: false)) return true;
-
-        if (!CanWeave) return false;
-
-        var shouldUseUsedUp = InBurst || IsMedicated
-            || (willHaveOneCharge && (InMages || (InArmys && SongTime > ArmyHeartbreakHoldThreshold)));
-        if (shouldUseUsedUp) return TryUseBloodletterVariant(out act, usedUp: true);
-
-        var atChargeCap = ActiveBloodletterVariant.Cooldown.CurrentCharges == BloodletterMax || willHaveMaxCharges;
-        return atChargeCap && TryUseBloodletterVariant(out act, usedUp: false);
+        var canRecoverAfterSpend = BardAscendedDecisionPolicy.CanRecoverBloodletterChargesAfterSpend(new BardAscendedBloodletterRecoveryInput
+        {
+            CurrentCharges = cooldown.CurrentCharges,
+            MaximumCharges = BloodletterMax,
+            IsCooldownTicking = cooldown.IsCoolingDown,
+            FirstChargeTimeRemaining = cooldown.RecastTimeRemainOneCharge,
+            OneChargeRecastTime = cooldown.RecastTimeOneChargeRaw,
+            RecoveryHorizon = GetBloodletterBurstEntryHorizon(),
+        });
+        return (canRecoverAfterSpend || willHaveMaxCharges) && TryUseBloodletterVariant(out act, usedUp: true);
     }
 
     private bool TryUseSideWinder(out IAction? act)

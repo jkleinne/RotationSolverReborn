@@ -476,6 +476,85 @@ internal static partial class PvETestSuite
         AssertTrue(BardAscendedDecisionPolicy.ShouldUseOgcdAoE(3), "oGCD AoE should start at three targets");
     }
 
+    static void BardAscendedBloodletterRecoveryForecastsPostSpendCharges()
+    {
+        var cases = new[]
+        {
+            (
+                Name: "no charge available",
+                Input: new BardAscendedBloodletterRecoveryInput
+                {
+                    CurrentCharges = 0,
+                    MaximumCharges = 3,
+                    OneChargeRecastTime = 15f,
+                    RecoveryHorizon = 30f,
+                },
+                Expected: false),
+            (
+                Name: "zero recovery horizon",
+                Input: new BardAscendedBloodletterRecoveryInput
+                {
+                    CurrentCharges = 1,
+                    MaximumCharges = 3,
+                    OneChargeRecastTime = 15f,
+                    RecoveryHorizon = 0f,
+                },
+                Expected: false),
+            (
+                Name: "active tick recovers exactly by horizon",
+                Input: new BardAscendedBloodletterRecoveryInput
+                {
+                    CurrentCharges = 2,
+                    MaximumCharges = 3,
+                    IsCooldownTicking = true,
+                    FirstChargeTimeRemaining = 5f,
+                    OneChargeRecastTime = 15f,
+                    RecoveryHorizon = 20f,
+                },
+                Expected: true),
+            (
+                Name: "active tick misses horizon",
+                Input: new BardAscendedBloodletterRecoveryInput
+                {
+                    CurrentCharges = 2,
+                    MaximumCharges = 3,
+                    IsCooldownTicking = true,
+                    FirstChargeTimeRemaining = 5f,
+                    OneChargeRecastTime = 15f,
+                    RecoveryHorizon = 19.99f,
+                },
+                Expected: false),
+            (
+                Name: "full charge spend starts a fresh recast",
+                Input: new BardAscendedBloodletterRecoveryInput
+                {
+                    CurrentCharges = 3,
+                    MaximumCharges = 3,
+                    OneChargeRecastTime = 15f,
+                    RecoveryHorizon = 15f,
+                },
+                Expected: true),
+            (
+                Name: "full charge spend cannot recover before short horizon",
+                Input: new BardAscendedBloodletterRecoveryInput
+                {
+                    CurrentCharges = 3,
+                    MaximumCharges = 3,
+                    OneChargeRecastTime = 15f,
+                    RecoveryHorizon = 14.99f,
+                },
+                Expected: false),
+        };
+
+        foreach (var testCase in cases)
+        {
+            AssertEqual(
+                testCase.Expected,
+                BardAscendedDecisionPolicy.CanRecoverBloodletterChargesAfterSpend(testCase.Input),
+                testCase.Name);
+        }
+    }
+
     static void BardAscendedRuntimeUsesResolvedAoeTargetCounts()
     {
         var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
@@ -1289,6 +1368,63 @@ internal static partial class PvETestSuite
             attackAbility,
             @"\bif\s*\(\s*TryUseOpenerAbility\s*\(\s*out\s+act\s*\)\s*\)\s*return\s+true\s*;.*?\bTryUseRadiantFinale\s*\(\s*out\s+act\s*\).*?\bTryUseBattleVoice\s*\(\s*out\s+act\s*\).*?\bTryUseRagingStrikes\s*\(\s*out\s+act\s*\).*?\bTryUseHeartBreakShot\s*\(\s*out\s+act\s*\).*?\bTryUseSideWinder\s*\(\s*out\s+act\s*\)",
             "BRD Ascended should attempt strict opener attack abilities before normal attack priority");
+    }
+
+    static void BardAscendedBloodletterUsesLiberalSpendingWithBurstReservation()
+    {
+        var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
+        var policySource = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BardAscendedDecisionPolicy.cs")));
+        var emergencyAbility = ExtractMethodBody(source, "EmergencyAbility");
+        var attackAbility = ExtractMethodBody(source, "AttackAbility");
+        var tryUseHeartbreak = ExtractMethodBody(source, "bool TryUseHeartBreakShot");
+        var reservationActive = ExtractMethodBody(source, "bool IsBloodletterBurstReservationActive");
+        var reservationHorizon = ExtractMethodBody(source, "float GetBloodletterBurstEntryHorizon");
+        var chargeForecast = ExtractMethodBody(policySource, "bool CanRecoverBloodletterChargesAfterSpend");
+
+        AssertSourceDoesNotMatch(
+            tryUseHeartbreak,
+            @"\b(isInWanderersHold|isInMagesHold|isEmpyrealBlocking|holdForRagingOrCap)\b",
+            "BRD Ascended should remove broad non-reservation Bloodletter holds");
+        AssertSourceMatches(
+            reservationActive,
+            @"return\s+CanEnterBurstWindow\s*\|\|\s*\(\s*InArmys\s*&&\s*SongTime\s*<=\s*ArmyHeartbreakHoldThreshold\s*\)\s*;",
+            "Bloodletter reservation should be active only for immediate burst entry or Army's Paeon pooling");
+        AssertSourceMatches(
+            reservationHorizon,
+            @"if\s*\(\s*CanEnterBurstWindow\s*\)\s*return\s+0f\s*;.*?return\s+InArmys\s*&&\s*SongTime\s*<=\s*ArmyHeartbreakHoldThreshold\s*\?\s*Math\.Max\s*\(\s*0f\s*,\s*SongTime\s*-\s*ArmyRemainTime\s*\)\s*:\s*0f\s*;",
+            "Bloodletter reservation horizon should use the planned Army song swap point");
+        AssertSourceMatches(
+            policySource,
+            @"internal\s+readonly\s+record\s+struct\s+BardAscendedBloodletterRecoveryInput\s*\{.*?int\s+CurrentCharges\s*\{\s*get;\s*init;\s*\}.*?int\s+MaximumCharges\s*\{\s*get;\s*init;\s*\}.*?bool\s+IsCooldownTicking\s*\{\s*get;\s*init;\s*\}.*?float\s+FirstChargeTimeRemaining\s*\{\s*get;\s*init;\s*\}.*?float\s+OneChargeRecastTime\s*\{\s*get;\s*init;\s*\}.*?float\s+RecoveryHorizon\s*\{\s*get;\s*init;\s*\}",
+            "Bloodletter recovery inputs should be grouped to avoid primitive parameter ordering");
+        AssertSourceMatches(
+            tryUseHeartbreak,
+            @"BardAscendedDecisionPolicy\.CanRecoverBloodletterChargesAfterSpend\s*\(\s*new\s+BardAscendedBloodletterRecoveryInput\s*\{.*?CurrentCharges\s*=\s*cooldown\.CurrentCharges.*?MaximumCharges\s*=\s*BloodletterMax.*?IsCooldownTicking\s*=\s*cooldown\.IsCoolingDown.*?FirstChargeTimeRemaining\s*=\s*cooldown\.RecastTimeRemainOneCharge.*?OneChargeRecastTime\s*=\s*cooldown\.RecastTimeOneChargeRaw.*?RecoveryHorizon\s*=\s*GetBloodletterBurstEntryHorizon\s*\(\s*\)",
+            "Bloodletter runtime should delegate grouped recovery inputs to the policy");
+        AssertSourceMatches(
+            chargeForecast,
+            @"var\s+chargesAfterSpend\s*=\s*Math\.Max\s*\(\s*input\.CurrentCharges\s*-\s*1\s*,\s*0\s*\).*?var\s+chargesNeeded\s*=\s*input\.MaximumCharges\s*-\s*chargesAfterSpend",
+            "Bloodletter recovery should forecast from the post-spend charge count");
+        AssertSourceMatches(
+            chargeForecast,
+            @"var\s+firstChargeRecoveryTime\s*=\s*input\.IsCooldownTicking\s*&&\s*input\.CurrentCharges\s*<\s*input\.MaximumCharges\s*\?\s*Math\.Max\s*\(\s*0f\s*,\s*input\.FirstChargeTimeRemaining\s*\)\s*:\s*input\.OneChargeRecastTime\s*;",
+            "Bloodletter recovery should distinguish an existing cooldown tick from a fresh full-charge spend");
+        AssertSourceMatches(
+            tryUseHeartbreak,
+            @"var\s+reservationActive\s*=\s*IsBloodletterBurstReservationActive\s*\(\s*\)\s*;.*?if\s*\(\s*InBurst\s*\|\|\s*!\s*reservationActive\s*\)\s*\{.*?return\s+TryUseBloodletterVariant\s*\(\s*out\s+act\s*,\s*usedUp:\s*true\s*\)\s*;.*?\}",
+            "Bloodletter should spend freely outside burst reservation");
+        AssertSourceMatches(
+            tryUseHeartbreak,
+            @"var\s+canRecoverAfterSpend\s*=\s*BardAscendedDecisionPolicy\.CanRecoverBloodletterChargesAfterSpend\s*\(.*?\).*?return\s+\(\s*canRecoverAfterSpend\s*\|\|\s*willHaveMaxCharges\s*\)\s*&&\s*TryUseBloodletterVariant\s*\(\s*out\s+act\s*,\s*usedUp:\s*true\s*\)\s*;",
+            "Bloodletter reservation should spend only when recovery or overcap protection allows it");
+        AssertSourceMatches(
+            emergencyAbility,
+            @"TryUseEmpyrealArrow\s*\(\s*out\s+act\s*\).*?TryUseBarrage\s*\(\s*out\s+act\s*\).*?TryUsePitchPerfect\s*\(\s*out\s+act\s*\)",
+            "Emergency ability priority should keep Empyreal Arrow, Barrage, and Pitch Perfect ahead of attack ability spending");
+        AssertSourceMatches(
+            attackAbility,
+            @"TryUseRadiantFinale\s*\(\s*out\s+act\s*\).*?TryUseBattleVoice\s*\(\s*out\s+act\s*\).*?TryUseRagingStrikes\s*\(\s*out\s+act\s*\).*?TryUseHeartBreakShot\s*\(\s*out\s+act\s*\).*?TryUseSideWinder\s*\(\s*out\s+act\s*\)",
+            "Attack ability priority should keep burst buffs before Bloodletter and Sidewinder after Bloodletter");
     }
 
     static void BardAscendedRuntimeAdvancesStrictOpenerOnlyAfterActionSuccess()

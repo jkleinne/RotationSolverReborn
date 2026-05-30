@@ -66,6 +66,16 @@ internal readonly record struct BardAscendedApexDecisionInput(
     bool WouldUseEnhancedFiller,
     bool NoFutureBlastPossible);
 
+internal readonly record struct BardAscendedBloodletterRecoveryInput
+{
+    internal int CurrentCharges { get; init; }
+    internal int MaximumCharges { get; init; }
+    internal bool IsCooldownTicking { get; init; }
+    internal float FirstChargeTimeRemaining { get; init; }
+    internal float OneChargeRecastTime { get; init; }
+    internal float RecoveryHorizon { get; init; }
+}
+
 internal static class BardAscendedDecisionPolicy
 {
     internal const float SongMaxDuration = 45f;
@@ -214,6 +224,22 @@ internal static class BardAscendedDecisionPolicy
     internal static bool ShouldUseOgcdAoE(int affectedTargets)
     {
         return affectedTargets >= OgcdAoETargets;
+    }
+
+    internal static bool CanRecoverBloodletterChargesAfterSpend(BardAscendedBloodletterRecoveryInput input)
+    {
+        if (input.CurrentCharges <= 0) return false;
+
+        var chargesAfterSpend = Math.Max(input.CurrentCharges - 1, 0);
+        var chargesNeeded = input.MaximumCharges - chargesAfterSpend;
+        if (chargesNeeded <= 0) return true;
+        if (input.RecoveryHorizon <= 0f) return false;
+
+        var firstChargeRecoveryTime = input.IsCooldownTicking && input.CurrentCharges < input.MaximumCharges
+            ? Math.Max(0f, input.FirstChargeTimeRemaining)
+            : input.OneChargeRecastTime;
+        var fullRecoveryTime = firstChargeRecoveryTime + (chargesNeeded - 1) * input.OneChargeRecastTime;
+        return fullRecoveryTime <= input.RecoveryHorizon;
     }
 
     internal static bool ShouldStartFirstCycle(
