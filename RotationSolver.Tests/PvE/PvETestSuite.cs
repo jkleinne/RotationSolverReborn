@@ -40,6 +40,7 @@ internal static partial class PvETestSuite
         new("bard ascended runtime enters strict opener before priority gcds", BardAscendedRuntimeEntersStrictOpenerBeforePriorityGcds),
         new("bard ascended runtime enters strict opener during countdown", BardAscendedRuntimeEntersStrictOpenerDuringCountdown),
         new("bard ascended runtime enters strict opener before priority abilities", BardAscendedRuntimeEntersStrictOpenerBeforePriorityAbilities),
+        new("bard ascended bloodletter uses liberal spending with burst reservation", BardAscendedBloodletterUsesLiberalSpendingWithBurstReservation),
         new("bard ascended runtime advances strict opener only after action success", BardAscendedRuntimeAdvancesStrictOpenerOnlyAfterActionSuccess),
     ];
 }

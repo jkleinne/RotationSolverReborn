@@ -1291,6 +1291,54 @@ internal static partial class PvETestSuite
             "BRD Ascended should attempt strict opener attack abilities before normal attack priority");
     }
 
+    static void BardAscendedBloodletterUsesLiberalSpendingWithBurstReservation()
+    {
+        var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
+        var emergencyAbility = ExtractMethodBody(source, "EmergencyAbility");
+        var attackAbility = ExtractMethodBody(source, "AttackAbility");
+        var tryUseHeartbreak = ExtractMethodBody(source, "bool TryUseHeartBreakShot");
+        var reservationActive = ExtractMethodBody(source, "bool IsBloodletterBurstReservationActive");
+        var reservationHorizon = ExtractMethodBody(source, "float GetBloodletterBurstEntryHorizon");
+        var chargeForecast = ExtractMethodBody(source, "bool CanRecoverBloodletterChargesAfterSpend");
+
+        AssertSourceDoesNotMatch(
+            tryUseHeartbreak,
+            @"\b(isInWanderersHold|isInMagesHold|isEmpyrealBlocking|holdForRagingOrCap)\b",
+            "BRD Ascended should remove broad non-reservation Bloodletter holds");
+        AssertSourceMatches(
+            reservationActive,
+            @"return\s+CanEnterBurstWindow\s*\|\|\s*\(\s*InArmys\s*&&\s*SongTime\s*<=\s*ArmyHeartbreakHoldThreshold\s*\)\s*;",
+            "Bloodletter reservation should be active only for immediate burst entry or Army's Paeon pooling");
+        AssertSourceMatches(
+            reservationHorizon,
+            @"if\s*\(\s*CanEnterBurstWindow\s*\)\s*return\s+0f\s*;.*?return\s+InArmys\s*&&\s*SongTime\s*<=\s*ArmyHeartbreakHoldThreshold\s*\?\s*Math\.Max\s*\(\s*0f\s*,\s*SongTime\s*-\s*ArmyRemainTime\s*\)\s*:\s*0f\s*;",
+            "Bloodletter reservation horizon should use the planned Army song swap point");
+        AssertSourceMatches(
+            chargeForecast,
+            @"var\s+chargesAfterSpend\s*=\s*Math\.Max\s*\(\s*currentCharges\s*-\s*1\s*,\s*0\s*\).*?var\s+chargesNeeded\s*=\s*maximumCharges\s*-\s*chargesAfterSpend",
+            "Bloodletter recovery should forecast from the post-spend charge count");
+        AssertSourceMatches(
+            chargeForecast,
+            @"var\s+firstChargeRecoveryTime\s*=\s*isCooldownTicking\s*&&\s*currentCharges\s*<\s*maximumCharges\s*\?\s*Math\.Max\s*\(\s*0f\s*,\s*firstChargeTimeRemaining\s*\)\s*:\s*oneChargeRecastTime\s*;",
+            "Bloodletter recovery should distinguish an existing cooldown tick from a fresh full-charge spend");
+        AssertSourceMatches(
+            tryUseHeartbreak,
+            @"var\s+reservationActive\s*=\s*IsBloodletterBurstReservationActive\s*\(\s*\)\s*;.*?if\s*\(\s*InBurst\s*\|\|\s*!\s*reservationActive\s*\)\s*\{.*?return\s+TryUseBloodletterVariant\s*\(\s*out\s+act\s*,\s*usedUp:\s*true\s*\)\s*;.*?\}",
+            "Bloodletter should spend freely outside burst reservation");
+        AssertSourceMatches(
+            tryUseHeartbreak,
+            @"var\s+canRecoverAfterSpend\s*=\s*CanRecoverBloodletterChargesAfterSpend\s*\(.*?\).*?return\s+\(\s*canRecoverAfterSpend\s*\|\|\s*willHaveMaxCharges\s*\)\s*&&\s*TryUseBloodletterVariant\s*\(\s*out\s+act\s*,\s*usedUp:\s*true\s*\)\s*;",
+            "Bloodletter reservation should spend only when recovery or overcap protection allows it");
+        AssertSourceMatches(
+            emergencyAbility,
+            @"TryUseEmpyrealArrow\s*\(\s*out\s+act\s*\).*?TryUseBarrage\s*\(\s*out\s+act\s*\).*?TryUsePitchPerfect\s*\(\s*out\s+act\s*\)",
+            "Emergency ability priority should keep Empyreal Arrow, Barrage, and Pitch Perfect ahead of attack ability spending");
+        AssertSourceMatches(
+            attackAbility,
+            @"TryUseRadiantFinale\s*\(\s*out\s+act\s*\).*?TryUseBattleVoice\s*\(\s*out\s+act\s*\).*?TryUseRagingStrikes\s*\(\s*out\s+act\s*\).*?TryUseHeartBreakShot\s*\(\s*out\s+act\s*\).*?TryUseSideWinder\s*\(\s*out\s+act\s*\)",
+            "Attack ability priority should keep burst buffs before Bloodletter and Sidewinder after Bloodletter");
+    }
+
     static void BardAscendedRuntimeAdvancesStrictOpenerOnlyAfterActionSuccess()
     {
         var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
