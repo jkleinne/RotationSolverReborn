@@ -1475,32 +1475,6 @@ public sealed class BRD_Ascended : BardRotation
             : 0f;
     }
 
-    private readonly record struct BloodletterChargeRecoveryForecast
-    {
-        public int CurrentCharges { get; init; }
-        public int MaximumCharges { get; init; }
-        public bool IsCooldownTicking { get; init; }
-        public float FirstChargeTimeRemaining { get; init; }
-        public float OneChargeRecastTime { get; init; }
-        public float RecoveryHorizon { get; init; }
-    }
-
-    private static bool CanRecoverBloodletterChargesAfterSpend(BloodletterChargeRecoveryForecast forecast)
-    {
-        if (forecast.CurrentCharges <= 0) return false;
-
-        var chargesAfterSpend = Math.Max(forecast.CurrentCharges - 1, 0);
-        var chargesNeeded = forecast.MaximumCharges - chargesAfterSpend;
-        if (chargesNeeded <= 0) return true;
-        if (forecast.RecoveryHorizon <= 0f) return false;
-
-        var firstChargeRecoveryTime = forecast.IsCooldownTicking && forecast.CurrentCharges < forecast.MaximumCharges
-            ? Math.Max(0f, forecast.FirstChargeTimeRemaining)
-            : forecast.OneChargeRecastTime;
-        var fullRecoveryTime = firstChargeRecoveryTime + (chargesNeeded - 1) * forecast.OneChargeRecastTime;
-        return fullRecoveryTime <= forecast.RecoveryHorizon;
-    }
-
     private bool TryUseHeartBreakShot(out IAction? act)
     {
         act = null;
@@ -1517,7 +1491,7 @@ public sealed class BRD_Ascended : BardRotation
             return TryUseBloodletterVariant(out act, usedUp: true);
         }
 
-        var canRecoverAfterSpend = CanRecoverBloodletterChargesAfterSpend(new BloodletterChargeRecoveryForecast
+        var canRecoverAfterSpend = BardAscendedDecisionPolicy.CanRecoverBloodletterChargesAfterSpend(new BardAscendedBloodletterRecoveryInput
         {
             CurrentCharges = cooldown.CurrentCharges,
             MaximumCharges = BloodletterMax,

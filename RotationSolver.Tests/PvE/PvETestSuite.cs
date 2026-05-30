@@ -18,6 +18,7 @@ internal static partial class PvETestSuite
         new("bard ascended runtime falls back when enhanced filler cannot resolve", BardAscendedRuntimeFallsBackWhenEnhancedFillerCannotResolve),
         new("bard ascended aoe thresholds distinguish gcd and ogcd", BardAscendedAoeThresholdsDistinguishGcdAndOgcd),
         new("bard ascended runtime uses resolved aoe target counts", BardAscendedRuntimeUsesResolvedAoeTargetCounts),
+        new("bard ascended bloodletter recovery forecasts post spend charges", BardAscendedBloodletterRecoveryForecastsPostSpendCharges),
         new("bard ascended first cycle starts on combat entry and timer reset", BardAscendedFirstCycleStartsOnCombatEntryAndTimerReset),
         new("bard ascended dirty start recovery only uses dungeon song starts", BardAscendedDirtyStartRecoveryOnlyUsesDungeonSongStarts),
         new("bard ascended runtime uses support action hooks", BardAscendedRuntimeUsesSupportActionHooks),
