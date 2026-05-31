@@ -423,9 +423,10 @@ public sealed class BRD_Ascended : BardRotation
         if (TryUseIronJaws(out act)) return true;
         if (TryUseBurst(out act)) return true;
         if (TryUseAoeApexArrow(out act)
-            || TryUseAoeBlastArrow(out act)) return true;
-        if (TryUseAoE(out act)) return true;
+            || TryUseAoeBlastArrow(out act)
+            || TryUseEnhancedAoeFiller(out act)) return true;
         if (TryUseDoTs(out act)) return true;
+        if (TryUseAoE(out act)) return true;
         if (TryUseApexArrow(out act)
             || TryUseBlastArrow(out act)) return true;
         if (TryUseResonantArrow(out act)) return true;
@@ -1081,6 +1082,17 @@ public sealed class BRD_Ascended : BardRotation
         act = null;
         if (IsInSandbagMode || !CanUseEnhancedFiller || WouldUseDoTs) return false;
 
+        if (TryUseEnhancedAoeFiller(out act)) return true;
+
+        var procArrow = RefulgentArrowPvE.EnoughLevel ? RefulgentArrowPvE : StraightShotPvE;
+        return procArrow.CanUse(out act, skipComboCheck: true);
+    }
+
+    private bool TryUseEnhancedAoeFiller(out IAction? act)
+    {
+        act = null;
+        if (IsInSandbagMode || !CanUseEnhancedFiller) return false;
+
         var procAoE = ShadowbitePvE.EnoughLevel ? ShadowbitePvE : WideVolleyPvE;
         if (procAoE.CanUse(out var procAoEAct, skipAoeCheck: true, skipComboCheck: true) && HasEnoughGcdAoETargets(procAoEAct))
         {
@@ -1088,24 +1100,13 @@ public sealed class BRD_Ascended : BardRotation
             return true;
         }
 
-        var procArrow = RefulgentArrowPvE.EnoughLevel ? RefulgentArrowPvE : StraightShotPvE;
-        return procArrow.CanUse(out act, skipComboCheck: true);
+        return false;
     }
 
     private bool TryUseAoE(out IAction? act)
     {
         act = null;
-        if (IsInSandbagMode) return false;
-
-        if (CanUseEnhancedFiller)
-        {
-            var procAoE = ShadowbitePvE.EnoughLevel ? ShadowbitePvE : WideVolleyPvE;
-            if (procAoE.CanUse(out var procAoEAct, skipAoeCheck: true, skipComboCheck: true) && HasEnoughGcdAoETargets(procAoEAct))
-            {
-                act = procAoEAct;
-                return true;
-            }
-        }
+        if (TryUseEnhancedAoeFiller(out act)) return true;
 
         var aoeAction = LadonsbitePvE.EnoughLevel ? LadonsbitePvE : QuickNockPvE;
         if (aoeAction.CanUse(out var aoeActionAct, skipAoeCheck: true) && HasEnoughGcdAoETargets(aoeActionAct))

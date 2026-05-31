@@ -578,6 +578,7 @@ internal static partial class PvETestSuite
     {
         var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
         var enhancedFiller = ExtractMethodBody(source, "bool TryUseEnhancedFiller");
+        var enhancedAoeFiller = ExtractMethodBody(source, "bool TryUseEnhancedAoeFiller");
         var aoe = ExtractMethodBody(source, "bool TryUseAoE");
         var bloodletterVariant = ExtractMethodBody(source, "bool TryUseBloodletterVariant");
 
@@ -604,13 +605,13 @@ internal static partial class PvETestSuite
             "Rain of Death should not use field hostiles before target resolution");
 
         AssertSourceMatches(
-            enhancedFiller,
+            enhancedAoeFiller,
             @"\bprocAoE\.CanUse\s*\(\s*out\s+var\s+procAoEAct\s*,\s*skipAoeCheck\s*:\s*true\s*,\s*skipComboCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughGcdAoETargets\s*\(\s*procAoEAct\s*\).*?\bact\s*=\s*procAoEAct\s*;",
             "enhanced filler AoE should assign only resolved targets that pass the Ascended GCD AoE threshold");
         AssertSourceMatches(
             aoe,
-            @"\bprocAoE\.CanUse\s*\(\s*out\s+var\s+procAoEAct\s*,\s*skipAoeCheck\s*:\s*true\s*,\s*skipComboCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughGcdAoETargets\s*\(\s*procAoEAct\s*\).*?\bact\s*=\s*procAoEAct\s*;",
-            "proc AoE should assign only resolved targets that pass the Ascended GCD AoE threshold");
+            @"TryUseEnhancedAoeFiller\s*\(\s*out\s+act\s*\).*?aoeAction\.CanUse\s*\(\s*out\s+var\s+aoeActionAct\s*,\s*skipAoeCheck\s*:\s*true\s*\)",
+            "GCD AoE should reuse the enhanced AoE helper before standard AoE");
         AssertSourceMatches(
             aoe,
             @"\baoeAction\.CanUse\s*\(\s*out\s+var\s+aoeActionAct\s*,\s*skipAoeCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughGcdAoETargets\s*\(\s*aoeActionAct\s*\).*?\bact\s*=\s*aoeActionAct\s*;",
@@ -632,6 +633,7 @@ internal static partial class PvETestSuite
         var burst = ExtractMethodBody(source, "bool TryUseBurst");
         var aoeApex = ExtractMethodBody(source, "bool TryUseAoeApexArrow");
         var aoeBlast = ExtractMethodBody(source, "bool TryUseAoeBlastArrow");
+        var enhancedAoeFiller = ExtractMethodBody(source, "bool TryUseEnhancedAoeFiller");
         var aoe = ExtractMethodBody(source, "bool TryUseAoE");
         var policySource = StripSourceComments(File.ReadAllText(RepositoryPath(
             "RotationSolver",
@@ -641,8 +643,8 @@ internal static partial class PvETestSuite
 
         AssertSourceMatches(
             generalGcd,
-            @"TryUseOpenerGcd\s*\(\s*out\s+act\s*\).*?TryUseIronJaws\s*\(\s*out\s+act\s*\).*?TryUseBurst\s*\(\s*out\s+act\s*\).*?TryUseAoeApexArrow\s*\(\s*out\s+act\s*\).*?TryUseAoeBlastArrow\s*\(\s*out\s+act\s*\).*?TryUseAoE\s*\(\s*out\s+act\s*\).*?TryUseDoTs\s*\(\s*out\s+act\s*\).*?TryUseApexArrow\s*\(\s*out\s+act\s*\).*?TryUseBlastArrow\s*\(\s*out\s+act\s*\).*?TryUseResonantArrow\s*\(\s*out\s+act\s*\).*?TryUseFiller\s*\(\s*out\s+act\s*\)",
-            "BRD Ascended should spend burst and AoE GCDs before fresh DoTs while keeping Iron Jaws first");
+            @"TryUseOpenerGcd\s*\(\s*out\s+act\s*\).*?TryUseIronJaws\s*\(\s*out\s+act\s*\).*?TryUseBurst\s*\(\s*out\s+act\s*\).*?TryUseAoeApexArrow\s*\(\s*out\s+act\s*\).*?TryUseAoeBlastArrow\s*\(\s*out\s+act\s*\).*?TryUseEnhancedAoeFiller\s*\(\s*out\s+act\s*\).*?TryUseDoTs\s*\(\s*out\s+act\s*\).*?TryUseAoE\s*\(\s*out\s+act\s*\).*?TryUseApexArrow\s*\(\s*out\s+act\s*\).*?TryUseBlastArrow\s*\(\s*out\s+act\s*\).*?TryUseResonantArrow\s*\(\s*out\s+act\s*\).*?TryUseFiller\s*\(\s*out\s+act\s*\)",
+            "BRD Ascended should spend burst and premium AoE GCDs before fresh DoTs while keeping normal AoE filler after DoTs");
         AssertSourceMatches(
             burst,
             @"TryUseRadiantEncore\s*\(\s*out\s+act\s*\).*?TryUseApexArrow\s*\(\s*out\s+act\s*\).*?TryUseBlastArrow\s*\(\s*out\s+act\s*\).*?TryUseResonantArrow\s*\(\s*out\s+act\s*\).*?TryUseEnhancedFiller\s*\(\s*out\s+act\s*\)",
@@ -659,6 +661,10 @@ internal static partial class PvETestSuite
             aoeBlast,
             @"IsInSandbagMode.*?BlastArrowPvEReady.*?WouldUseIronJaws.*?BlastArrowPvE\.CanUse\s*\(\s*out\s+act\s*,\s*skipAoeCheck\s*:\s*true\s*,\s*skipComboCheck\s*:\s*true\s*\).*?HasEnoughGcdAoETargets\s*\(\s*act\s*\)",
             "AoE Blast should use resolved Blast targets and keep Iron Jaws protection");
+        AssertSourceMatches(
+            enhancedAoeFiller,
+            @"CanUseEnhancedFiller.*?procAoE\.CanUse\s*\(\s*out\s+var\s+procAoEAct\s*,\s*skipAoeCheck\s*:\s*true\s*,\s*skipComboCheck\s*:\s*true\s*\).*?HasEnoughGcdAoETargets\s*\(\s*procAoEAct\s*\)",
+            "enhanced AoE filler should use resolved proc AoE targets before fresh DoTs");
         AssertSourceDoesNotMatch(
             policySource,
             @"BardAscendedApexDecisionInput\s*\([^)]*(AffectedTargets|TargetCount|AoETargets)",
@@ -667,6 +673,10 @@ internal static partial class PvETestSuite
             aoe,
             @"CanUseEnhancedFiller\s*&&\s*!\s*WouldUseDoTs",
             "fresh DoTs should not block enhanced AoE filler on packs");
+        AssertSourceDoesNotMatch(
+            aoe,
+            @"\bvar\s+procAoE\b",
+            "normal AoE filler should not carry the enhanced AoE proc branch");
     }
 
     static void BardAscendedDirtyStartRecoveryOnlyUsesDungeonSongStarts()
@@ -975,7 +985,7 @@ internal static partial class PvETestSuite
 
         AssertSourceMatches(
             generalGcd,
-            @"TryUseBurst\(out\s+act\).*?TryUseAoeApexArrow\(out\s+act\).*?TryUseAoeBlastArrow\(out\s+act\).*?TryUseAoE\(out\s+act\).*?TryUseDoTs\(out\s+act\).*?TryUseApexArrow\(out\s+act\).*?TryUseBlastArrow\(out\s+act\).*?TryUseResonantArrow\(out\s+act\).*?TryUseFiller\(out\s+act\)",
+            @"TryUseBurst\(out\s+act\).*?TryUseAoeApexArrow\(out\s+act\).*?TryUseAoeBlastArrow\(out\s+act\).*?TryUseEnhancedAoeFiller\(out\s+act\).*?TryUseDoTs\(out\s+act\).*?TryUseAoE\(out\s+act\).*?TryUseApexArrow\(out\s+act\).*?TryUseBlastArrow\(out\s+act\).*?TryUseResonantArrow\(out\s+act\).*?TryUseFiller\(out\s+act\)",
             "BRD Ascended should reach Resonant Arrow before filler even when burst is inactive");
     }
 
@@ -1392,7 +1402,7 @@ internal static partial class PvETestSuite
 
         AssertSourceMatches(
             generalGcd,
-            @"TryUseOpenerGcd\s*\(\s*out\s+act\s*\).*?TryUseIronJaws\s*\(\s*out\s+act\s*\).*?TryUseBurst\s*\(\s*out\s+act\s*\).*?TryUseAoeApexArrow\s*\(\s*out\s+act\s*\).*?TryUseAoeBlastArrow\s*\(\s*out\s+act\s*\).*?TryUseAoE\s*\(\s*out\s+act\s*\).*?TryUseDoTs\s*\(\s*out\s+act\s*\)",
+            @"TryUseOpenerGcd\s*\(\s*out\s+act\s*\).*?TryUseIronJaws\s*\(\s*out\s+act\s*\).*?TryUseBurst\s*\(\s*out\s+act\s*\).*?TryUseAoeApexArrow\s*\(\s*out\s+act\s*\).*?TryUseAoeBlastArrow\s*\(\s*out\s+act\s*\).*?TryUseEnhancedAoeFiller\s*\(\s*out\s+act\s*\).*?TryUseDoTs\s*\(\s*out\s+act\s*\)",
             "BRD Ascended should attempt strict opener GCD before normal priority GCDs");
     }
 
