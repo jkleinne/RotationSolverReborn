@@ -12,7 +12,7 @@ public sealed class BRD_Ascended : BardRotation
 
     #region Constants
     private const float DoTEndBuffer = 0.5f;
-    private const float ArmyHeartbreakHoldThreshold = 30f;
+    private const float ArmyHeartbreakHoldThreshold = 35f;
     private const float SidewinderBuffLookahead = 10f;
     private const float HeartbreakChargeLookahead = 5f;
     private const float Cycle369PrepullHeartbreakWindowSeconds = 1.65f;
@@ -25,12 +25,12 @@ public sealed class BRD_Ascended : BardRotation
     private static readonly StatusID[] NoBurstStatuses = [];
     private static readonly StatusID[] RagingStrikesStatuses = [StatusID.RagingStrikes];
     private static readonly StatusID[] BattleVoiceStatuses = [StatusID.BattleVoice];
-    private static readonly StatusID[] RadiantFinaleStatuses = [StatusID.RadiantFinale];
+    private static readonly StatusID[] RadiantFinaleStatuses = [StatusID.RadiantFinale_2964];
     private static readonly StatusID[] RagingBattleStatuses = [StatusID.RagingStrikes, StatusID.BattleVoice];
-    private static readonly StatusID[] RagingFinaleStatuses = [StatusID.RagingStrikes, StatusID.RadiantFinale];
-    private static readonly StatusID[] BattleFinaleStatuses = [StatusID.BattleVoice, StatusID.RadiantFinale];
+    private static readonly StatusID[] RagingFinaleStatuses = [StatusID.RagingStrikes, StatusID.RadiantFinale_2964];
+    private static readonly StatusID[] BattleFinaleStatuses = [StatusID.BattleVoice, StatusID.RadiantFinale_2964];
     private static readonly StatusID[] FullBurstStatuses =
-        [StatusID.RagingStrikes, StatusID.BattleVoice, StatusID.RadiantFinale];
+        [StatusID.RagingStrikes, StatusID.BattleVoice, StatusID.RadiantFinale_2964];
 
     #endregion
 
@@ -421,8 +421,12 @@ public sealed class BRD_Ascended : BardRotation
         RefreshCombatCycleState();
         if (TryUseOpenerGcd(out act)) return true;
         if (TryUseIronJaws(out act)) return true;
-        if (TryUseDoTs(out act)) return true;
         if (TryUseBurst(out act)) return true;
+        if (TryUseAoeApexArrow(out act)
+            || TryUseAoeBlastArrow(out act)
+            || TryUseEnhancedAoeFiller(out act)) return true;
+        if (TryUseDoTs(out act)) return true;
+        if (TryUseAoE(out act)) return true;
         if (TryUseApexArrow(out act)
             || TryUseBlastArrow(out act)) return true;
         if (TryUseResonantArrow(out act)) return true;
@@ -975,10 +979,7 @@ public sealed class BRD_Ascended : BardRotation
         if (TryUseRadiantEncore(out act)) return true;
         if (TryUseApexArrow(out act) || TryUseBlastArrow(out act)) return true;
         if (TryUseResonantArrow(out act)) return true;
-        if (TryUseEnhancedFiller(out act)) return true;
-        if (TryUseIronJaws(out act)) return true;
-        return TryUseFiller(out act)
-               || base.GeneralGCD(out act);
+        return TryUseEnhancedFiller(out act);
     }
 
     private static BardAscendedSongPhase CurrentSongPhase =>
@@ -995,7 +996,6 @@ public sealed class BRD_Ascended : BardRotation
         SoulVoice: SoulVoice,
         IsInBurst: InBurst,
         WouldUseIronJaws: WouldUseIronJaws,
-        CanEnterBurst: CanEnterBurstWindow,
         SongSecondsRemaining: SongTime,
         TargetSecondsRemaining: EffectiveTargetTimeToKill,
         WeaponTotalSeconds: WeaponTotal,
@@ -1012,6 +1012,18 @@ public sealed class BRD_Ascended : BardRotation
         return ApexArrowPvE.CanUse(out act);
     }
 
+    private bool TryUseAoeApexArrow(out IAction? act)
+    {
+        act = null;
+        if (IsInSandbagMode || SoulVoice < BardAscendedDecisionPolicy.ApexBlastReadySoulVoice)
+        {
+            return false;
+        }
+
+        return ApexArrowPvE.CanUse(out act, skipAoeCheck: true)
+               && HasEnoughGcdAoETargets(act);
+    }
+
     private bool TryUseBlastArrow(out IAction? act)
     {
         act = null;
@@ -1024,6 +1036,18 @@ public sealed class BRD_Ascended : BardRotation
         }
 
         return BlastArrowPvE.CanUse(out act, skipComboCheck: true);
+    }
+
+    private bool TryUseAoeBlastArrow(out IAction? act)
+    {
+        act = null;
+        if (IsInSandbagMode || !BlastArrowPvEReady || WouldUseIronJaws)
+        {
+            return false;
+        }
+
+        return BlastArrowPvE.CanUse(out act, skipAoeCheck: true, skipComboCheck: true)
+               && HasEnoughGcdAoETargets(act);
     }
 
     private bool TryUseRadiantEncore(out IAction? act)
@@ -1058,6 +1082,17 @@ public sealed class BRD_Ascended : BardRotation
         act = null;
         if (IsInSandbagMode || !CanUseEnhancedFiller || WouldUseDoTs) return false;
 
+        if (TryUseEnhancedAoeFiller(out act)) return true;
+
+        var procArrow = RefulgentArrowPvE.EnoughLevel ? RefulgentArrowPvE : StraightShotPvE;
+        return procArrow.CanUse(out act, skipComboCheck: true);
+    }
+
+    private bool TryUseEnhancedAoeFiller(out IAction? act)
+    {
+        act = null;
+        if (IsInSandbagMode || !CanUseEnhancedFiller) return false;
+
         var procAoE = ShadowbitePvE.EnoughLevel ? ShadowbitePvE : WideVolleyPvE;
         if (procAoE.CanUse(out var procAoEAct, skipAoeCheck: true, skipComboCheck: true) && HasEnoughGcdAoETargets(procAoEAct))
         {
@@ -1065,24 +1100,13 @@ public sealed class BRD_Ascended : BardRotation
             return true;
         }
 
-        var procArrow = RefulgentArrowPvE.EnoughLevel ? RefulgentArrowPvE : StraightShotPvE;
-        return procArrow.CanUse(out act, skipComboCheck: true);
+        return false;
     }
 
     private bool TryUseAoE(out IAction? act)
     {
         act = null;
-        if (IsInSandbagMode) return false;
-
-        if (CanUseEnhancedFiller && !WouldUseDoTs)
-        {
-            var procAoE = ShadowbitePvE.EnoughLevel ? ShadowbitePvE : WideVolleyPvE;
-            if (procAoE.CanUse(out var procAoEAct, skipAoeCheck: true, skipComboCheck: true) && HasEnoughGcdAoETargets(procAoEAct))
-            {
-                act = procAoEAct;
-                return true;
-            }
-        }
+        if (TryUseEnhancedAoeFiller(out act)) return true;
 
         var aoeAction = LadonsbitePvE.EnoughLevel ? LadonsbitePvE : QuickNockPvE;
         if (aoeAction.CanUse(out var aoeActionAct, skipAoeCheck: true) && HasEnoughGcdAoETargets(aoeActionAct))
@@ -1557,7 +1581,7 @@ public sealed class BRD_Ascended : BardRotation
     {
         private BRD_Ascended? _rotation;
 
-        public BardAscendedPotionTiming Timing { get; set; } = BardAscendedPotionTiming.TwoEight;
+        public BardAscendedPotionTiming Timing { get; set; } = BardAscendedPotionTiming.Opener;
 
         public bool ShouldUsePotion(BRD_Ascended rotation, out IAction? act, bool clippingCheck = true)
         {

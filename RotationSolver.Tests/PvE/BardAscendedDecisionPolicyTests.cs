@@ -215,6 +215,45 @@ internal static partial class PvETestSuite
         AssertEqual(new BardAscendedSongDurations(40f, 38f, 37f), custom, "custom should return caller supplied durations");
     }
 
+    static void BardAscendedRadiantFinaleUsesDamageBuffStatus()
+    {
+        var bardSource = StripSourceComments(File.ReadAllText(RepositoryPath(
+            "RotationSolver.Basic",
+            "Rotations",
+            "Basic",
+            "BardRotation.cs")));
+        var ascendedSource = StripSourceComments(File.ReadAllText(RepositoryPath(
+            "RotationSolver",
+            "RebornRotations",
+            "Ranged",
+            "BRD_Ascended.cs")));
+
+        AssertSourceMatches(
+            bardSource,
+            @"HasRadiantFinale\s*=>\s*StatusHelper\.PlayerHasStatus\s*\(\s*true\s*,\s*StatusID\.RadiantFinale_2964\s*,\s*StatusID\.RadiantFinale\s*\)",
+            "shared Bard Radiant Finale detection should prefer the damage buff status and keep legacy status compatibility");
+        AssertSourceMatches(
+            ascendedSource,
+            @"RadiantFinaleStatuses\s*=\s*\[\s*StatusID\.RadiantFinale_2964\s*\]",
+            "BRD Ascended burst status sets should use the Radiant Finale damage buff");
+        AssertSourceMatches(
+            ascendedSource,
+            @"RagingFinaleStatuses\s*=\s*\[\s*StatusID\.RagingStrikes\s*,\s*StatusID\.RadiantFinale_2964\s*\]",
+            "BRD Ascended Raging Strikes and Radiant Finale burst set should use the Radiant Finale damage buff");
+        AssertSourceMatches(
+            ascendedSource,
+            @"BattleFinaleStatuses\s*=\s*\[\s*StatusID\.BattleVoice\s*,\s*StatusID\.RadiantFinale_2964\s*\]",
+            "BRD Ascended Battle Voice and Radiant Finale burst set should use the Radiant Finale damage buff");
+        AssertSourceMatches(
+            ascendedSource,
+            @"FullBurstStatuses\s*=\s*\[\s*StatusID\.RagingStrikes\s*,\s*StatusID\.BattleVoice\s*,\s*StatusID\.RadiantFinale_2964\s*\]",
+            "BRD Ascended full burst should use the Radiant Finale damage buff");
+        AssertSourceDoesNotMatch(
+            ascendedSource,
+            @"FullBurstStatuses\s*=\s*\[\s*StatusID\.RagingStrikes\s*,\s*StatusID\.BattleVoice\s*,\s*StatusID\.RadiantFinale\s*\]",
+            "BRD Ascended full burst should not wait on the non damage Radiant Finale status");
+    }
+
     static void BardAscendedApexSpendsDuringBurstAndMageBalladWindows()
     {
         AssertTrue(
@@ -250,32 +289,29 @@ internal static partial class PvETestSuite
             "Apex should not spend only because Army's Paeon has enough Soul Voice");
     }
 
-    static void BardAscendedApexCapFallbackRespectsBurstAvailability()
+    static void BardAscendedApexCapFallbackStaysInMageBallad()
     {
         AssertFalse(
-            ShouldSpendApex(BardAscendedSongPhase.WanderersMinuet, soulVoice: 100, canEnterBurst: true),
-            "Apex should hold capped Soul Voice in Wanderer's Minuet when burst can enter");
-        AssertTrue(
-            ShouldSpendApex(BardAscendedSongPhase.WanderersMinuet, soulVoice: 100, canEnterBurst: false),
-            "Apex should spend capped Soul Voice in Wanderer's Minuet when burst cannot enter");
+            ShouldSpendApex(BardAscendedSongPhase.WanderersMinuet, soulVoice: 100),
+            "Apex should hold capped Soul Voice in Wanderer's Minuet when no end of fight dump is needed");
         AssertFalse(
-            ShouldSpendApex(BardAscendedSongPhase.ArmysPaeon, soulVoice: 100, canEnterBurst: true),
-            "Apex should hold capped Soul Voice in Army's Paeon when burst can enter");
+            ShouldSpendApex(BardAscendedSongPhase.ArmysPaeon, soulVoice: 100),
+            "Apex should hold capped Soul Voice in Army's Paeon when no end of fight dump is needed");
         AssertTrue(
-            ShouldSpendApex(BardAscendedSongPhase.ArmysPaeon, soulVoice: 100, canEnterBurst: false),
-            "Apex should spend capped Soul Voice in Army's Paeon when burst cannot enter");
+            ShouldSpendApex(BardAscendedSongPhase.MagesBallad, soulVoice: 100, songSecondsRemaining: 30f),
+            "Apex should still spend capped Soul Voice in Mage's Ballad");
         AssertFalse(
             ShouldSpendApex(
                 BardAscendedSongPhase.WanderersMinuet,
                 soulVoice: 100,
-                wouldUseIronJaws: true,
-                canEnterBurst: false),
-            "Iron Jaws should still block capped Soul Voice fallback");
+                wouldUseIronJaws: true),
+            "Iron Jaws should still block non end of fight Apex spending");
     }
 
-    static void BardAscendedRuntimeFeedsBurstActionabilityToApexPolicy()
+    static void BardAscendedRuntimeKeepsBurstActionabilityAtBuffGates()
     {
         var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
+        var policySource = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BardAscendedDecisionPolicy.cs")));
         var pendingRadiantFinaleGate = ExtractMethodBody(source, "bool CanStartBurstWithRadiantFinale");
         var pendingBattleVoiceGate = ExtractMethodBody(source, "bool CanStartBurstWithBattleVoice");
         var pendingRagingGate = ExtractMethodBody(source, "bool CanStartBurstWithRagingStrikes");
@@ -283,31 +319,14 @@ internal static partial class PvETestSuite
         var tryUseBattleVoice = ExtractMethodBody(source, "bool TryUseBattleVoice");
         var tryUseRagingStrikes = ExtractMethodBody(source, "bool TryUseRagingStrikes");
 
-        AssertTrue(
-            ShouldSpendApex(BardAscendedSongPhase.ArmysPaeon, soulVoice: 100, canEnterBurst: false),
-            "Apex should spend capped Soul Voice when Army's Paeon prevents burst from starting");
-        AssertFalse(
-            ShouldSpendApex(BardAscendedSongPhase.ArmysPaeon, soulVoice: 100, canEnterBurst: true),
-            "Apex should hold capped Soul Voice when burst can enter");
-        AssertTrue(
-            ShouldSpendApex(BardAscendedSongPhase.MagesBallad, soulVoice: 100, canEnterBurst: true, songSecondsRemaining: 30f),
-            "Mage's Ballad cap spending should not depend on burst actionability");
-        AssertFalse(
-            ShouldSpendApex(
-                BardAscendedSongPhase.ArmysPaeon,
-                soulVoice: 100,
-                wouldUseIronJaws: true,
-                canEnterBurst: false),
-            "Iron Jaws should keep priority over the capped Soul Voice recovery fallback");
-
-        AssertSourceMatches(
-            source,
-            @"\bCanEnterBurst:\s*CanEnterBurstWindow\b",
-            "BRD Ascended should pass runtime burst actionability into Apex decisions");
+        AssertSourceDoesNotMatch(
+            policySource,
+            @"BardAscendedApexDecisionInput\s*\([^)]*CanEnterBurst",
+            "Apex policy input should not keep dead burst actionability data");
         AssertSourceDoesNotMatch(
             source,
-            @"\bCanEnterBurst:\s*CanBurst\b",
-            "BRD Ascended should not pass raw burst permission into Apex decisions");
+            @"\bCanEnterBurst:\s*",
+            "BRD Ascended Apex decisions should not receive runtime burst actionability");
         AssertSourceMatches(
             source,
             @"\bprivate\s+bool\s+CanEnterBurstWindow\s*\{.*?if\s*\(\s*!\s*CanBurst\s*\)\s*return\s+false\s*;.*?if\s*\(\s*InBurst\s*\)\s*return\s+true\s*;.*?return\s+CanStartBurstWithRadiantFinale\(out\s+_\)\s*\|\|\s*CanStartBurstWithBattleVoice\(out\s+_\)\s*\|\|\s*CanStartBurstWithRagingStrikes\(out\s+_\)\s*;",
@@ -472,8 +491,8 @@ internal static partial class PvETestSuite
     {
         AssertFalse(BardAscendedDecisionPolicy.ShouldUseGcdAoE(1), "GCD AoE should reject one target");
         AssertTrue(BardAscendedDecisionPolicy.ShouldUseGcdAoE(2), "GCD AoE should start at two targets");
-        AssertFalse(BardAscendedDecisionPolicy.ShouldUseOgcdAoE(2), "oGCD AoE should reject two targets");
-        AssertTrue(BardAscendedDecisionPolicy.ShouldUseOgcdAoE(3), "oGCD AoE should start at three targets");
+        AssertFalse(BardAscendedDecisionPolicy.ShouldUseOgcdAoE(1), "oGCD AoE should reject one target");
+        AssertTrue(BardAscendedDecisionPolicy.ShouldUseOgcdAoE(2), "oGCD AoE should start at two targets");
     }
 
     static void BardAscendedBloodletterRecoveryForecastsPostSpendCharges()
@@ -559,6 +578,7 @@ internal static partial class PvETestSuite
     {
         var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
         var enhancedFiller = ExtractMethodBody(source, "bool TryUseEnhancedFiller");
+        var enhancedAoeFiller = ExtractMethodBody(source, "bool TryUseEnhancedAoeFiller");
         var aoe = ExtractMethodBody(source, "bool TryUseAoE");
         var bloodletterVariant = ExtractMethodBody(source, "bool TryUseBloodletterVariant");
 
@@ -585,13 +605,13 @@ internal static partial class PvETestSuite
             "Rain of Death should not use field hostiles before target resolution");
 
         AssertSourceMatches(
-            enhancedFiller,
+            enhancedAoeFiller,
             @"\bprocAoE\.CanUse\s*\(\s*out\s+var\s+procAoEAct\s*,\s*skipAoeCheck\s*:\s*true\s*,\s*skipComboCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughGcdAoETargets\s*\(\s*procAoEAct\s*\).*?\bact\s*=\s*procAoEAct\s*;",
             "enhanced filler AoE should assign only resolved targets that pass the Ascended GCD AoE threshold");
         AssertSourceMatches(
             aoe,
-            @"\bprocAoE\.CanUse\s*\(\s*out\s+var\s+procAoEAct\s*,\s*skipAoeCheck\s*:\s*true\s*,\s*skipComboCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughGcdAoETargets\s*\(\s*procAoEAct\s*\).*?\bact\s*=\s*procAoEAct\s*;",
-            "proc AoE should assign only resolved targets that pass the Ascended GCD AoE threshold");
+            @"TryUseEnhancedAoeFiller\s*\(\s*out\s+act\s*\).*?aoeAction\.CanUse\s*\(\s*out\s+var\s+aoeActionAct\s*,\s*skipAoeCheck\s*:\s*true\s*\)",
+            "GCD AoE should reuse the enhanced AoE helper before standard AoE");
         AssertSourceMatches(
             aoe,
             @"\baoeAction\.CanUse\s*\(\s*out\s+var\s+aoeActionAct\s*,\s*skipAoeCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughGcdAoETargets\s*\(\s*aoeActionAct\s*\).*?\bact\s*=\s*aoeActionAct\s*;",
@@ -600,6 +620,63 @@ internal static partial class PvETestSuite
             bloodletterVariant,
             @"\bRainOfDeathPvE\.CanUse\s*\(\s*out\s+var\s+rainOfDeathAct\s*,\s*usedUp\s*:\s*usedUp\s*,\s*skipAoeCheck\s*:\s*true\s*\)\s*&&\s*HasEnoughOgcdAoETargets\s*\(\s*rainOfDeathAct\s*\).*?\bact\s*=\s*rainOfDeathAct\s*;",
             "Rain of Death should assign only resolved targets that pass the Ascended oGCD AoE threshold");
+    }
+
+    static void BardAscendedRuntimeUsesAoeApexAndBlastBeforeFreshDots()
+    {
+        var source = StripSourceComments(File.ReadAllText(RepositoryPath(
+            "RotationSolver",
+            "RebornRotations",
+            "Ranged",
+            "BRD_Ascended.cs")));
+        var generalGcd = ExtractMethodBody(source, "GeneralGCD");
+        var burst = ExtractMethodBody(source, "bool TryUseBurst");
+        var aoeApex = ExtractMethodBody(source, "bool TryUseAoeApexArrow");
+        var aoeBlast = ExtractMethodBody(source, "bool TryUseAoeBlastArrow");
+        var enhancedAoeFiller = ExtractMethodBody(source, "bool TryUseEnhancedAoeFiller");
+        var aoe = ExtractMethodBody(source, "bool TryUseAoE");
+        var policySource = StripSourceComments(File.ReadAllText(RepositoryPath(
+            "RotationSolver",
+            "RebornRotations",
+            "Ranged",
+            "BardAscendedDecisionPolicy.cs")));
+
+        AssertSourceMatches(
+            generalGcd,
+            @"TryUseOpenerGcd\s*\(\s*out\s+act\s*\).*?TryUseIronJaws\s*\(\s*out\s+act\s*\).*?TryUseBurst\s*\(\s*out\s+act\s*\).*?TryUseAoeApexArrow\s*\(\s*out\s+act\s*\).*?TryUseAoeBlastArrow\s*\(\s*out\s+act\s*\).*?TryUseEnhancedAoeFiller\s*\(\s*out\s+act\s*\).*?TryUseDoTs\s*\(\s*out\s+act\s*\).*?TryUseAoE\s*\(\s*out\s+act\s*\).*?TryUseApexArrow\s*\(\s*out\s+act\s*\).*?TryUseBlastArrow\s*\(\s*out\s+act\s*\).*?TryUseResonantArrow\s*\(\s*out\s+act\s*\).*?TryUseFiller\s*\(\s*out\s+act\s*\)",
+            "BRD Ascended should spend burst and premium AoE GCDs before fresh DoTs while keeping normal AoE filler after DoTs");
+        AssertSourceMatches(
+            burst,
+            @"TryUseRadiantEncore\s*\(\s*out\s+act\s*\).*?TryUseApexArrow\s*\(\s*out\s+act\s*\).*?TryUseBlastArrow\s*\(\s*out\s+act\s*\).*?TryUseResonantArrow\s*\(\s*out\s+act\s*\).*?TryUseEnhancedFiller\s*\(\s*out\s+act\s*\)",
+            "burst GCDs should keep the burst package before returning to the outer priority");
+        AssertSourceDoesNotMatch(
+            burst,
+            @"TryUseIronJaws\s*\(\s*out\s+act\s*\)|TryUseFiller\s*\(\s*out\s+act\s*\)|base\.GeneralGCD\s*\(\s*out\s+act\s*\)",
+            "burst GCDs should not fall through to lower priority GCD fallback");
+        AssertSourceMatches(
+            aoeApex,
+            @"SoulVoice\s*<\s*BardAscendedDecisionPolicy\.ApexBlastReadySoulVoice.*?ApexArrowPvE\.CanUse\s*\(\s*out\s+act\s*,\s*skipAoeCheck\s*:\s*true\s*\).*?HasEnoughGcdAoETargets\s*\(\s*act\s*\)",
+            "AoE Apex should use resolved Apex targets and the 80 gauge threshold");
+        AssertSourceMatches(
+            aoeBlast,
+            @"IsInSandbagMode.*?BlastArrowPvEReady.*?WouldUseIronJaws.*?BlastArrowPvE\.CanUse\s*\(\s*out\s+act\s*,\s*skipAoeCheck\s*:\s*true\s*,\s*skipComboCheck\s*:\s*true\s*\).*?HasEnoughGcdAoETargets\s*\(\s*act\s*\)",
+            "AoE Blast should use resolved Blast targets and keep Iron Jaws protection");
+        AssertSourceMatches(
+            enhancedAoeFiller,
+            @"CanUseEnhancedFiller.*?procAoE\.CanUse\s*\(\s*out\s+var\s+procAoEAct\s*,\s*skipAoeCheck\s*:\s*true\s*,\s*skipComboCheck\s*:\s*true\s*\).*?HasEnoughGcdAoETargets\s*\(\s*procAoEAct\s*\)",
+            "enhanced AoE filler should use resolved proc AoE targets before fresh DoTs");
+        AssertSourceDoesNotMatch(
+            policySource,
+            @"BardAscendedApexDecisionInput\s*\([^)]*(AffectedTargets|TargetCount|AoETargets)",
+            "Apex policy input should not absorb live resolved target counts");
+        AssertSourceDoesNotMatch(
+            aoe,
+            @"CanUseEnhancedFiller\s*&&\s*!\s*WouldUseDoTs",
+            "fresh DoTs should not block enhanced AoE filler on packs");
+        AssertSourceDoesNotMatch(
+            aoe,
+            @"\bvar\s+procAoE\b",
+            "normal AoE filler should not carry the enhanced AoE proc branch");
     }
 
     static void BardAscendedDirtyStartRecoveryOnlyUsesDungeonSongStarts()
@@ -883,6 +960,24 @@ internal static partial class PvETestSuite
             "BRD Ascended potion helper should accept the active rotation during runtime checks");
     }
 
+    static void BardAscendedDefaultsFavorGuideTimings()
+    {
+        var source = StripSourceComments(File.ReadAllText(RepositoryPath(
+            "RotationSolver",
+            "RebornRotations",
+            "Ranged",
+            "BRD_Ascended.cs")));
+
+        AssertSourceMatches(
+            source,
+            @"private\s+const\s+float\s+ArmyHeartbreakHoldThreshold\s*=\s*35f\s*;",
+            "Army's Paeon Heartbreak pooling should begin at 35 seconds remaining");
+        AssertSourceMatches(
+            source,
+            @"public\s+BardAscendedPotionTiming\s+Timing\s*\{\s*get;\s*set;\s*\}\s*=\s*BardAscendedPotionTiming\.Opener\s*;",
+            "BRD Ascended should default new potion settings to opener potion usage");
+    }
+
     static void BardAscendedRuntimeSpendsResonantReadyBeforeFiller()
     {
         var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
@@ -890,7 +985,7 @@ internal static partial class PvETestSuite
 
         AssertSourceMatches(
             generalGcd,
-            @"\bTryUseBurst\(out\s+act\).*?\bTryUseApexArrow\(out\s+act\).*?\bTryUseBlastArrow\(out\s+act\).*?\bTryUseResonantArrow\(out\s+act\).*?\bTryUseFiller\(out\s+act\)",
+            @"TryUseBurst\(out\s+act\).*?TryUseAoeApexArrow\(out\s+act\).*?TryUseAoeBlastArrow\(out\s+act\).*?TryUseEnhancedAoeFiller\(out\s+act\).*?TryUseDoTs\(out\s+act\).*?TryUseAoE\(out\s+act\).*?TryUseApexArrow\(out\s+act\).*?TryUseBlastArrow\(out\s+act\).*?TryUseResonantArrow\(out\s+act\).*?TryUseFiller\(out\s+act\)",
             "BRD Ascended should reach Resonant Arrow before filler even when burst is inactive");
     }
 
@@ -1307,7 +1402,7 @@ internal static partial class PvETestSuite
 
         AssertSourceMatches(
             generalGcd,
-            @"\bif\s*\(\s*TryUseOpenerGcd\s*\(\s*out\s+act\s*\)\s*\)\s*return\s+true\s*;.*?\bTryUseIronJaws\s*\(\s*out\s+act\s*\).*?\bTryUseDoTs\s*\(\s*out\s+act\s*\).*?\bTryUseBurst\s*\(\s*out\s+act\s*\).*?\bTryUseApexArrow\s*\(\s*out\s+act\s*\).*?\bTryUseBlastArrow\s*\(\s*out\s+act\s*\).*?\bTryUseResonantArrow\s*\(\s*out\s+act\s*\).*?\bTryUseFiller\s*\(\s*out\s+act\s*\)",
+            @"TryUseOpenerGcd\s*\(\s*out\s+act\s*\).*?TryUseIronJaws\s*\(\s*out\s+act\s*\).*?TryUseBurst\s*\(\s*out\s+act\s*\).*?TryUseAoeApexArrow\s*\(\s*out\s+act\s*\).*?TryUseAoeBlastArrow\s*\(\s*out\s+act\s*\).*?TryUseEnhancedAoeFiller\s*\(\s*out\s+act\s*\).*?TryUseDoTs\s*\(\s*out\s+act\s*\)",
             "BRD Ascended should attempt strict opener GCD before normal priority GCDs");
     }
 
@@ -1485,7 +1580,6 @@ internal static partial class PvETestSuite
         byte soulVoice,
         bool isInBurst = false,
         bool wouldUseIronJaws = false,
-        bool canEnterBurst = true,
         float songSecondsRemaining = 45f,
         float targetSecondsRemaining = float.PositiveInfinity,
         float weaponTotalSeconds = 2.48f,
@@ -1497,7 +1591,6 @@ internal static partial class PvETestSuite
             SoulVoice: soulVoice,
             IsInBurst: isInBurst,
             WouldUseIronJaws: wouldUseIronJaws,
-            CanEnterBurst: canEnterBurst,
             SongSecondsRemaining: songSecondsRemaining,
             TargetSecondsRemaining: targetSecondsRemaining,
             WeaponTotalSeconds: weaponTotalSeconds,
