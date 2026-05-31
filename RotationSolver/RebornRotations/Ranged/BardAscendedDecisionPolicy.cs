@@ -59,7 +59,6 @@ internal readonly record struct BardAscendedApexDecisionInput(
     byte SoulVoice,
     bool IsInBurst,
     bool WouldUseIronJaws,
-    bool CanEnterBurst,
     float SongSecondsRemaining,
     float TargetSecondsRemaining,
     float WeaponTotalSeconds,
@@ -98,7 +97,7 @@ internal static class BardAscendedDecisionPolicy
     internal const int ApexBeatsBurstShotSoulVoice = 32;
     internal const int ApexBeatsEnhancedFillerSoulVoice = 40;
     internal const int GcdAoETargets = 2;
-    internal const int OgcdAoETargets = 3;
+    internal const int OgcdAoETargets = 2;
 
     private const float OpenerPotionSeconds = 0f;
     private const float TwoMinutePotionSeconds = 120f;
@@ -185,11 +184,6 @@ internal static class BardAscendedDecisionPolicy
         if (input.WouldUseIronJaws)
         {
             return false;
-        }
-
-        if (!input.CanEnterBurst && input.SoulVoice >= SoulVoiceCap)
-        {
-            return true;
         }
 
         if (input.IsInBurst)
