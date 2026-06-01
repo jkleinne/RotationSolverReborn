@@ -27,3 +27,6 @@ jobs:
 
       - name: Build Plugin
         run: dotnet build --no-restore -c Release RotationSolver/RotationSolver.csproj
+
+      - name: Run Tests
+        run: dotnet run --project RotationSolver.Tests/RotationSolver.Tests.csproj
