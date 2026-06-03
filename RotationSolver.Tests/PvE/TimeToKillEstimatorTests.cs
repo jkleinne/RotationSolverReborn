@@ -111,4 +111,14 @@ internal static partial class PvETestSuite
 		AssertClose(16.0, est, 1e-6, "80% HP at 0.05/s should estimate 16.0s remaining");
 		AssertTrue(est >= 10.0, "high HP must keep the opener estimate above the dying threshold");
 	}
+
+	static void TimeToKillEstimatorReturnsNaNForNaNCurrentHp()
+	{
+		var samples = ConstantRateSamples(count: 10, ratioAtNewest: 0.12, dropPerSecond: 0.02);
+		var est = TimeToKillEstimator.EstimateRemainingSeconds(
+			samples, currentHpRatio: double.NaN,
+			TimeToKillEstimator.DefaultWindowSeconds, TimeToKillEstimator.DefaultMinSamples,
+			minSpanSeconds: 2.5, TimeToKillEstimator.DefaultRateEpsilon);
+		AssertTrue(double.IsNaN(est), "a NaN current HP ratio should return NaN");
+	}
 }

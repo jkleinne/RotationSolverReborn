@@ -54,5 +54,6 @@ internal static partial class PvETestSuite
 		new("ttk estimator returns nan for flat hp", TimeToKillEstimatorReturnsNaNForFlatHp),
 		new("ttk estimator returns nan for rising hp", TimeToKillEstimatorReturnsNaNForRisingHp),
 		new("ttk estimator high hp yields large estimate for opener", TimeToKillEstimatorHighHpYieldsLargeEstimateForOpener),
+		new("ttk estimator returns nan for nan current hp", TimeToKillEstimatorReturnsNaNForNaNCurrentHp),
 	];
 }
