@@ -780,7 +780,7 @@ public sealed class BRD_Ascended : BardRotation
 
 	private bool WouldUseIronJaws => HasTargetAwareIronJawsCandidate();
 
-	private bool WouldUseDoTs => HasTargetAwareDoTCandidate();
+	private bool WouldUseDoTs => HasTargetAwareDoTUseCandidate();
 
 	private static bool TargetHasDoT(IBattleChara target, IBaseAction action)
 	{
@@ -946,24 +946,24 @@ public sealed class BRD_Ascended : BardRotation
 			   && ShouldUseIronJawsOnTarget(target);
 	}
 
-	private bool HasTargetAwareStormbiteCandidate()
+	private bool HasTargetAwareStormbiteUseCandidate()
 	{
 		return TryPreviewActionTarget(Stormbite, out var stormbiteTarget, skipStatusProvideCheck: true)
 			   && ShouldUseStormbiteOnTarget(stormbiteTarget)
 			   && !ShouldFreshDotYieldToNormalAoe(stormbiteTarget);
 	}
 
-	private bool HasTargetAwareCausticBiteCandidate()
+	private bool HasTargetAwareCausticBiteUseCandidate()
 	{
 		return TryPreviewActionTarget(CausticBite, out var causticTarget, skipStatusProvideCheck: true)
 			   && ShouldUseCausticBiteOnTarget(causticTarget)
 			   && !ShouldFreshDotYieldToNormalAoe(causticTarget);
 	}
 
-	private bool HasTargetAwareDoTCandidate()
+	private bool HasTargetAwareDoTUseCandidate()
 	{
-		return HasTargetAwareStormbiteCandidate()
-			   || HasTargetAwareCausticBiteCandidate();
+		return HasTargetAwareStormbiteUseCandidate()
+			   || HasTargetAwareCausticBiteUseCandidate();
 	}
 
 	private bool TryUseIronJaws(out IAction? act)
@@ -981,7 +981,7 @@ public sealed class BRD_Ascended : BardRotation
 		{
 			if (ShouldFreshDotYieldToNormalAoe(stormbiteTarget))
 			{
-				if (TryUseNormalAoeFiller(out act)) return true;
+				if (TryUseNormalAoeFiller(out act, BardAscendedDecisionPolicy.NormalAoeFreshDotOverrideTargets)) return true;
 				if (Stormbite.CanUse(out act, skipStatusProvideCheck: true)) return true;
 			}
 			else if (Stormbite.CanUse(out act, skipStatusProvideCheck: true))
@@ -994,7 +994,7 @@ public sealed class BRD_Ascended : BardRotation
 			&& ShouldUseCausticBiteOnTarget(causticTarget))
 		{
 			if (ShouldFreshDotYieldToNormalAoe(causticTarget)
-				&& TryUseNormalAoeFiller(out act))
+				&& TryUseNormalAoeFiller(out act, BardAscendedDecisionPolicy.NormalAoeFreshDotOverrideTargets))
 			{
 				return true;
 			}
@@ -1106,9 +1106,12 @@ public sealed class BRD_Ascended : BardRotation
 
 	#region Filler GCDs
 
-	private static bool HasEnoughGcdAoETargets(IAction? act) =>
+	private static bool HasMinimumGcdAoETargets(IAction? act, int minimumAffectedTargets) =>
 		act is IBaseAction baseAction
-		&& BardAscendedDecisionPolicy.ShouldUseGcdAoE(baseAction.Target.AffectedTargets.Length);
+		&& baseAction.Target.AffectedTargets.Length >= minimumAffectedTargets;
+
+	private static bool HasEnoughGcdAoETargets(IAction? act) =>
+		HasMinimumGcdAoETargets(act, BardAscendedDecisionPolicy.GcdAoETargets);
 
 	private static bool HasEnoughOgcdAoETargets(IAction? act) =>
 		act is IBaseAction baseAction
@@ -1172,14 +1175,18 @@ public sealed class BRD_Ascended : BardRotation
 		}
 	}
 
-	private bool TryUseNormalAoeFiller(out IAction? act)
+	private bool TryUseNormalAoeFiller(out IAction? act) =>
+		TryUseNormalAoeFiller(out act, BardAscendedDecisionPolicy.GcdAoETargets);
+
+	private bool TryUseNormalAoeFiller(out IAction? act, int minimumAffectedTargets)
 	{
 		act = null;
 		if (!TryPreviewNormalAoeFiller(out var normalAoePreview)) return false;
-		if (!BardAscendedDecisionPolicy.ShouldUseGcdAoE(normalAoePreview.AffectedTargets)) return false;
+		if (normalAoePreview.AffectedTargets < minimumAffectedTargets) return false;
 
 		var aoeAction = LadonsbitePvE.EnoughLevel ? LadonsbitePvE : QuickNockPvE;
-		if (!aoeAction.CanUse(out var aoeActionAct, skipAoeCheck: true) || !HasEnoughGcdAoETargets(aoeActionAct))
+		if (!aoeAction.CanUse(out var aoeActionAct, skipAoeCheck: true)
+			|| !HasMinimumGcdAoETargets(aoeActionAct, minimumAffectedTargets))
 		{
 			return false;
 		}

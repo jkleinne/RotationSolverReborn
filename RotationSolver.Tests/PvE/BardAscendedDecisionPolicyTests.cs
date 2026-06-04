@@ -73,9 +73,9 @@ internal static partial class PvETestSuite
 	{
 		var source = StripSourceComments(File.ReadAllText(RepositoryPath("RotationSolver", "RebornRotations", "Ranged", "BRD_Ascended.cs")));
 		var ironJawsCandidate = ExtractMethodBody(source, "bool HasTargetAwareIronJawsCandidate");
-		var dotCandidate = ExtractMethodBody(source, "bool HasTargetAwareDoTCandidate");
-		var stormbiteCandidate = ExtractMethodBody(source, "bool HasTargetAwareStormbiteCandidate");
-		var causticCandidate = ExtractMethodBody(source, "bool HasTargetAwareCausticBiteCandidate");
+		var dotCandidate = ExtractMethodBody(source, "bool HasTargetAwareDoTUseCandidate");
+		var stormbiteCandidate = ExtractMethodBody(source, "bool HasTargetAwareStormbiteUseCandidate");
+		var causticCandidate = ExtractMethodBody(source, "bool HasTargetAwareCausticBiteUseCandidate");
 		var tryUseIronJaws = ExtractMethodBody(source, "bool TryUseIronJaws");
 		var tryUseDoTs = ExtractMethodBody(source, "bool TryUseDoTs");
 		var previewTarget = ExtractMethodBody(source, "bool TryPreviewActionTarget");
@@ -102,8 +102,8 @@ internal static partial class PvETestSuite
 			"WouldUseIronJaws should delegate to the target aware Iron Jaws candidate path");
 		AssertSourceMatches(
 			source,
-			@"\bprivate\s+bool\s+WouldUseDoTs\s*=>\s*HasTargetAwareDoTCandidate\s*\(\s*\)\s*;",
-			"WouldUseDoTs should delegate to the target aware DoT candidate path");
+			@"\bprivate\s+bool\s+WouldUseDoTs\s*=>\s*HasTargetAwareDoTUseCandidate\s*\(\s*\)\s*;",
+			"WouldUseDoTs should delegate to the target aware DoT use candidate path");
 
 		AssertSourceMatches(
 			ironJawsCandidate,
@@ -119,8 +119,8 @@ internal static partial class PvETestSuite
 			"Caustic Bite candidate should preview the resolved target before threshold evaluation");
 		AssertSourceMatches(
 			dotCandidate,
-			@"HasTargetAwareStormbiteCandidate\s*\(\s*\).*?HasTargetAwareCausticBiteCandidate\s*\(\s*\)",
-			"DoT candidate should compose the target aware Stormbite and Caustic Bite paths");
+			@"HasTargetAwareStormbiteUseCandidate\s*\(\s*\).*?HasTargetAwareCausticBiteUseCandidate\s*\(\s*\)",
+			"DoT use candidate should compose the target aware Stormbite and Caustic Bite paths");
 
 		AssertSourceMatches(
 			tryUseIronJaws,
@@ -647,7 +647,7 @@ internal static partial class PvETestSuite
 
 		AssertSourceMatches(
 			source,
-			@"\bprivate\s+static\s+bool\s+HasEnoughGcdAoETargets\s*\(\s*IAction\?\s+act\s*\)\s*=>\s*act\s+is\s+IBaseAction\s+baseAction\s*&&\s*BardAscendedDecisionPolicy\.ShouldUseGcdAoE\s*\(\s*baseAction\.Target\.AffectedTargets\.Length\s*\)\s*;",
+			@"\bprivate\s+static\s+bool\s+HasMinimumGcdAoETargets\s*\(\s*IAction\?\s+act\s*,\s*int\s+minimumAffectedTargets\s*\)\s*=>\s*act\s+is\s+IBaseAction\s+baseAction\s*&&\s*baseAction\.Target\.AffectedTargets\.Length\s*>=\s*minimumAffectedTargets\s*;.*?\bprivate\s+static\s+bool\s+HasEnoughGcdAoETargets\s*\(\s*IAction\?\s+act\s*\)\s*=>\s*HasMinimumGcdAoETargets\s*\(\s*act\s*,\s*BardAscendedDecisionPolicy\.GcdAoETargets\s*\)\s*;",
 			"BRD Ascended should gate GCD AoE by the resolved action affected target count");
 		AssertSourceMatches(
 			source,
@@ -689,7 +689,7 @@ internal static partial class PvETestSuite
 			"normal AoE preview should restore ActionPreview after every probe");
 		AssertSourceMatches(
 			normalAoeFiller,
-			@"aoeAction\.CanUse\s*\(\s*out\s+var\s+aoeActionAct\s*,\s*skipAoeCheck\s*:\s*true\s*\).*?HasEnoughGcdAoETargets\s*\(\s*aoeActionAct\s*\).*?act\s*=\s*aoeActionAct",
+			@"normalAoePreview\.AffectedTargets\s*<\s*minimumAffectedTargets.*?aoeAction\.CanUse\s*\(\s*out\s+var\s+aoeActionAct\s*,\s*skipAoeCheck\s*:\s*true\s*\).*?HasMinimumGcdAoETargets\s*\(\s*aoeActionAct\s*,\s*minimumAffectedTargets\s*\).*?act\s*=\s*aoeActionAct",
 			"normal AoE commit should recheck the final resolved affected target count");
 		AssertSourceMatches(
 			freshDotYield,
@@ -731,11 +731,11 @@ internal static partial class PvETestSuite
 			"BRD Ascended should represent unresolved normal AoE preview explicitly");
 		AssertSourceMatches(
 			tryUseDots,
-			@"\bShouldUseStormbiteOnTarget\s*\(\s*stormbiteTarget\s*\).*?if\s*\(\s*ShouldFreshDotYieldToNormalAoe\s*\(\s*stormbiteTarget\s*\)\s*\)\s*\{.*?if\s*\(\s*TryUseNormalAoeFiller\s*\(\s*out\s+act\s*\)\s*\)\s*return\s+true\s*;.*?if\s*\(\s*Stormbite\.CanUse\s*\(\s*out\s+act\s*,\s*skipStatusProvideCheck\s*:\s*true\s*\)\s*\)\s*return\s+true\s*;",
+			@"\bShouldUseStormbiteOnTarget\s*\(\s*stormbiteTarget\s*\).*?if\s*\(\s*ShouldFreshDotYieldToNormalAoe\s*\(\s*stormbiteTarget\s*\)\s*\)\s*\{.*?if\s*\(\s*TryUseNormalAoeFiller\s*\(\s*out\s+act\s*,\s*BardAscendedDecisionPolicy\.NormalAoeFreshDotOverrideTargets\s*\)\s*\)\s*return\s+true\s*;.*?if\s*\(\s*Stormbite\.CanUse\s*\(\s*out\s+act\s*,\s*skipStatusProvideCheck\s*:\s*true\s*\)\s*\)\s*return\s+true\s*;",
 			"Stormbite should try normal AoE after a valid fresh DoT preview and fall back to Stormbite if AoE commit rejects");
 		AssertSourceMatches(
 			tryUseDots,
-			@"\bShouldUseCausticBiteOnTarget\s*\(\s*causticTarget\s*\).*?if\s*\(\s*ShouldFreshDotYieldToNormalAoe\s*\(\s*causticTarget\s*\).*?TryUseNormalAoeFiller\s*\(\s*out\s+act\s*\).*?return\s+true\s*;.*?return\s+CausticBite\.CanUse\s*\(\s*out\s+act\s*,\s*skipStatusProvideCheck\s*:\s*true\s*\)",
+			@"\bShouldUseCausticBiteOnTarget\s*\(\s*causticTarget\s*\).*?if\s*\(\s*ShouldFreshDotYieldToNormalAoe\s*\(\s*causticTarget\s*\).*?TryUseNormalAoeFiller\s*\(\s*out\s+act\s*,\s*BardAscendedDecisionPolicy\.NormalAoeFreshDotOverrideTargets\s*\).*?return\s+true\s*;.*?return\s+CausticBite\.CanUse\s*\(\s*out\s+act\s*,\s*skipStatusProvideCheck\s*:\s*true\s*\)",
 			"Caustic Bite should try normal AoE after a valid fresh DoT preview and fall back to Caustic Bite if AoE commit rejects");
 		AssertSourceMatches(
 			burst,
