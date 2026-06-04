@@ -155,6 +155,8 @@ public sealed class BRD_Ascended : BardRotation
 	private BardAscendedDirtyStartRecoveryState _dirtyStartRecoveryState;
 	private float _lastCountdownRemainTime;
 
+	private readonly record struct NormalAoePreview(bool HasResolvedCandidate, int AffectedTargets);
+
 	#endregion
 
 	#region Target Status
@@ -854,6 +856,20 @@ public sealed class BRD_Ascended : BardRotation
 		}
 	}
 
+	private bool ShouldFreshDotYieldToNormalAoe(IBattleChara target)
+	{
+		var normalAoePreview = TryPreviewNormalAoeFiller(out var preview)
+			? preview
+			: new NormalAoePreview(HasResolvedCandidate: false, AffectedTargets: 0);
+
+		return BardAscendedDecisionPolicy.ShouldFreshDotYieldToNormalAoe(
+			new BardAscendedFreshDotAoeInput(
+				HasResolvedNormalAoeCandidate: normalAoePreview.HasResolvedCandidate,
+				NormalAoeAffectedTargets: normalAoePreview.AffectedTargets,
+				TargetSecondsRemaining: GetDotTargetTimeToKill(target),
+				IsBossTarget: IsDotBossTarget(target)));
+	}
+
 	private bool ShouldUseIronJawsOnTarget(IBattleChara target)
 	{
 		if (!CanUseDoTOnTarget(target)) return false;
@@ -933,13 +949,15 @@ public sealed class BRD_Ascended : BardRotation
 	private bool HasTargetAwareStormbiteCandidate()
 	{
 		return TryPreviewActionTarget(Stormbite, out var stormbiteTarget, skipStatusProvideCheck: true)
-			   && ShouldUseStormbiteOnTarget(stormbiteTarget);
+			   && ShouldUseStormbiteOnTarget(stormbiteTarget)
+			   && !ShouldFreshDotYieldToNormalAoe(stormbiteTarget);
 	}
 
 	private bool HasTargetAwareCausticBiteCandidate()
 	{
 		return TryPreviewActionTarget(CausticBite, out var causticTarget, skipStatusProvideCheck: true)
-			   && ShouldUseCausticBiteOnTarget(causticTarget);
+			   && ShouldUseCausticBiteOnTarget(causticTarget)
+			   && !ShouldFreshDotYieldToNormalAoe(causticTarget);
 	}
 
 	private bool HasTargetAwareDoTCandidate()
@@ -958,14 +976,33 @@ public sealed class BRD_Ascended : BardRotation
 	private bool TryUseDoTs(out IAction? act)
 	{
 		act = null;
-		if (HasTargetAwareStormbiteCandidate()
-			&& Stormbite.CanUse(out act, skipStatusProvideCheck: true))
+		if (TryPreviewActionTarget(Stormbite, out var stormbiteTarget, skipStatusProvideCheck: true)
+			&& ShouldUseStormbiteOnTarget(stormbiteTarget))
 		{
-			return true;
+			if (ShouldFreshDotYieldToNormalAoe(stormbiteTarget))
+			{
+				if (TryUseNormalAoeFiller(out act)) return true;
+				if (Stormbite.CanUse(out act, skipStatusProvideCheck: true)) return true;
+			}
+			else if (Stormbite.CanUse(out act, skipStatusProvideCheck: true))
+			{
+				return true;
+			}
 		}
 
-		return HasTargetAwareCausticBiteCandidate()
-			   && CausticBite.CanUse(out act, skipStatusProvideCheck: true);
+		if (TryPreviewActionTarget(CausticBite, out var causticTarget, skipStatusProvideCheck: true)
+			&& ShouldUseCausticBiteOnTarget(causticTarget))
+		{
+			if (ShouldFreshDotYieldToNormalAoe(causticTarget)
+				&& TryUseNormalAoeFiller(out act))
+			{
+				return true;
+			}
+
+			return CausticBite.CanUse(out act, skipStatusProvideCheck: true);
+		}
+
+		return false;
 	}
 
 	#endregion
@@ -1103,19 +1140,59 @@ public sealed class BRD_Ascended : BardRotation
 		return false;
 	}
 
+	private bool TryPreviewNormalAoeFiller(out NormalAoePreview preview)
+	{
+		preview = default;
+		if (IsInSandbagMode) return false;
+
+		var wasActionPreview = IBaseAction.ActionPreview;
+		var aoeAction = LadonsbitePvE.EnoughLevel ? LadonsbitePvE : QuickNockPvE;
+
+		try
+		{
+			IBaseAction.ActionPreview = true;
+			if (!aoeAction.CanUse(out var aoeActionAct, skipAoeCheck: true))
+			{
+				return false;
+			}
+
+			if (aoeActionAct is not IBaseAction baseAction || !baseAction.PreviewTarget.HasValue)
+			{
+				return false;
+			}
+
+			preview = new NormalAoePreview(
+				HasResolvedCandidate: true,
+				AffectedTargets: baseAction.PreviewTarget.Value.AffectedTargets.Length);
+			return true;
+		}
+		finally
+		{
+			IBaseAction.ActionPreview = wasActionPreview;
+		}
+	}
+
+	private bool TryUseNormalAoeFiller(out IAction? act)
+	{
+		act = null;
+		if (!TryPreviewNormalAoeFiller(out var normalAoePreview)) return false;
+		if (!BardAscendedDecisionPolicy.ShouldUseGcdAoE(normalAoePreview.AffectedTargets)) return false;
+
+		var aoeAction = LadonsbitePvE.EnoughLevel ? LadonsbitePvE : QuickNockPvE;
+		if (!aoeAction.CanUse(out var aoeActionAct, skipAoeCheck: true) || !HasEnoughGcdAoETargets(aoeActionAct))
+		{
+			return false;
+		}
+
+		act = aoeActionAct;
+		return true;
+	}
+
 	private bool TryUseAoE(out IAction? act)
 	{
 		act = null;
 		if (TryUseEnhancedAoeFiller(out act)) return true;
-
-		var aoeAction = LadonsbitePvE.EnoughLevel ? LadonsbitePvE : QuickNockPvE;
-		if (aoeAction.CanUse(out var aoeActionAct, skipAoeCheck: true) && HasEnoughGcdAoETargets(aoeActionAct))
-		{
-			act = aoeActionAct;
-			return true;
-		}
-
-		return false;
+		return TryUseNormalAoeFiller(out act);
 	}
 
 	private bool TryUseFiller(out IAction? act)
