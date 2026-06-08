@@ -185,6 +185,30 @@ internal static partial class PvPTestSuite
 			"Degenerate zero effective HP must not produce a spurious kill-secure");
 	}
 
+	static void SilentNocturneRejectsSecureWhenTargetInvulnerable()
+	{
+		// Invulnerable target: effective HP is infinite, so no burst can secure. Health 0.80 keeps the
+		// engaged-HP trigger off, isolating the anti-heal path's infinite-eHP rejection.
+		var input = new BardPvPShutdownInput(
+			TargetHasResilience: false,
+			TargetIsCasting: false,
+			TargetThreatensFragileAlly: false,
+			TargetIsBurstWorthy: false,
+			TargetHealthRatio: 0.80f,
+			TargetDistance: 20f,
+			SafeBackstepExists: true,
+			ObjectiveControlNeeded: false,
+			KillSecure: new BardPvPKillSecureFacts(
+				EffectiveHpRatio: double.PositiveInfinity,
+				ExpectedDamageRatio: 0.50,
+				RecuperateRatio: 0.30,
+				TargetCanRecuperate: true,
+				HasGuard: false));
+
+		AssertFalse(BardPvPDecisionPolicy.ShouldUseSilentNocturne(input),
+			"Anti-heal secure must not fire against an invulnerable target");
+	}
+
 	static void SilentNocturneFiresOnEngagedTarget()
 	{
 		var input = new BardPvPShutdownInput(
