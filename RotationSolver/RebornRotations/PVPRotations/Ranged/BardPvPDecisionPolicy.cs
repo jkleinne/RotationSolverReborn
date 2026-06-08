@@ -73,7 +73,7 @@ internal static class BardPvPDecisionPolicy
 	private static bool WouldSilenceSecureKill(BardPvPShutdownInput input)
 	{
 		var facts = input.KillSecure;
-		if (!facts.TargetCanRecuperate || facts.ExpectedDamageRatio <= 0.0)
+		if (!facts.TargetCanRecuperate || facts.ExpectedDamageRatio <= 0.0 || facts.EffectiveHpRatio <= 0.0)
 		{
 			return false;
 		}

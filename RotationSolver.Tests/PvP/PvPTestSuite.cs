@@ -42,6 +42,7 @@ internal static partial class PvPTestSuite
 		new("silent nocturne rejects secure when burst kills regardless", SilentNocturneRejectsSecureWhenBurstKillsRegardless),
 		new("silent nocturne rejects secure when burst cannot kill", SilentNocturneRejectsSecureWhenBurstCannotKill),
 		new("silent nocturne rejects secure when target cannot recuperate", SilentNocturneRejectsSecureWhenTargetCannotRecuperate),
+		new("silent nocturne rejects secure when effective hp degenerate", SilentNocturneRejectsSecureWhenEffectiveHpDegenerate),
 		new("silent nocturne fires on engaged target", SilentNocturneFiresOnEngagedTarget),
 		new("repelling rejects unsafe backstep", RepellingRejectsUnsafeBackstep),
 		new("repelling rejects resilient target", RepellingRejectsResilientTarget),
