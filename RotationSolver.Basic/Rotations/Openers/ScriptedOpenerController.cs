@@ -125,12 +125,7 @@ public static class ScriptedOpenerController
 		var nextState = AdvanceAfterAbility(input.State, script);
 		if (!script.ShouldExecuteScripted(action, in input))
 		{
-			return new OpenerResult<TAction>(
-				OpenerResultKind.Skip,
-				OpenerRequestKind.None,
-				default,
-				OpenerWeaveSlot.None,
-				nextState);
+			return Skip<TAction>(nextState);
 		}
 
 		return Continue(OpenerRequestKind.Ability, action, input.State.NextWeaveSlot, nextState);
@@ -218,5 +213,15 @@ public static class ScriptedOpenerController
 		where TAction : struct, Enum
 	{
 		return new OpenerResult<TAction>(OpenerResultKind.Break, OpenerRequestKind.None, default, OpenerWeaveSlot.None, state.Complete());
+	}
+
+	/// <summary>
+	/// Advances the opener over a withheld scripted ability: carries the already-advanced
+	/// <paramref name="nextState"/> with no action, so callers skip this slot without leaving the opener.
+	/// </summary>
+	private static OpenerResult<TAction> Skip<TAction>(OpenerState nextState)
+		where TAction : struct, Enum
+	{
+		return new OpenerResult<TAction>(OpenerResultKind.Skip, OpenerRequestKind.None, default, OpenerWeaveSlot.None, nextState);
 	}
 }
