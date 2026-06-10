@@ -32,6 +32,7 @@ internal static partial class PvPTestSuite
 		new("pvp single target action use composes original predicate", PvPSingleTargetActionUseComposesOriginalPredicate),
 		new("pvp single target action use rejects zero target without predicate change", PvPSingleTargetActionUseRejectsZeroTargetWithoutPredicateChange),
 		new("mp pressure scores low and medium mp", MpPressureScoresLowAndMediumMp),
+		new("pvp scoring health pressure scales missing health by weight", PvPScoringHealthPressureScalesMissingHealthByWeight),
 		new("objective pressure scores known objective target", ObjectivePressureScoresKnownObjectiveTarget),
 		new("resilience penalty scores boolean signal", ResiliencePenaltyScoresBooleanSignal),
 		new("silent nocturne rejects filler use", SilentNocturneRejectsFillerUse),
@@ -201,5 +202,9 @@ internal static partial class PvPTestSuite
 		new("machinist frontline eagle eye shot accepts wildfire target", MachinistFrontlineEagleEyeShotAcceptsWildfireTarget),
 		new("machinist frontline eagle eye shot accepts guard pressure target", MachinistFrontlineEagleEyeShotAcceptsGuardPressureTarget),
 		new("machinist frontline eagle eye shot secures through guard", MachinistFrontlineEagleEyeShotSecuresThroughGuard),
+		new("pvp target ranking filters negative infinity scores", PvPTargetRankingFiltersNegativeInfinityScores),
+		new("pvp target ranking orders by supplied comparison", PvPTargetRankingOrdersBySuppliedComparison),
+		new("pvp target ranking delegates tiebreaks to comparison", PvPTargetRankingDelegatesTiebreaksToComparison),
+		new("pvp target ranking select best returns first ranked or null", PvPTargetRankingSelectBestReturnsFirstRankedOrNull),
 	];
 }
