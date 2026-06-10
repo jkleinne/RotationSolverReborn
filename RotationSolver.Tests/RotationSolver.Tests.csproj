@@ -21,6 +21,7 @@
 		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPSingleTargetActionOptions.cs" Link="PvPSingleTargetActionOptions.cs" />
 		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPSingleTargetActionUse.cs" Link="PvPSingleTargetActionUse.cs" />
 		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPScoringFactors.cs" Link="PvPScoringFactors.cs" />
+		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPTargetRanking.cs" Link="PvPTargetRanking.cs" />
 		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPBurstIntent.cs" Link="PvPBurstIntent.cs" />
 		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPBurstRecommendation.cs" Link="PvPBurstRecommendation.cs" />
 		<Compile Include="..\RotationSolver.Basic\Actions\PvPTargetSelection\PvPDamageGate.cs" Link="PvPDamageGate.cs" />

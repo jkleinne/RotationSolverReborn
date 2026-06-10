@@ -201,5 +201,9 @@ internal static partial class PvPTestSuite
 		new("machinist frontline eagle eye shot accepts wildfire target", MachinistFrontlineEagleEyeShotAcceptsWildfireTarget),
 		new("machinist frontline eagle eye shot accepts guard pressure target", MachinistFrontlineEagleEyeShotAcceptsGuardPressureTarget),
 		new("machinist frontline eagle eye shot secures through guard", MachinistFrontlineEagleEyeShotSecuresThroughGuard),
+		new("pvp target ranking filters negative infinity scores", PvPTargetRankingFiltersNegativeInfinityScores),
+		new("pvp target ranking orders by supplied comparison", PvPTargetRankingOrdersBySuppliedComparison),
+		new("pvp target ranking delegates tiebreaks to comparison", PvPTargetRankingDelegatesTiebreaksToComparison),
+		new("pvp target ranking select best returns first ranked or null", PvPTargetRankingSelectBestReturnsFirstRankedOrNull),
 	];
 }
