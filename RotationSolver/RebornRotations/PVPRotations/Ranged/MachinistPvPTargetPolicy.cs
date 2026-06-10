@@ -41,8 +41,8 @@ internal readonly record struct MachinistPvPTargetSnapshot(
 
 internal static class MachinistPvPTargetPolicy
 {
-	private const double LowMpScore = 3.0;
-	private const double MediumMpScore = 1.5;
+	private const double HealthPressureWeight = 4.0;
+	private const double MpPressureWeight = 3.0;
 	private const double ObjectiveScore = 1.5;
 	private const int TeamFocusThreshold = 2;
 	private const double AllyFocusScore = 1.25;
@@ -182,17 +182,12 @@ internal static class MachinistPvPTargetPolicy
 
 	private static double HealthPressure(float healthRatio)
 	{
-		return (1.0 - Math.Clamp(healthRatio, 0f, 1f)) * 4.0;
+		return PvPScoringFactors.ComputeHealthPressure(healthRatio, HealthPressureWeight);
 	}
 
 	private static double MpPressure(uint currentMp)
 	{
-		if (currentMp <= PvPScoringFactors.LowMp)
-		{
-			return LowMpScore;
-		}
-
-		return currentMp <= PvPScoringFactors.MediumMp ? MediumMpScore : 0.0;
+		return PvPScoringFactors.ComputeMpPressure(currentMp) * MpPressureWeight;
 	}
 
 	private static double GuardCost(MachinistPvPTargetSnapshot target, MachinistPvPActionIntent intent)

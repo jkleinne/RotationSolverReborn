@@ -216,7 +216,7 @@ internal static class BardPvPTargetPolicy
 
 	private static double HealthPressure(float healthRatio)
 	{
-		return (1.0 - Math.Clamp(healthRatio, 0f, 1f)) * HealthPressureWeight;
+		return PvPScoringFactors.ComputeHealthPressure(healthRatio, HealthPressureWeight);
 	}
 
 	private static double MpPressure(uint currentMp)
