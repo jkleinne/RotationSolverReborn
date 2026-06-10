@@ -61,36 +61,23 @@ internal static class MachinistPvPTargetPolicy
 		IReadOnlyList<MachinistPvPTargetSnapshot> targets,
 		MachinistPvPActionIntent intent)
 	{
-		var rankedTargets = Rank(targets, intent);
-		return rankedTargets.Count == 0 ? null : rankedTargets[0];
+		return PvPTargetRanking.SelectBest(targets, target => Score(target, intent), CompareScoredTargets);
 	}
 
 	internal static List<MachinistPvPTargetSnapshot> Rank(
 		IReadOnlyList<MachinistPvPTargetSnapshot> targets,
 		MachinistPvPActionIntent intent)
 	{
-		List<(MachinistPvPTargetSnapshot Target, double Score)> scoredTargets = [];
+		return PvPTargetRanking.Rank(targets, target => Score(target, intent), CompareScoredTargets);
+	}
 
-		foreach (var target in targets)
-		{
-			var score = Score(target, intent);
-			if (double.IsNegativeInfinity(score))
-			{
-				continue;
-			}
-
-			scoredTargets.Add((target, score));
-		}
-
-		scoredTargets.Sort((left, right) => right.Score.CompareTo(left.Score));
-
-		List<MachinistPvPTargetSnapshot> rankedTargets = [];
-		foreach (var scoredTarget in scoredTargets)
-		{
-			rankedTargets.Add(scoredTarget.Target);
-		}
-
-		return rankedTargets;
+	private static int CompareScoredTargets(
+		(MachinistPvPTargetSnapshot Target, double Score) left,
+		(MachinistPvPTargetSnapshot Target, double Score) right)
+	{
+		// Score-only on purpose: MCH ties are currently order-nondeterministic; making
+		// them deterministic is a flagged behavior-change follow-up, not this refactor.
+		return right.Score.CompareTo(left.Score);
 	}
 
 	internal static double Score(MachinistPvPTargetSnapshot target, MachinistPvPActionIntent intent)
