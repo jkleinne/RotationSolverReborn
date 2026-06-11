@@ -75,9 +75,16 @@ internal static class MachinistPvPTargetPolicy
 		(MachinistPvPTargetSnapshot Target, double Score) left,
 		(MachinistPvPTargetSnapshot Target, double Score) right)
 	{
-		// Score-only on purpose: MCH ties are currently order-nondeterministic; making
-		// them deterministic is a flagged behavior-change follow-up, not this refactor.
-		return right.Score.CompareTo(left.Score);
+		var scoreComparison = right.Score.CompareTo(left.Score);
+		if (scoreComparison != 0)
+		{
+			return scoreComparison;
+		}
+
+		var healthComparison = left.Target.HealthRatio.CompareTo(right.Target.HealthRatio);
+		return healthComparison != 0
+			? healthComparison
+			: left.Target.TargetId.CompareTo(right.Target.TargetId);
 	}
 
 	internal static double Score(MachinistPvPTargetSnapshot target, MachinistPvPActionIntent intent)
