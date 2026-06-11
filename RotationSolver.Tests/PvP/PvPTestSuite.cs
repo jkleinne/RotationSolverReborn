@@ -74,6 +74,7 @@ internal static partial class PvPTestSuite
 		new("machinist wildfire requires committed target and follow up", MachinistWildfireRequiresCommittedTargetAndFollowUp),
 		new("machinist bishop accepts objective teamfight", MachinistBishopAcceptsObjectiveTeamfight),
 		new("machinist bishop rejects out of range targets", MachinistBishopRejectsOutOfRangeTargets),
+		new("machinist target policy breaks score ties by health then id", MachinistTargetPolicyBreaksScoreTiesByHealthThenId),
 		new("machinist marksmans spite rejects guard", MachinistMarksmanSpiteRejectsGuard),
 		new("machinist marksmans spite holds on dying ally focused target", MachinistMarksmanSpiteHoldsOnDyingAllyFocusedTarget),
 		new("machinist marksmans spite accepts secure damage", MachinistMarksmanSpiteAcceptsSecureDamage),
