@@ -1154,8 +1154,16 @@ public sealed class ChurinDNC : DancerRotation
 
 		if (!DevilmentPvE.EnoughLevel || DevilmentPvE.Cooldown.IsCoolingDown || HasDevilment || IsLastAbility(ActionID.DevilmentPvE)) return false;
 
+		// Divergence from upstream 7.5.1 (7ad4bb19): that refactor dropped the fall-through
+		// guard and left `return true` unbraced, so Devilment reported ready outside finish
+		// windows (returning true with act == null). Restore the guard until upstream fixes it.
 		if (canUseTech || cantUseTech)
-			act = DevilmentPvE; return true;
+		{
+			act = DevilmentPvE;
+			return true;
+		}
+
+		return false;
 	}
 
 	private bool TryUseFlourish(out IAction? act)
