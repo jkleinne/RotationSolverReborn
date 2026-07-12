@@ -283,6 +283,25 @@ internal static partial class PvETestSuite
 			"another bard's Radiant Finale must not block our own cast");
 	}
 
+	static void BardAscendedStrictOpenerRequiresBurstToggle()
+	{
+		var source = StripSourceComments(File.ReadAllText(RepositoryPath(
+			"RotationSolver",
+			"RebornRotations",
+			"Ranged",
+			"BRD_Ascended.cs")));
+		var startStrictOpener = ExtractMethodBody(source, "void StartStrictOpener");
+
+		AssertSourceMatches(
+			startStrictOpener,
+			@"if\s*\(\s*!\s*CanBurst\s*\)\s*return\s*;",
+			"strict opener must not start while the burst toggle is disabled");
+		AssertSourceMatches(
+			startStrictOpener,
+			@"if\s*\(\s*!\s*CanBurst\s*\)\s*return\s*;.*?_isStrictOpenerActive\s*=\s*true\s*;",
+			"the burst gate must run before the opener activates");
+	}
+
 	static void BardAscendedApexSpendsDuringBurstAndMageBalladWindows()
 	{
 		AssertTrue(
