@@ -443,6 +443,9 @@ internal partial class Configs : IPluginConfiguration
 	[UI("", Action = ActionID.ImprovisationPvE, Parent = nameof(PoslockCasting))]
 	public bool PosImprovisation { get; set; } = false;
 
+	[UI("Unlock movement when pressing both left and right mouse buttons.", Parent = nameof(PoslockCasting))]
+	public bool PosLockMouse { get; set; } = false;
+
 	[ConditionBool, UI("Lock actions when casting Passage Of Arms during AOE mitigations.",
 	Filter = Extra)]
 	private static readonly bool _pldlockCasting = false;
@@ -1261,7 +1264,7 @@ internal partial class Configs : IPluginConfiguration
 
 	public int ActionSequencerIndex { get; set; }
 
-	[UI("The modifier key to unlock the movement temporarily", Description = "RB is for gamepad player", Parent = nameof(PoslockCasting))]
+	[UI("The modifier key to unlock the movement temporarily", Description = "RB is for gamepad player.", Parent = nameof(PoslockCasting))]
 	public ConsoleModifiers PoslockModifier { get; set; }
 
 	[Range(0, 5, ConfigUnitType.None, 1)]
