@@ -49,7 +49,7 @@ public partial class CustomRotation
 			return null;
 		}
 
-		if (DataCenter.Job == ECommons.ExcelServices.Job.NIN && StatusHelper.PlayerHasStatus(true, StatusID.Mudra) && DataCenter.DefaultGCDRemain >= 0.625f)
+		if (DataCenter.Job == ECommons.ExcelServices.Job.NIN && StatusHelper.PlayerHasStatus(true, StatusID.Mudra) && DataCenter.DefaultGCDRemain > 0.6f)
 		{
 			return null;
 		}
