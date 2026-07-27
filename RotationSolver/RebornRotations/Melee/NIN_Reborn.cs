@@ -128,7 +128,10 @@ public sealed class NIN_Reborn : NinjaRotation
 		}
 
 		// Side-effect: decide/refresh ninjutsu aim; do not consume the oGCD slot here.
-		if ((InCombat || (InCombat && CombatMudra)) && ((InCombat && HasHostilesInMaxRange) || (CombatMudra && HasHostilesInMaxRange && TenPvE.Cooldown.CurrentCharges == TenPvE.Cooldown.MaxCharges)))
+		// Upstream cb2e8fbc prefixed this gate with (InCombat || (InCombat && CombatMudra)), which absorbs
+		// to plain InCombat and so kills the default-on "Use Mudras outside of combat when enemies are
+		// near" setting. Dropping the prefix restores the pre-cb2e8fbc condition verbatim.
+		if ((InCombat && HasHostilesInMaxRange) || (CombatMudra && HasHostilesInMaxRange && TenPvE.Cooldown.CurrentCharges == TenPvE.Cooldown.MaxCharges))
 		{
 			_ = ChoiceNinjutsu(out _);
 		}
@@ -938,7 +941,10 @@ public sealed class NIN_Reborn : NinjaRotation
 		}
 
 		// Side-effect: decide/refresh ninjutsu aim; do not consume the oGCD slot here.
-		if ((InCombat || (InCombat && CombatMudra)) && ((InCombat && HasHostilesInMaxRange) || (CombatMudra && HasHostilesInMaxRange && TenPvE.Cooldown.CurrentCharges == TenPvE.Cooldown.MaxCharges)))
+		// Upstream cb2e8fbc prefixed this gate with (InCombat || (InCombat && CombatMudra)), which absorbs
+		// to plain InCombat and so kills the default-on "Use Mudras outside of combat when enemies are
+		// near" setting. Dropping the prefix restores the pre-cb2e8fbc condition verbatim.
+		if ((InCombat && HasHostilesInMaxRange) || (CombatMudra && HasHostilesInMaxRange && TenPvE.Cooldown.CurrentCharges == TenPvE.Cooldown.MaxCharges))
 		{
 			_ = ChoiceNinjutsu(out _);
 		}
