@@ -154,7 +154,10 @@ public sealed class SMN_Reborn : SummonerRotation
 			return true;
 		}
 
-		if (!IsLastAction(false, RadiantAegisPvE) && InCombat)
+		// Upstream 48cf08ea deleted the only read of RadiantOnCooldownSpam while relabelling it to
+		// carry the removed RadiantOnCooldown's meaning, leaving a checkbox that does nothing and a
+		// behavior nobody can turn off. Restore the read so the setting matches its label.
+		if (RadiantOnCooldownSpam && !IsLastAction(false, RadiantAegisPvE) && InCombat)
 		{
 			if (RadiantAegisPvE.CanUse(out act, usedUp: true))
 			{
