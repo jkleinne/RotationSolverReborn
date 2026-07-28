@@ -443,6 +443,9 @@ internal partial class Configs : IPluginConfiguration
 	[UI("", Action = ActionID.ImprovisationPvE, Parent = nameof(PoslockCasting))]
 	public bool PosImprovisation { get; set; } = false;
 
+	[UI("Unlock movement when pressing both left and right mouse buttons.", Parent = nameof(PoslockCasting))]
+	public bool PosLockMouse { get; set; } = false;
+
 	[ConditionBool, UI("Lock actions when casting Passage Of Arms during AOE mitigations.",
 	Filter = Extra)]
 	private static readonly bool _pldlockCasting = false;
@@ -491,6 +494,10 @@ internal partial class Configs : IPluginConfiguration
 	Description = "Enable to allow the plugin to use Phoenix Down item. (Experimental feature)",
 	Filter = AutoActionUsage)]
 	private static readonly bool _usePhoenixDown = false;
+
+	[ConditionBool, UI("Use Phoenix Down only if no Raiser alive in party",
+	Parent = nameof(UsePhoenixDown))]
+	private static readonly bool _usePhoenixDownHealerLogic = true;
 
 	[UI("Use damaging gap closer abilites if the distance to your target is less than this.",
 		Filter = AutoActionUsage)]
@@ -754,6 +761,9 @@ internal partial class Configs : IPluginConfiguration
 
 	[ConditionBool, UI("Use movement speed increase abilities when out of combat and out of duty.", Parent = nameof(UseAbility))]
 	private static readonly bool _autoSpeedOutOfCombatNoDuty = false;
+
+	[ConditionBool, UI("Use Sprint when a party tank is sprinting (non-tanks only).", Parent = nameof(UseAbility))]
+	private static readonly bool _autoSprintWithTank = false;
 
 	[ConditionBool, UI("Use beneficial ground-targeted actions", Description = "1.    Self-Target Fallback:\r\nIf range is zero, always targets the player and returns all affectable targets at the player's position.\r\n2.    Preferred Positions (OnLocations):\r\n•    Tries to get predefined beneficial positions for the current territory.\r\n•    If none are found and the content is a trial or raid, uses fallback points (e.g., 0,0 or 100,100 point as those are the center of arenas most of the time).\r\n•    Picks the closest point to the player, applies a small random offset, and checks if it’s within effect range.\r\n•    If so, returns that as the target area.\r\n3.    Boss Positional Fallback:\r\n•    If the current target is a boss with positional requirements and within range, uses the boss’s position (or a point within range) as the target area.\r\n4.    Party Member Fallback:\r\n•    Gathers party members within range + effect range.\r\n•    Attempts to find a party member who is being attacked (tank or focus target).\r\n•    If found, calculates whether to stay at the player’s position or move closer to the tank, based on distances and effect range.\r\n•    If not found or not needed, defaults to the player’s position.", Filter = HealingActionCondition, Section = 3)]
 	private static readonly bool _useGroundBeneficialAbility = true;
@@ -1258,7 +1268,7 @@ internal partial class Configs : IPluginConfiguration
 
 	public int ActionSequencerIndex { get; set; }
 
-	[UI("The modifier key to unlock the movement temporarily", Description = "RB is for gamepad player", Parent = nameof(PoslockCasting))]
+	[UI("The modifier key to unlock the movement temporarily", Description = "RB is for gamepad player.", Parent = nameof(PoslockCasting))]
 	public ConsoleModifiers PoslockModifier { get; set; }
 
 	[Range(0, 5, ConfigUnitType.None, 1)]

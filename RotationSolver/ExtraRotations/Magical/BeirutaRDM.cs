@@ -569,8 +569,12 @@ public sealed class BeirutaRDM : RedMageRotation
 			IsLastGCD(
 				ActionID.EnchantedRipostePvE, ActionID.EnchantedRipostePvE_45960,
 				ActionID.EnchantedZwerchhauPvE, ActionID.EnchantedZwerchhauPvE_45961,
+				ActionID.RedoublementPvE,
+				ActionID.EnchantedRedoublementPvE,
+				ActionID.EnchantedRedoublementPvE_45962,
 				ActionID.EnchantedMoulinetPvE,
 				ActionID.EnchantedMoulinetDeuxPvE,
+				ActionID.EnchantedMoulinetTroisPvE,
 				ActionID.VerholyPvE,
 				ActionID.VerflarePvE,
 				ActionID.ScorchPvE) ||
